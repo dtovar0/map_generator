@@ -270,7 +270,8 @@ function applySnapshot(snap) {
     capacityLabelFontSize:generalConfig.capacityLabelFontSize,
     capacityLabelOverride:false,
     dividerPosition:generalConfig.dividerPosition, dividerPositionOverride:false,
-    routeLane:0, styleOverride:false, fromPortLocked:false, toPortLocked:false, ...l
+    routeLane:0, styleOverride:false, fromPortLocked:false, toPortLocked:false,
+    dataSource:null, telemetryError:null, telemetryTimestamp:null, ...l
   })).map(l => {
     const capacity = Math.max(.01, Number(l.capacity) || 100);
     const rawIn  = l.inUsage  == null ? (Number(l.inPct)  || 0) : Number(l.inUsage);
@@ -1391,6 +1392,7 @@ function onNodeClickForLink(toId, requestedPort, pointer = null) {
     inPct:0, outPct:0, editorInPct:iP, editorOutPct:oP,
     usageLabelInPosition:50, usageLabelOutPosition:50,
     capacity:100, capacityUnit:'Mbps', inUsage:0, outUsage:0,
+    dataSource:null, telemetryError:null, telemetryTimestamp:null,
     usageLabelPosition:generalConfig.usageLabelPosition,
     usageLabelRotate:generalConfig.usageLabelRotate,
     usageLabelFlip:generalConfig.usageLabelFlip,
@@ -2576,6 +2578,9 @@ function showPresentationLinkInfo(id) {
     ['Tag de capacidad', l.capacityLabelVisible === false ? 'Oculto' : `${l.capacityLabelFontSize ?? 11}px · ${{above:'Arriba',below:'Abajo',left:'Izquierda',right:'Derecha'}[l.capacityLabelSide] || 'Derecha'}${l.capacityLabelRotate ? ' · sigue enlace' : ''}${l.capacityLabelRotate && l.capacityLabelFlip ? ' · giro vertical 180°' : ''} · ${l.capacityLabelOverride ? 'individual' : 'general'}`],
     ['Texto de tráfico', `${l.usageLabelFormat === 'human' ? 'Utilización legible' : 'Porcentaje'} · ${labelPositionNames[l.usageLabelPosition] || 'Arriba'}${l.usageLabelRotate ? ' · sigue enlace' : ''}${l.usageLabelRotate && l.usageLabelFlip ? ' · giro vertical 180°' : ''} · ${l.usageLabelOverride ? 'individual' : 'general'}`]
   ];
+  if (l.dataSource?.provider === 'cacti') {
+    rows.splice(5, 0, ['Gráfica Cacti', l.dataSource.graphName || 'Binding anterior sin gráfica']);
+  }
   document.getElementById('presentation-info-title').textContent = `${from?.name || l.from} → ${to?.name || l.to}`;
   document.getElementById('presentation-info-content').innerHTML = presentationInfoRows(rows);
   document.getElementById('presentation-info').classList.add('show');
@@ -2671,6 +2676,418 @@ async function refreshPresentationData() {
     await selectPresentationDate(selectedMapDate, true);
   } finally {
     presentationRefreshInFlight = false;
+  }
+}
+
+const cactiDemoCatalog = {
+  devices: [
+    {id:901, name:'Demo Core SW-01', hostname:'core-sw-01.demo.local'},
+    {id:902, name:'Demo Edge RTR-01', hostname:'edge-rtr-01.demo.local'},
+    {id:903, name:'Demo Firewall HA', hostname:'fw-ha.demo.local'}
+  ],
+  graphs: new Map([
+    [901, [
+      {id:19001, hostId:901, name:'Traffic - TenGigabitEthernet1/1 uplink ISP', dataSources:[
+        {localDataId:99001, name:'Te1/1 · uplink ISP', snmpIndex:'TenGigabitEthernet1/1', dataSourceNames:['traffic_in','traffic_out']}
+      ]},
+      {id:19002, hostId:901, name:'Traffic - Port-channel10 backbone', dataSources:[
+        {localDataId:99002, name:'Po10 · backbone', snmpIndex:'Port-channel10', dataSourceNames:['traffic_in','traffic_out']}
+      ]}
+    ]],
+    [902, [
+      {id:29001, hostId:902, name:'Traffic - WAN MPLS', dataSources:[
+        {localDataId:99011, name:'Gi0/0 · WAN MPLS', snmpIndex:'GigabitEthernet0/0', dataSourceNames:['traffic_in','traffic_out']}
+      ]},
+      {id:29002, hostId:902, name:'Traffic - Internet DIA', dataSources:[
+        {localDataId:99012, name:'Gi0/1 · Internet DIA', snmpIndex:'GigabitEthernet0/1', dataSourceNames:['bytes_in','bytes_out']}
+      ]}
+    ]],
+    [903, [
+      {id:39001, hostId:903, name:'Traffic - Outside interface', dataSources:[
+        {localDataId:99021, name:'outside · public', snmpIndex:'outside', dataSourceNames:['in','out']}
+      ]},
+      {id:39002, hostId:903, name:'Traffic - Inside trunk', dataSources:[
+        {localDataId:99022, name:'inside · trunk', snmpIndex:'inside', dataSourceNames:['traffic_in','traffic_out']}
+      ]}
+    ]]
+  ])
+};
+const cactiCatalog = { devices:null, graphs:new Map(), sources:new Map(), demo:false };
+
+function setCactiModalState(message, type = '') {
+  const state = document.getElementById('cacti-modal-state');
+  if (state) state.innerHTML = message ? `<span class="cacti-state ${type}">${message}</span>` : '';
+}
+
+function cactiBindingHtml(link) {
+  const binding = link.dataSource?.provider === 'cacti' ? link.dataSource : null;
+  const status = link.telemetryError
+    ? `<span class="cacti-state error">⚠ ${escapeHtml(link.telemetryError)}</span>`
+    : binding
+      ? `<span class="cacti-state connected">● Vinculado${link.telemetryTimestamp ? ` · ${new Date(link.telemetryTimestamp * 1000).toLocaleString()}` : ''}</span>`
+      : '<span class="cacti-state">Sin fuente vinculada</span>';
+  return `<div class="prop-row cacti-binding" id="cacti-binding-${link.id}">
+    <div class="prop-label">Fuente de datos · Cacti</div>
+    ${status}
+    ${binding ? `<div class="cacti-binding-summary"><strong>${escapeHtml(binding.deviceName || `Host ${binding.hostId}`)}</strong>${binding.graphName ? `<span>Gráfica: ${escapeHtml(binding.graphName)}</span>` : ''}<span>${escapeHtml(binding.sourceName || `Fuente ${binding.localDataId}`)}</span><small>IN: ${escapeHtml(binding.inDs || '—')} · OUT: ${escapeHtml(binding.outDs || '—')}</small></div>` : ''}
+    <div class="cacti-binding-actions">
+      <button class="tb-btn primary" type="button" onclick="openCactiBindingModal('${link.id}')">${binding ? 'Cambiar fuente' : 'Vincular fuente'}</button>
+      ${binding ? `<button class="tb-btn" type="button" onclick="testCactiBinding('${link.id}')">Probar</button><button class="tb-btn" type="button" onclick="clearCactiBinding('${link.id}')">Quitar</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function openCactiBindingModal(linkId) {
+  const link = links.find(item => item.id === linkId);
+  if (!link) return;
+  const modal = document.getElementById('cacti-binding-modal');
+  const picker = document.getElementById('cacti-modal-picker');
+  if (!modal || !picker) {
+    loadCactiDevices(linkId);
+    return;
+  }
+  modal.dataset.linkId = linkId;
+  picker.innerHTML = '';
+  setCactiModalState('Preparando catálogo de Cacti…');
+  modal.classList.add('open');
+  loadCactiDevices(linkId, true);
+}
+
+function closeCactiBindingModal() {
+  document.getElementById('cacti-binding-modal')?.classList.remove('open');
+}
+
+function saveCactiBindingFromModal() {
+  const modal = document.getElementById('cacti-binding-modal');
+  const linkId = modal?.dataset.linkId;
+  if (!linkId) return;
+  const hostId = Number(document.getElementById(`cacti-device-${linkId}`)?.value);
+  const sourceSelect = document.getElementById(`cacti-source-${linkId}`);
+  const localDataId = Number(sourceSelect?.value);
+  const graphId = Number(sourceSelect?.selectedOptions?.[0]?.dataset?.graphId);
+  if (!hostId || !localDataId) {
+    setCactiModalState('Selecciona equipo y fuente antes de guardar.', 'error');
+    return;
+  }
+  applyCactiBinding(linkId, hostId, localDataId, graphId || null);
+}
+
+function resetCactiDemoCatalog() {
+  cactiCatalog.devices = cactiDemoCatalog.devices;
+  cactiCatalog.graphs = new Map();
+  cactiCatalog.sources = new Map();
+  cactiCatalog.demo = true;
+  const linkId = document.getElementById('cacti-binding-modal')?.dataset.linkId;
+  if (linkId) {
+    setCactiModalState('Modo demo activo: usando catálogo de ejemplo.', 'connected');
+    loadCactiDevices(linkId);
+  }
+}
+
+function cactiDisabledFlowHtml(linkId, sourceText = 'Primero selecciona un equipo…', dsText = 'Primero selecciona una fuente…') {
+  return `<div id="cacti-source-wrap-${linkId}">
+    <div class="cacti-modal-grid">
+      <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" disabled>
+        <option>${escapeHtml(sourceText)}</option>
+      </select></label>
+    </div>
+    <div id="cacti-ds-wrap-${linkId}">
+      <div class="cacti-ds-grid">
+        <label>Entrada<select class="prop-val" id="cacti-in-${linkId}" disabled><option>${escapeHtml(dsText)}</option></select></label>
+        <label>Salida<select class="prop-val" id="cacti-out-${linkId}" disabled><option>${escapeHtml(dsText)}</option></select></label>
+      </div>
+      ${cactiPreviewHtml('Selecciona una fuente y sus DS para ver valores de muestra.')}
+    </div>
+  </div>`;
+}
+
+function cactiDisabledCatalogHtml(linkId, deviceText = 'Cargando equipos…', sourceText = 'Primero selecciona un equipo…', dsText = 'Primero selecciona una fuente…') {
+  return `<div class="cacti-modal-grid">
+    <label><span>Equipo</span><select class="prop-val" id="cacti-device-${linkId}" disabled><option>${escapeHtml(deviceText)}</option></select></label>
+  </div><div id="cacti-graph-wrap-${linkId}">${cactiDisabledFlowHtml(linkId, sourceText, dsText)}</div>`;
+}
+
+function cactiPreviewHtml(message = 'Sin vista previa todavía.') {
+  return `<div class="cacti-preview" id="cacti-preview">
+    <div class="cacti-preview-head"><strong>Vista previa</strong><span>${escapeHtml(message)}</span></div>
+    <div class="cacti-preview-grid">
+      <div><small>Entrada</small><b id="cacti-preview-in">—</b><em id="cacti-preview-in-ds">DS no seleccionado</em></div>
+      <div><small>Salida</small><b id="cacti-preview-out">—</b><em id="cacti-preview-out-ds">DS no seleccionado</em></div>
+    </div>
+  </div>`;
+}
+
+function formatCactiPreviewValue(value) {
+  if (value == null || !Number.isFinite(Number(value))) return '—';
+  const abs = Math.abs(Number(value));
+  if (abs >= 1000) return `${(Number(value) / 1000).toFixed(2)} Gbps`;
+  if (abs >= 1) return `${Number(value).toFixed(2)} Mbps`;
+  return `${(Number(value) * 1000).toFixed(2)} Kbps`;
+}
+
+function setCactiPreview({message = '', inValue = null, outValue = null, inDs = '', outDs = '', error = false} = {}) {
+  const preview = document.getElementById('cacti-preview'); if (!preview) return;
+  preview.classList.toggle('error', !!error);
+  const msg = preview.querySelector('.cacti-preview-head span');
+  const inEl = document.getElementById('cacti-preview-in');
+  const outEl = document.getElementById('cacti-preview-out');
+  const inDsEl = document.getElementById('cacti-preview-in-ds');
+  const outDsEl = document.getElementById('cacti-preview-out-ds');
+  if (msg) msg.textContent = message;
+  if (inEl) inEl.textContent = formatCactiPreviewValue(inValue);
+  if (outEl) outEl.textContent = formatCactiPreviewValue(outValue);
+  if (inDsEl) inDsEl.textContent = inDs || 'DS no seleccionado';
+  if (outDsEl) outDsEl.textContent = outDs || 'DS no seleccionado';
+}
+
+async function previewCactiBinding(linkId, hostId, localDataId) {
+  const inDs = document.getElementById(`cacti-in-${linkId}`)?.value || '';
+  const outDs = document.getElementById(`cacti-out-${linkId}`)?.value || '';
+  if (!inDs && !outDs) {
+    setCactiPreview({message:'Selecciona Entrada o Salida para previsualizar.', inDs, outDs});
+    return;
+  }
+  if (cactiCatalog.demo) {
+    const base = Number(localDataId) % 100;
+    setCactiPreview({
+      message:'Valores demo para validar que elegiste los DS correctos.',
+      inValue: inDs ? 180 + base + Math.random() * 60 : null,
+      outValue: outDs ? 95 + base + Math.random() * 45 : null,
+      inDs, outDs
+    });
+    return;
+  }
+  setCactiPreview({message:'Consultando última muestra recolectada…', inDs, outDs});
+  try {
+    const response = await fetch('/api/cacti/metrics', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      bindings:[{linkId:`preview-${linkId}`, localDataId:Number(localDataId), inDs, outDs, multiplier:8}]
+    })});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'No se pudo consultar la vista previa');
+    const metric = result.metrics?.[0] || {};
+    if (metric.error) throw new Error(metric.error);
+    setCactiPreview({
+      message: metric.timestamp ? `Muestra: ${new Date(metric.timestamp * 1000).toLocaleString()}` : 'Última muestra recolectada.',
+      inValue: bpsToLinkUnit(metric.inBps, 'Mbps'),
+      outValue: bpsToLinkUnit(metric.outBps, 'Mbps'),
+      inDs, outDs
+    });
+  } catch (error) {
+    setCactiPreview({message:error.message || 'No hay datos recolectados para esta fuente.', inDs, outDs, error:true});
+  }
+}
+
+async function loadCactiDevices(linkId) {
+  const useModal = document.getElementById('cacti-binding-modal')?.classList.contains('open')
+    && document.getElementById('cacti-binding-modal')?.dataset.linkId === linkId;
+  const picker = useModal ? document.getElementById('cacti-modal-picker') : document.getElementById(`cacti-picker-${linkId}`);
+  if (!picker) return;
+  picker.innerHTML = cactiDisabledCatalogHtml(linkId);
+  try {
+    if (!cactiCatalog.devices) {
+      try {
+        const response = await fetch('/api/cacti/devices', {cache:'no-store'});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Cacti no disponible');
+        cactiCatalog.devices = result.devices;
+        cactiCatalog.demo = false;
+        setCactiModalState('');
+      } catch (error) {
+        cactiCatalog.devices = cactiDemoCatalog.devices;
+        cactiCatalog.demo = true;
+        setCactiModalState('Modo demo: Cacti todavía no está conectado, usando catálogo de ejemplo.', 'connected');
+      }
+    }
+    if (cactiCatalog.demo) {
+      setCactiModalState('Modo demo: Cacti todavía no está conectado, usando catálogo de ejemplo.', 'connected');
+    }
+    const link = links.find(item => item.id === linkId);
+    picker.innerHTML = `<div class="cacti-modal-grid">
+      <label><span>Equipo</span><select class="prop-val" id="cacti-device-${linkId}" onchange="loadCactiGraphs('${linkId}',this.value)">
+        <option value="">Selecciona un equipo…</option>${cactiCatalog.devices.map(device => `<option value="${device.id}" ${Number(link?.dataSource?.hostId)===device.id?'selected':''}>${escapeHtml(device.name)}${device.hostname ? ` · ${escapeHtml(device.hostname)}` : ''}</option>`).join('')}
+      </select></label>
+    </div><div id="cacti-graph-wrap-${linkId}">${cactiDisabledFlowHtml(linkId)}</div>`;
+    if (link?.dataSource?.hostId) loadCactiGraphs(linkId, link.dataSource.hostId);
+  } catch (error) {
+    picker.innerHTML = `${cactiDisabledCatalogHtml(linkId, 'No se pudieron cargar equipos', 'Sin fuentes disponibles', 'Sin fuente disponible')}<span class="cacti-state error">⚠ ${escapeHtml(error.message || 'No se pudo consultar Cacti')}</span>`;
+  }
+}
+
+async function loadCactiGraphs(linkId, rawHostId) {
+  const hostId = Number(rawHostId), wrap = document.getElementById(`cacti-graph-wrap-${linkId}`);
+  if (!wrap) return;
+  if (!hostId) { wrap.innerHTML = cactiDisabledFlowHtml(linkId); return; }
+  wrap.innerHTML = cactiDisabledFlowHtml(linkId, 'Cargando fuentes…', 'Primero selecciona una fuente…');
+  try {
+    if (!cactiCatalog.graphs.has(hostId)) {
+      if (cactiCatalog.demo) {
+        cactiCatalog.graphs.set(hostId, cactiDemoCatalog.graphs.get(hostId) || []);
+      } else {
+        const response = await fetch(`/api/cacti/devices/${hostId}/graphs`, {cache:'no-store'});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'No se pudieron cargar las gráficas');
+        cactiCatalog.graphs.set(hostId, result.graphs);
+      }
+    }
+    const graphs = cactiCatalog.graphs.get(hostId), link = links.find(item => item.id === linkId);
+    const sources = graphs.flatMap(graph => (graph.dataSources || []).map(source => ({
+      ...source, graphId:graph.id, graphName:graph.name
+    })));
+    cactiCatalog.sources.set(hostId, sources);
+    wrap.innerHTML = `<div id="cacti-source-wrap-${linkId}"><div class="cacti-modal-grid">
+      <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" ${sources.length ? '' : 'disabled'} onchange="renderCactiDsPicker('${linkId}',${hostId},this.value,this.selectedOptions[0]?.dataset?.graphId)">
+          <option value="">${sources.length ? 'Selecciona una fuente…' : 'No hay fuentes disponibles'}</option>${sources.map(source => `<option value="${source.localDataId}" data-graph-id="${source.graphId || ''}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
+        </select></label>
+      </div><div id="cacti-ds-wrap-${linkId}">
+        <div class="cacti-ds-grid">
+          <label>Entrada<select class="prop-val" id="cacti-in-${linkId}" disabled><option>Selecciona una fuente…</option></select></label>
+          <label>Salida<select class="prop-val" id="cacti-out-${linkId}" disabled><option>Selecciona una fuente…</option></select></label>
+        </div>
+        ${cactiPreviewHtml('Selecciona una fuente y sus DS para ver valores de muestra.')}
+      </div></div>`;
+    const selected = link?.dataSource?.localDataId || (sources.length === 1 ? sources[0].localDataId : null);
+    if (selected) {
+      const sourceSelect = document.getElementById(`cacti-source-${linkId}`);
+      sourceSelect.value = String(selected);
+      renderCactiDsPicker(linkId, hostId, selected, sourceSelect.selectedOptions[0]?.dataset?.graphId || null);
+    }
+  } catch (error) {
+    wrap.innerHTML = `${cactiDisabledFlowHtml(linkId, 'No se pudieron cargar las fuentes', 'Sin fuente disponible')}<span class="cacti-state error">⚠ ${escapeHtml(error.message)}</span>`;
+  }
+}
+
+function loadCactiGraphSources(linkId, hostId, rawGraphId) {
+  const graphId = Number(rawGraphId), wrap = document.getElementById(`cacti-source-wrap-${linkId}`);
+  const graph = (cactiCatalog.graphs.get(Number(hostId)) || []).find(item => item.id === graphId);
+  if (!wrap || !graph) { if (wrap) wrap.innerHTML = ''; return; }
+  cactiCatalog.sources.set(Number(hostId), graph.dataSources || []);
+  const link = links.find(item => item.id === linkId);
+  wrap.innerHTML = `<div class="cacti-modal-grid">
+    <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" onchange="renderCactiDsPicker('${linkId}',${hostId},this.value,${graphId})">
+        <option value="">Selecciona una fuente…</option>${graph.dataSources.map(source => `<option value="${source.localDataId}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
+      </select></label>
+    </div><div id="cacti-ds-wrap-${linkId}"></div>`;
+  const selected = link?.dataSource?.graphId === graphId ? link.dataSource.localDataId : (graph.dataSources.length === 1 ? graph.dataSources[0].localDataId : null);
+  if (selected) {
+    document.getElementById(`cacti-source-${linkId}`).value = String(selected);
+    renderCactiDsPicker(linkId, hostId, selected, graphId);
+  }
+}
+
+async function loadCactiSources(linkId, rawHostId) {
+  const hostId = Number(rawHostId), wrap = document.getElementById(`cacti-source-wrap-${linkId}`);
+  if (!wrap || !hostId) { if (wrap) wrap.innerHTML = ''; return; }
+  wrap.innerHTML = '<span class="cacti-state">Buscando fuentes RRD…</span>';
+  try {
+    if (!cactiCatalog.sources.has(hostId)) {
+      const response = await fetch(`/api/cacti/devices/${hostId}/data-sources`, {cache:'no-store'});
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'No se pudieron cargar las fuentes');
+      cactiCatalog.sources.set(hostId, result.dataSources);
+    }
+    const sources = cactiCatalog.sources.get(hostId), link = links.find(item => item.id === linkId);
+    wrap.innerHTML = `<label class="prop-label" style="margin-top:8px">Interfaz / fuente</label>
+      <select class="prop-val" id="cacti-source-${linkId}" onchange="renderCactiDsPicker('${linkId}',${hostId},this.value)">
+        <option value="">Selecciona una fuente…</option>${sources.map(source => `<option value="${source.localDataId}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
+      </select><div id="cacti-ds-wrap-${linkId}"></div>`;
+    if (link?.dataSource?.localDataId) renderCactiDsPicker(linkId, hostId, link.dataSource.localDataId);
+  } catch (error) {
+    wrap.innerHTML = `<span class="cacti-state error">⚠ ${escapeHtml(error.message)}</span>`;
+  }
+}
+
+function renderCactiDsPicker(linkId, hostId, rawLocalDataId, graphId = null) {
+  const localDataId = Number(rawLocalDataId), wrap = document.getElementById(`cacti-ds-wrap-${linkId}`);
+  const source = (cactiCatalog.sources.get(Number(hostId)) || []).find(item => item.localDataId === localDataId);
+  if (!wrap || !source) {
+    if (wrap) wrap.innerHTML = `<div class="cacti-ds-grid">
+      <label>Entrada<select class="prop-val" id="cacti-in-${linkId}" disabled><option>Selecciona una fuente…</option></select></label>
+      <label>Salida<select class="prop-val" id="cacti-out-${linkId}" disabled><option>Selecciona una fuente…</option></select></label>
+    </div>${cactiPreviewHtml('Selecciona una fuente y sus DS para ver valores de muestra.')}`;
+    return;
+  }
+  const link = links.find(item => item.id === linkId), names = source.dataSourceNames;
+  const guess = side => names.find(name => new RegExp(`(^|_)${side}($|_)`, 'i').test(name)) || '';
+  const inDs = link?.dataSource?.localDataId === localDataId ? link.dataSource.inDs : guess('in');
+  const outDs = link?.dataSource?.localDataId === localDataId ? link.dataSource.outDs : guess('out');
+  const options = selected => `<option value="">Ninguna</option>${names.map(name => `<option value="${escapeHtml(name)}" ${name===selected?'selected':''}>${escapeHtml(name)}</option>`).join('')}`;
+  wrap.innerHTML = `<div class="cacti-ds-grid"><label>Entrada<select class="prop-val" id="cacti-in-${linkId}" onchange="previewCactiBinding('${linkId}',${hostId},${localDataId})">${options(inDs)}</select></label><label>Salida<select class="prop-val" id="cacti-out-${linkId}" onchange="previewCactiBinding('${linkId}',${hostId},${localDataId})">${options(outDs)}</select></label></div>
+    ${cactiPreviewHtml('Calculando vista previa…')}`;
+  previewCactiBinding(linkId, hostId, localDataId);
+}
+
+async function applyCactiBinding(linkId, hostId, localDataId, graphId = null) {
+  const link = links.find(item => item.id === linkId);
+  const device = (cactiCatalog.devices || []).find(item => item.id === Number(hostId));
+  const source = (cactiCatalog.sources.get(Number(hostId)) || []).find(item => item.localDataId === Number(localDataId));
+  const graph = (cactiCatalog.graphs.get(Number(hostId)) || []).find(item => item.id === Number(graphId));
+  if (!link || !source) return;
+  link.dataSource = { provider:'cacti', hostId:Number(hostId), localDataId:Number(localDataId),
+    deviceName:device?.name || '', graphId:graph?.id || source.graphId || null, graphName:graph?.name || source.graphName || '', sourceName:source.name,
+    inDs:document.getElementById(`cacti-in-${linkId}`)?.value || '', outDs:document.getElementById(`cacti-out-${linkId}`)?.value || '',
+    multiplier:8 };
+  link.telemetryError = null; pushHistory(); updatePropsPanel();
+  closeCactiBindingModal();
+  if (cactiCatalog.demo) {
+    link.inUsage = 420 + Math.round(Math.random() * 180);
+    link.outUsage = 260 + Math.round(Math.random() * 160);
+    const cap = Math.max(1, Number(link.capacity) || 1000);
+    link.inPct = Math.round((link.inUsage / cap) * 100);
+    link.outPct = Math.round((link.outUsage / cap) * 100);
+    link.telemetryTimestamp = Math.floor(Date.now() / 1000);
+    renderLinks();
+    showToast('Fuente demo vinculada. Cuando Cacti esté activo usará datos reales.', 'success');
+    return;
+  }
+  await testCactiBinding(linkId);
+}
+
+function clearCactiBinding(linkId) {
+  const link = links.find(item => item.id === linkId); if (!link) return;
+  link.dataSource = null; link.telemetryError = null; link.telemetryTimestamp = null;
+  pushHistory(); updatePropsPanel(); renderLinks();
+}
+
+function bpsToLinkUnit(bps, unit) {
+  const factors = {Kbps:1e3, Mbps:1e6, Gbps:1e9, Tbps:1e12};
+  return bps == null ? null : bps / (factors[unit] || 1e6);
+}
+
+async function refreshCactiMetrics(date = null, onlyLinkId = null) {
+  const bound = links.filter(link => link.dataSource?.provider === 'cacti' && (!onlyLinkId || link.id === onlyLinkId));
+  if (!bound.length) return {updated:0, errors:0};
+  const response = await fetch('/api/cacti/metrics', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+    ...(date ? {date} : {}), bindings:bound.map(link => ({linkId:link.id, localDataId:link.dataSource.localDataId,
+      inDs:link.dataSource.inDs, outDs:link.dataSource.outDs, multiplier:link.dataSource.multiplier}))
+  })});
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'No se pudieron consultar las métricas');
+  let updated = 0, errors = 0;
+  result.metrics.forEach(metric => {
+    const link = links.find(item => item.id === metric.linkId); if (!link) return;
+    link.telemetryError = metric.error || null;
+    if (metric.error) { errors++; return; }
+    link.telemetryTimestamp = metric.timestamp;
+    const inUsage = bpsToLinkUnit(metric.inBps, link.capacityUnit), outUsage = bpsToLinkUnit(metric.outBps, link.capacityUnit);
+    if (inUsage != null) link.inUsage = inUsage;
+    if (outUsage != null) link.outUsage = outUsage;
+    link.inPct = Math.round((link.inUsage || 0) / Math.max(.01, link.capacity) * 1000) / 10;
+    link.outPct = Math.round((link.outUsage || 0) / Math.max(.01, link.capacity) * 1000) / 10;
+    updated++;
+  });
+  renderLinks();
+  if (selectedLinkId && (!onlyLinkId || selectedLinkId === onlyLinkId)) updatePropsPanel();
+  return {updated, errors};
+}
+
+async function testCactiBinding(linkId) {
+  setStatus('Consultando métricas recolectadas…');
+  try {
+    const result = await refreshCactiMetrics(null, linkId);
+    setStatus(result.errors ? '⚠ El colector aún no ha guardado datos' : '✓ Fuente Cacti conectada');
+  } catch (error) {
+    const link = links.find(item => item.id === linkId); if (link) link.telemetryError = error.message;
+    updatePropsPanel(); setStatus('⚠ No se pudieron consultar las métricas');
   }
 }
 
@@ -3141,6 +3558,7 @@ function updatePropsPanel() {
         <textarea class="prop-val editable" placeholder="Descripción del enlace"
                   onchange="updateLinkDescription('${l.id}',this.value)">${escapeHtml(l.description || '')}</textarea>
       </div>
+      ${cactiBindingHtml(l)}
       <div class="prop-row">
         <div class="prop-label">Capacidad del enlace para umbrales</div>
         <input class="prop-val" type="number" min="0.01" step="0.01" value="${l.capacity ?? 100}"
@@ -4293,6 +4711,10 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.preventDefault(); closeChartWizard(); }
     return;
   }
+  if (document.getElementById('cacti-binding-modal')?.classList.contains('open')) {
+    if (e.key === 'Escape') { e.preventDefault(); closeCactiBindingModal(); }
+    return;
+  }
   if (document.getElementById('map-modal')?.classList.contains('open')) {
     if (e.key === 'Escape') { e.preventDefault(); closeMapModal(); }
     return;
@@ -4613,6 +5035,10 @@ async function selectPresentationDate(date, autoRefresh = false) {
     if (!response.ok) throw new Error(result.error || 'Sin información');
     document.body.classList.remove('presentation-date-empty');
     applySnapshot(result.snapshot);
+    const telemetry = await refreshCactiMetrics(liveRequest ? null : date).catch(error => {
+      console.error('Cacti telemetry:', error);
+      return {updated:0, errors:1};
+    });
     if (liveRequest && result.date) {
       selectedMapDate = result.date;
       localStorage.setItem('mapgen_current_server_date', selectedMapDate);
@@ -4623,7 +5049,8 @@ async function selectPresentationDate(date, autoRefresh = false) {
     if (focusedNodeId && nodes.some(n => n.id === focusedNodeId)) showPresentationNodeInfo(focusedNodeId);
     else if (focusedLinkId && links.some(l => l.id === focusedLinkId)) showPresentationLinkInfo(focusedLinkId);
     const refreshedAt = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    setStatus(autoRefresh ? `✓ Live actualizado · ${refreshedAt}` : `Mostrando ${result.map.name} · ${date}`);
+    const telemetryNote = telemetry.updated ? ` · ${telemetry.updated} RRD` : telemetry.errors ? ' · Cacti sin datos' : '';
+    setStatus(autoRefresh ? `✓ Live actualizado · ${refreshedAt}${telemetryNote}` : `Mostrando ${result.map.name} · ${date}${telemetryNote}`);
     if (!autoRefresh && presentationMode) schedulePresentationRefresh();
   } catch (err) {
     console.error(err);

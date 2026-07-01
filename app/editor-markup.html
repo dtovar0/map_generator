@@ -448,6 +448,30 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="cacti-binding-modal" role="dialog" aria-modal="true" aria-labelledby="cacti-binding-modal-title">
+  <div class="modal-card cacti-modal-card">
+    <div class="modal-header">
+      <span class="modal-icon">🌵</span>
+      <span class="modal-title" id="cacti-binding-modal-title">Vincular fuente de Cacti</span>
+      <button class="modal-close" onclick="closeCactiBindingModal()" title="Cerrar (Esc)">✕</button>
+    </div>
+    <div class="modal-body cacti-modal-body">
+      <p class="modal-subtitle">Selecciona el equipo, la gráfica y la fuente que alimentará este enlace. Por ahora, si Cacti no responde, se carga un catálogo demo.</p>
+      <div id="cacti-modal-state"></div>
+      <div id="cacti-modal-picker" class="cacti-picker cacti-modal-picker"></div>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-left">
+        <button class="tb-btn" onclick="resetCactiDemoCatalog()">Usar demo</button>
+      </div>
+      <div class="modal-footer-right">
+        <button class="tb-btn" onclick="closeCactiBindingModal()">Cancelar</button>
+        <button class="tb-btn primary" onclick="saveCactiBindingFromModal()">Guardar vínculo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="map-modal" role="dialog" aria-modal="true" aria-labelledby="map-modal-title">
   <div class="modal-card map-modal-panel">
     <div class="modal-header">
