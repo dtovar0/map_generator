@@ -1,0 +1,26 @@
+{
+  "name": "map-generator-demo-v3-next",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "chart.js": "4.5.1",
+    "html-to-image": "1.11.13",
+    "jspdf": "4.2.1",
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.9",
+    "@types/prop-types": "15.7.15",
+    "@types/react": "18.3.23",
+    "@types/react-dom": "18.3.7",
+    "typescript": "5.9.3"
+  }
+}

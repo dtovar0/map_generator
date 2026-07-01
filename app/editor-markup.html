@@ -1,0 +1,542 @@
+
+<div id="topbar">
+  <span class="logo">Map<span>Gen</span></span>
+  <div class="sep"></div>
+
+  <!-- Acciones directas -->
+  <button class="tb-btn toolbar-icon" onclick="newMap()" title="Nuevo mapa (Ctrl+N)" aria-label="Nuevo mapa"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M12 10v6"/></svg></span></button>
+  <button class="tb-btn toolbar-icon" onclick="saveMap()" title="Guardar (Ctrl+G)" aria-label="Guardar"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M5 4h12l2 2v14H5z"/><path d="M8 4v6h8V4M8 20v-6h8v6"/></svg></span></button>
+  <button class="tb-btn toolbar-icon" onclick="saveMapAs()" title="Guardar como nuevo mapa" aria-label="Guardar como nuevo mapa"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 5h11l2 2v5M7 5v5h7V5M5 19v-5h7"/><path d="M18 15v6M15 18h6"/></svg></span></button>
+  <button class="tb-btn toolbar-icon" onclick="exportMap()" title="Exportar JSON" aria-label="Exportar JSON"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M5 19h14"/></svg></span></button>
+  <div class="sep"></div>
+  <!-- Selector de mapas -->
+  <button class="tb-btn" id="menu-btn" onclick="openMapModal()"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="m3 6 5-2 8 3 5-2v14l-5 2-8-3-5 2z"/><path d="M8 4v14M16 7v14"/></svg></span><span class="btn-label">Mapas</span></button>
+
+  <div class="sep"></div>
+
+  <!-- Panel toggles -->
+  <button class="ct-btn active" id="tool-toggle-palette" onclick="togglePalettePanel()" title="Mostrar/ocultar panel de herramientas">◧</button>
+  <button class="ct-btn active" id="tool-toggle-props" onclick="togglePropsPanel()" aria-pressed="true" title="Mostrar/ocultar panel de propiedades">◨</button>
+
+  <div class="ct-sep"></div>
+
+  <!-- Tool buttons -->
+  <button class="ct-btn" id="tool-scale" onclick="toggleScalePanel()" title="Escala de Color" aria-label="Escala de color"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
+  <button class="ct-btn" id="tool-config" onclick="toggleConfigPanel()" title="Configuración general" aria-label="Configuración general"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7-.7-1.7.9-1.9-2.1-2.1-1.9.9-1.7-.7-.7-2h-3l-.7 2-1.7.7-1.9-.9-2.1 2.1.9 1.9-.7 1.7-2 .7v3l2 .7.7 1.7-.9 1.9 2.1 2.1 1.9-.9 1.7.7.7 2h3l.7-2 1.7-.7 1.9.9 2.1-2.1-.9-1.9.7-1.7z"/></svg></button>
+  <button class="ct-btn" id="tool-hotkeys" onclick="openHotkeysModal()" title="Configurar atajos" aria-label="Configurar atajos"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h.01M11 9h.01M15 9h.01M18 9h.01M7 13h.01M10 13h.01M17 13h.01M8 16h8"/></svg></button>
+  <button class="ct-btn" id="tool-theme" onclick="toggleTheme()" title="Cambiar tema" aria-label="Cambiar tema"><svg viewBox="0 0 24 24"><path d="M20 15.5A8 8 0 1 1 8.5 4 6.5 6.5 0 0 0 20 15.5z"/></svg></button>
+  <button class="ct-btn" id="tool-search" onclick="openSearch()" title="Buscar nodo (Ctrl+F)" aria-label="Buscar nodo"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></button>
+  <button class="ct-btn" id="tool-multi-place" onclick="toggleMultiPlacement()" aria-pressed="false"
+          title="Colocación única activa: la herramienta se libera después de insertar" aria-label="Alternar colocación continua"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/></svg></button>
+
+  <div class="ct-sep"></div>
+
+  <button class="ct-btn disabled" id="btn-undo" onclick="undo()" title="Deshacer (Ctrl+Z)">↩</button>
+  <button class="ct-btn disabled" id="btn-redo" onclick="redo()" title="Rehacer (Ctrl+Y)">↪</button>
+
+  <div class="ct-sep"></div>
+
+  <!-- Zoom controls -->
+  <button class="ct-btn" onclick="zoomIn()" title="Zoom in">＋</button>
+  <button class="ct-btn" id="zoom-label" style="cursor:default">100%</button>
+  <button class="ct-btn" onclick="zoomOut()" title="Zoom out">－</button>
+  <button class="ct-btn" onclick="zoomFit()" title="Ajustar vista">⛶</button>
+
+  <div class="spacer"></div>
+  <label class="presentation-action" id="presentation-view-control" title="Seleccionar vista en vivo o histórica">
+    <span>Vista</span>
+    <div class="seg-toggle seg-compact" role="group" aria-label="Vista">
+      <label class="seg-opt" title="Live"><input type="radio" name="presentation-view-mode" value="live" checked onchange="setPresentationViewMode('live')" /><span class="seg-glyph" aria-hidden="true">▶</span></label>
+      <label class="seg-opt" title="Por día"><input type="radio" name="presentation-view-mode" value="day" onchange="setPresentationViewMode('day')" /><span class="seg-glyph" aria-hidden="true">📅</span></label>
+    </div>
+  </label>
+  <label class="presentation-action" id="presentation-date-control" title="Seleccionar fecha del mapa">
+    <span>Fecha</span>
+    <input id="presentation-date" type="date" onchange="selectPresentationDate(this.value)" />
+  </label>
+  <label class="presentation-action" id="presentation-refresh-control" title="Intervalo de actualización automática">
+    <span>Auto refresco</span>
+    <select id="presentation-refresh" onchange="setPresentationRefresh(this.value)">
+      <option value="5">5 m</option><option value="10">10 m</option><option value="15">15 m</option>
+      <option value="30">30 m</option><option value="60">60 m</option>
+    </select>
+  </label>
+  <button class="tb-btn presentation-action" id="btn-save-map" onclick="saveMap()" title="Guardar mapa y fecha en el servidor">💾 Guardar</button>
+  <button class="tb-btn presentation-action" id="btn-open-map" onclick="openMapModal()" title="Abrir un mapa guardado en el servidor">📂 Abrir mapa</button>
+  <button class="tb-btn presentation-action presentation-export" onclick="exportMapImage()" title="Exportar vista como imagen PNG">🖼 Imagen</button>
+  <button class="tb-btn presentation-action presentation-export" onclick="exportMapPdf()" title="Exportar vista como documento PDF">📄 PDF</button>
+  <input id="map-file-input" type="file" accept="application/json,.json" hidden onchange="importMapFile(this)" />
+  <button class="tb-btn presentation-toggle" id="btn-presentation" onclick="togglePresentationMode()"
+          aria-pressed="false" title="Cambiar entre vista de editor y presentación (P)">▶ Presentación</button>
+</div>
+
+<div id="app">
+  <!-- PALETTE -->
+  <div id="palette">
+    <div class="pal-item active" id="pal-select" onclick="cancelPlacing();setTool('select')" title="Seleccionar (S)">
+      <span class="pal-icon"><svg viewBox="0 0 24 24"><path d="m5 4 13 8-6 1-3 6z"/></svg></span>
+      <span class="pal-name">Selec.</span>
+    </div>
+    <div class="pal-divider"></div>
+    <div class="pal-item" id="pal-node" data-type="switch" data-icon="🔲" data-label="Nodo" onclick="activatePlacing(this)" title="Colocar nodo (N)">
+      <span class="pal-badge">+</span><span class="pal-icon"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6M9 13h4"/></svg></span><span class="pal-name">Nodo</span>
+    </div>
+    <div class="pal-item" id="pal-link" onclick="cancelPlacing();setTool('link')" title="Conectar (L)">
+      <span class="pal-icon"><svg viewBox="0 0 24 24"><path d="M8.5 15.5 6 18a3.5 3.5 0 0 1-5-5l3-3a3.5 3.5 0 0 1 5 0"/><path d="m15.5 8.5 2.5-2.5a3.5 3.5 0 0 1 5 5l-3 3a3.5 3.5 0 0 1-5 0"/><path d="m8 16 8-8"/></svg></span>
+      <span class="pal-name">Link</span>
+    </div>
+    <div class="pal-item" id="pal-icon" data-type="server" data-icon="🖼️" data-label="Icono" onclick="activatePlacing(this)">
+      <span class="pal-badge">+</span><span class="pal-icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="9" cy="10" r="1.5"/><path d="m6 17 4-4 3 3 2-2 3 3"/></svg></span><span class="pal-name">Icono</span>
+    </div>
+    <div class="pal-item" id="pal-text" data-type="text" data-icon="" data-label="Texto" onclick="activatePlacing(this)">
+      <span class="pal-badge">+</span><span class="pal-icon"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M8 20h8"/></svg></span><span class="pal-name">Texto</span>
+    </div>
+    <div class="pal-item" id="chart-pal" data-type="chart" data-icon="📊" data-label="Gráfica" onclick="startChartPlacementMode()">
+      <span class="pal-badge">+</span><span class="pal-icon"><svg viewBox="0 0 24 24"><path d="M5 19V10h4v9M10 19V5h4v14M15 19v-7h4v7M3 19h18"/></svg></span><span class="pal-name">Gráfica</span>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="canvas-wrap">
+    <div id="canvas-bg"></div>
+    <svg id="links-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="canvas"></div>
+    <svg id="overlay-svg" xmlns="http://www.w3.org/2000/svg" style="position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:20"></svg>
+
+    <!-- Search bar -->
+    <div id="search-bar" role="search" aria-label="Buscar nodo">
+      <span class="search-icon">⌕</span>
+      <input id="search-input" type="text" placeholder="Buscar nodo…" autocomplete="off"
+             oninput="doSearch(this.value)" onkeydown="handleSearchKey(event)" />
+      <span id="search-count" class="search-count"></span>
+      <button class="search-nav" onclick="navigateSearch(-1)" title="Anterior (↑)">↑</button>
+      <button class="search-nav" onclick="navigateSearch(1)" title="Siguiente (↓)">↓</button>
+      <button class="search-close" onclick="closeSearch()" title="Cerrar (Esc)">×</button>
+    </div>
+
+    <div id="place-preview">
+      <div class="preview-box" id="preview-box"></div>
+      <div class="preview-label" id="preview-label"></div>
+    </div>
+
+    <div id="drop-hint" aria-live="polite">
+      <div class="empty-state-glow"></div>
+      <div class="empty-state-card">
+        <div class="empty-state-visual" aria-hidden="true">
+          <svg viewBox="0 0 64 64">
+            <path class="empty-path" d="M18 42 31 22l16 17" />
+            <path class="empty-path secondary" d="m18 42 29-3" />
+            <circle cx="31" cy="22" r="6" />
+            <rect x="11" y="36" width="14" height="14" rx="4" />
+            <rect x="40" y="32" width="14" height="14" rx="4" />
+          </svg>
+          <span class="empty-state-spark spark-one"></span>
+          <span class="empty-state-spark spark-two"></span>
+        </div>
+        <div class="empty-state-eyebrow"><span></span> Lienzo preparado</div>
+        <h2>Construye tu primer mapa</h2>
+        <p class="empty-state-copy">Convierte tu infraestructura en una vista clara, conectada y fácil de presentar.</p>
+        <div class="empty-state-steps">
+          <div class="empty-step"><span>01</span><strong>Elige</strong><small>un elemento de la paleta</small></div>
+          <i aria-hidden="true">→</i>
+          <div class="empty-step"><span>02</span><strong>Coloca</strong><small>el elemento en el canvas</small></div>
+          <i aria-hidden="true">→</i>
+          <div class="empty-step"><span>03</span><strong>Conecta</strong><small>y personaliza tu mapa</small></div>
+        </div>
+        <div class="empty-state-tip"><kbd>S</kbd><span>Seleccionar</span><kbd>L</kbd><span>Conectar</span><kbd>Ctrl G</kbd><span>Guardar</span></div>
+      </div>
+    </div>
+
+    <div id="pos-badge">x: 0  y: 0</div>
+    <div id="place-banner" role="status">
+      <span class="place-banner-icon">＋</span>
+      <span class="place-banner-copy"><strong>Herramienta lista</strong><small>Haz clic en el canvas para colocar el elemento</small></span>
+      <span class="place-banner-key">ESC <em>Cancelar</em></span>
+    </div>
+    <div id="presentation-no-data">
+      <div class="no-data-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V8l4-3 4 3 4-3 4 3v11"/><path d="M8 5v11M16 5v11M3 19h18"/></svg></div>
+      <span class="no-data-kicker">Vista histórica</span>
+      <strong>Esta fecha aún no tiene una captura</strong>
+      <span>Regresa al editor, prepara los datos del día y guarda el mapa para crear el historial.</span>
+    </div>
+
+  </div>
+
+  <aside id="presentation-info" aria-live="polite">
+    <div class="presentation-info-head">
+      <strong id="presentation-info-title">Información</strong>
+      <button type="button" onclick="hidePresentationInfo()" aria-label="Limpiar selección">×</button>
+    </div>
+    <div id="presentation-info-content">
+      <p class="presentation-info-empty">Selecciona un nodo o enlace para consultar su información.</p>
+    </div>
+  </aside>
+
+  <!-- RIGHT PANEL -->
+  <div id="props">
+    <div id="props-section">
+      <div class="panel-section">
+        <div class="panel-title">Propiedades</div>
+        <div id="props-content">
+          <div class="ins-panel">
+            <header class="ins-head">
+              <span class="ins-head-icon"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h5M8 16h7"/></svg></span>
+              <span class="ins-head-text"><strong>Propiedades</strong><small>Inspector contextual</small></span>
+              <span class="ins-head-dot" title="Esperando selección"></span>
+            </header>
+            <div class="ins-body">
+              <div class="ins-hero ins-hero--orbit" aria-hidden="true">
+                <span class="ins-hero-icon"><svg viewBox="0 0 48 48"><rect x="9" y="10" width="20" height="20" rx="5"/><path d="M19 30v8M14 38h10M29 20h10M35 16l4 4-4 4"/><path class="cursor" d="m28 27 10 6-5 2-2 5z"/></svg></span><i></i><i></i>
+              </div>
+              <span class="ins-kicker"><b></b> Inspector listo</span>
+              <strong class="ins-title">Selecciona un elemento</strong>
+              <p class="ins-copy">Elige un nodo o enlace del canvas para descubrir y editar todos sus detalles.</p>
+            </div>
+            <footer class="ins-footer">
+              <span class="ins-footer-label">Elementos compatibles</span>
+              <div class="ins-chips"><span><svg viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12" rx="3"/></svg>Nodo</span><span><svg viewBox="0 0 20 20"><path d="M3 10h14M6 7l-3 3 3 3M14 7l3 3-3 3"/></svg>Enlace</span></div>
+              <div class="ins-tip"><kbd>↖</kbd><span>Selecciona para comenzar</span></div>
+            </footer>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="scale-editor">
+      <div class="panel-title">Umbrales generales de enlaces</div>
+      <p style="font-size:11px;color:var(--text2);line-height:1.4;margin-bottom:12px">
+        Se aplican a todos los enlaces que no tengan umbrales individuales.
+      </p>
+
+      <div class="palette-sel-row">
+        <label>Paleta predefinida</label>
+        <select id="palette-sel" onchange="applyPreset(this.value)">
+          <option value="cacti">Cacti Clásico</option>
+          <option value="traffic">Semáforo</option>
+          <option value="heat">Mapa de Calor</option>
+          <option value="cool">Frío→Cálido</option>
+          <option value="custom">Personalizado</option>
+        </select>
+      </div>
+
+      <div class="scale-bar-preview" id="scale-preview-bar"></div>
+
+      <div id="scale-threshold-list"></div>
+
+      <button class="add-threshold-btn" onclick="addThreshold()">+ Agregar umbral</button>
+    </div>
+
+    <div id="config-editor">
+      <div class="panel-title">Configuración general</div>
+      <p style="font-size:11px;color:var(--text2);line-height:1.4;margin-bottom:14px">
+        Se aplica a elementos nuevos y a los que no tengan ajustes individuales.
+      </p>
+      <div class="prop-row canvas-preferences">
+        <div class="prop-label">Comportamiento del lienzo</div>
+        <label class="canvas-preference-item">
+          <span class="canvas-preference-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 10h16M10 4v16"/></svg></span>
+          <span class="canvas-preference-copy"><strong>Mostrar cuadrícula</strong><small>Guía visual para alinear elementos</small></span>
+          <input id="cfg-grid-enabled" class="config-switch" type="checkbox" onchange="setGridEnabled(this.checked)" />
+        </label>
+        <label class="canvas-preference-item">
+          <span class="canvas-preference-icon"><svg viewBox="0 0 24 24"><path d="M7 4v7a5 5 0 0 0 10 0V4M7 7h4M13 7h4"/><path d="M5 20h14"/></svg></span>
+          <span class="canvas-preference-copy"><strong>Ajuste magnético</strong><small>Alinea posiciones a la cuadrícula</small></span>
+          <input id="cfg-snap-enabled" class="config-switch" type="checkbox" onchange="setSnapEnabled(this.checked)" />
+        </label>
+        <label class="canvas-preference-item">
+          <span class="canvas-preference-icon"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></span>
+          <span class="canvas-preference-copy"><strong>Ordenamiento automático</strong><small>Acomoda los nodos en cuadrícula y distribuye los enlaces</small></span>
+          <input id="cfg-auto-order" class="config-switch" type="checkbox" onchange="setAutoOrderEnabled(this.checked)" />
+        </label>
+      </div>
+      <div class="prop-row">
+        <div class="prop-label">Tamaño predeterminado del nodo</div>
+        <div class="prop-pair">
+          <input id="cfg-node-width" class="prop-val coord" type="number" min="32" max="2000" onchange="updateGeneralConfig('nodeWidth',this.value)" />
+          <span style="color:var(--text3)">×</span>
+          <input id="cfg-node-height" class="prop-val coord" type="number" min="32" max="2000" onchange="updateGeneralConfig('nodeHeight',this.value)" />
+        </div>
+      </div>
+      <div class="prop-row">
+        <div class="prop-label">Separación nodo–enlace</div>
+        <div class="prop-pair">
+          <input id="cfg-link-padding" class="prop-val coord" type="number" min="0" max="100" onchange="updateGeneralConfig('linkPadding',this.value)" />
+          <span style="font-size:11px;color:var(--text2)">px</span>
+        </div>
+      </div>
+      <div class="prop-row" style="margin-top:16px">
+        <div class="prop-label">Apariencia predeterminada · nodos</div>
+        <select id="cfg-regular-font-family" class="prop-val" onchange="updateGeneralConfig('regularFontFamily',this.value)">
+          <option value="system-ui">Sistema</option><option value="Arial">Arial</option>
+          <option value="Georgia">Georgia</option><option value="Consolas">Consolas</option>
+          <option value="Times New Roman">Times New Roman</option>
+        </select>
+        <div class="format-toolbar">
+          <div class="prop-pair">
+            <input id="cfg-regular-font-size" class="prop-val coord" type="number" min="8" max="120" onchange="updateGeneralConfig('regularFontSize',this.value)" />
+            <span style="font-size:11px;color:var(--text2)">px</span>
+          </div>
+          <div class="text-format-group" role="group" aria-label="Estilo de texto">
+            <label class="format-toggle" data-format="bold" title="Negrita"><input id="cfg-regular-font-bold" type="checkbox" onchange="updateGeneralConfig('regularFontBold',this.checked)" /><span class="format-glyph" aria-hidden="true">B</span></label>
+            <label class="format-toggle" data-format="italic" title="Cursiva"><input id="cfg-regular-font-italic" type="checkbox" onchange="updateGeneralConfig('regularFontItalic',this.checked)" /><span class="format-glyph" aria-hidden="true">I</span></label>
+          </div>
+        </div>
+        <div class="prop-label" style="margin-top:7px">Color del texto</div>
+        <input id="cfg-regular-text-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('regularTextColor',this.value)" />
+        <div class="prop-label" style="margin-top:9px">Contenedor del nodo</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 58px;gap:6px">
+          <label style="font-size:10px;color:var(--text2)">Fondo<input id="cfg-regular-node-background" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('regularNodeBackground',this.value)" /></label>
+          <label style="font-size:10px;color:var(--text2)">Borde<input id="cfg-regular-node-border-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('regularNodeBorderColor',this.value)" /></label>
+          <label style="font-size:10px;color:var(--text2)">px<input id="cfg-regular-node-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('regularNodeBorderWidth',this.value)" /></label>
+        </div>
+        <label class="prop-check" style="margin-top:7px"><input id="cfg-regular-node-background-transparent" type="checkbox" onchange="updateGeneralConfig('regularNodeBackgroundTransparent',this.checked)" /> Fondo transparente</label>
+        <label class="prop-check" style="margin-top:5px"><input id="cfg-regular-node-border-hidden" type="checkbox" onchange="updateGeneralConfig('regularNodeBorderHidden',this.checked)" /> Ocultar borde</label>
+        <div class="prop-label" style="margin-top:9px">Contenedor del nombre</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 58px;gap:6px">
+          <label style="font-size:10px;color:var(--text2)">Fondo<input id="cfg-regular-text-background" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('regularTextBackground',this.value)" /></label>
+          <label style="font-size:10px;color:var(--text2)">Borde<input id="cfg-regular-text-border-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('regularTextBorderColor',this.value)" /></label>
+          <label style="font-size:10px;color:var(--text2)">px<input id="cfg-regular-text-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('regularTextBorderWidth',this.value)" /></label>
+        </div>
+        <label class="prop-check" style="margin-top:7px"><input id="cfg-regular-text-background-transparent" type="checkbox" onchange="updateGeneralConfig('regularTextBackgroundTransparent',this.checked)" /> Fondo transparente</label>
+        <label class="prop-check" style="margin-top:5px"><input id="cfg-regular-text-border-hidden" type="checkbox" onchange="updateGeneralConfig('regularTextBorderHidden',this.checked)" /> Ocultar borde</label>
+      </div>
+      <div class="prop-row">
+        <div class="prop-label">Apariencia predeterminada · nodos de texto</div>
+        <select id="cfg-text-node-font-family" class="prop-val" onchange="updateGeneralConfig('textNodeFontFamily',this.value)">
+          <option value="system-ui">Sistema</option><option value="Arial">Arial</option>
+          <option value="Georgia">Georgia</option><option value="Consolas">Consolas</option>
+          <option value="Times New Roman">Times New Roman</option>
+        </select>
+        <div class="format-toolbar">
+          <div class="prop-pair">
+            <input id="cfg-text-node-font-size" class="prop-val coord" type="number" min="8" max="120" onchange="updateGeneralConfig('textNodeFontSize',this.value)" />
+            <span style="font-size:11px;color:var(--text2)">px</span>
+          </div>
+          <div class="text-format-group" role="group" aria-label="Estilo de texto">
+            <label class="format-toggle" data-format="bold" title="Negrita"><input id="cfg-text-node-font-bold" type="checkbox" onchange="updateGeneralConfig('textNodeFontBold',this.checked)" /><span class="format-glyph" aria-hidden="true">B</span></label>
+            <label class="format-toggle" data-format="italic" title="Cursiva"><input id="cfg-text-node-font-italic" type="checkbox" onchange="updateGeneralConfig('textNodeFontItalic',this.checked)" /><span class="format-glyph" aria-hidden="true">I</span></label>
+          </div>
+        </div>
+        <div class="prop-label" style="margin-top:7px">Color del texto</div>
+        <input id="cfg-text-node-text-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('textNodeTextColor',this.value)" />
+        <div class="prop-label" style="margin-top:9px">Contenedor del nodo</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 58px;gap:6px">
+          <label style="font-size:10px;color:var(--text2)">Fondo<input id="cfg-text-node-background" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('textNodeBackground',this.value)" /></label>
+          <label style="font-size:10px;color:var(--text2)">Borde<input id="cfg-text-node-border-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('textNodeBorderColor',this.value)" /></label>
+          <label style="font-size:10px;color:var(--text2)">px<input id="cfg-text-node-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('textNodeBorderWidth',this.value)" /></label>
+        </div>
+        <label class="prop-check" style="margin-top:7px"><input id="cfg-text-node-background-transparent" type="checkbox" onchange="updateGeneralConfig('textNodeBackgroundTransparent',this.checked)" /> Fondo transparente</label>
+        <label class="prop-check" style="margin-top:5px"><input id="cfg-text-node-border-hidden" type="checkbox" onchange="updateGeneralConfig('textNodeBorderHidden',this.checked)" /> Ocultar borde</label>
+        <div class="prop-label" style="margin-top:9px">Contenedor del texto</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 58px;gap:6px">
+          <label style="font-size:10px;color:var(--text2)">Fondo<input id="cfg-text-node-text-background" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('textNodeTextBackground',this.value)" /></label>
+          <label style="font-size:10px;color:var(--text2)">Borde<input id="cfg-text-node-text-border-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('textNodeTextBorderColor',this.value)" /></label>
+          <label style="font-size:10px;color:var(--text2)">px<input id="cfg-text-node-text-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('textNodeTextBorderWidth',this.value)" /></label>
+        </div>
+        <label class="prop-check" style="margin-top:7px"><input id="cfg-text-node-text-background-transparent" type="checkbox" onchange="updateGeneralConfig('textNodeTextBackgroundTransparent',this.checked)" /> Fondo transparente</label>
+        <label class="prop-check" style="margin-top:5px"><input id="cfg-text-node-text-border-hidden" type="checkbox" onchange="updateGeneralConfig('textNodeTextBorderHidden',this.checked)" /> Ocultar borde</label>
+      </div>
+      <div class="prop-row" style="margin-top:16px">
+        <div class="prop-label">Grosor predeterminado del link</div>
+        <div class="prop-pair">
+          <input id="cfg-link-width" class="prop-val coord" type="number" min="1" max="24" onchange="updateGeneralConfig('linkWidth',this.value)" />
+          <span style="font-size:11px;color:var(--text2)">px</span>
+        </div>
+      </div>
+      <div class="prop-row">
+        <div class="prop-label">Marcador intermedio del link</div>
+        <div id="cfg-mid-termination-host"></div>
+      </div>
+      <div class="prop-row">
+        <div class="prop-label" style="display:flex;justify-content:space-between">
+          <span>Posición predeterminada del divisor</span><span id="cfg-divider-position-value">50%</span>
+        </div>
+        <input id="cfg-divider-position" class="prop-val" type="range" min="5" max="95" step="1"
+               oninput="document.getElementById('cfg-divider-position-value').textContent=this.value+'%'"
+               onchange="updateGeneralConfig('dividerPosition',this.value)" />
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3)"><span>Entrada</span><span>Salida</span></div>
+      </div>
+      <div class="prop-row">
+        <div class="prop-label">Texto de utilización predeterminado</div>
+        <div id="cfg-usage-label-format-host"></div>
+        <div class="prop-label" style="margin-top:7px">Ubicación</div>
+        <div id="cfg-usage-label-position-host"></div>
+        <label class="prop-check" style="margin-top:7px"><input id="cfg-usage-label-rotate" type="checkbox"
+               onchange="updateGeneralConfig('usageLabelRotate',this.checked)" /> Rotar siguiendo el enlace</label>
+        <label class="prop-check" style="margin-top:5px"><input id="cfg-usage-label-flip" type="checkbox" disabled
+               onchange="updateGeneralConfig('usageLabelFlip',this.checked)" /> Girar 180° sólo en vertical</label>
+      </div>
+      <div class="prop-row">
+        <div class="prop-label">Tag de capacidad predeterminado</div>
+        <label class="prop-check"><input id="cfg-capacity-label-visible" type="checkbox"
+               onchange="updateGeneralConfig('capacityLabelVisible',this.checked)" /> Mostrar tag de capacidad</label>
+        <div class="prop-label" style="margin-top:7px">Posición del tag</div>
+        <div id="cfg-capacity-label-placement-host"></div>
+        <div class="prop-label" style="margin-top:7px">Tamaño del texto</div>
+        <div class="prop-pair"><input id="cfg-capacity-label-font-size" class="prop-val coord" type="number" min="8" max="72"
+             onchange="updateGeneralConfig('capacityLabelFontSize',this.value)" /><span>px</span></div>
+        <label class="prop-check" style="margin-top:7px"><input id="cfg-capacity-label-rotate" type="checkbox"
+               onchange="updateGeneralConfig('capacityLabelRotate',this.checked)" /> Rotar siguiendo el enlace</label>
+        <label class="prop-check" style="margin-top:5px"><input id="cfg-capacity-label-flip" type="checkbox" disabled
+               onchange="updateGeneralConfig('capacityLabelFlip',this.checked)" /> Girar 180° sólo en vertical</label>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">
+  <span id="mode-label">Modo: Seleccionar</span>
+  <span>|</span>
+  <span id="node-count">Nodos: 0 | Enlaces: 0</span>
+  <span>|</span>
+  <span>Escala:</span>
+  <div class="scale-mini" id="scale-mini-bar"></div>
+  <div class="spacer"></div>
+  <div class="status-message" id="status-message" data-state="ready" aria-live="polite"><div class="status-dot"></div><span id="status-text">Listo</span></div>
+  <span>|</span>
+  <span id="coord-display">x:—  y:—</span>
+</div>
+
+<div class="modal-backdrop" id="chart-wizard" role="dialog" aria-modal="true" aria-labelledby="chart-wizard-title">
+  <div class="modal-card">
+    <div class="modal-header">
+      <span class="modal-icon">📊</span>
+      <span class="modal-title" id="chart-wizard-title">Crear gráfica</span>
+      <button class="modal-close" onclick="closeChartWizard()" title="Cerrar (Esc)">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-subtitle">Configura la visualización y después colócala en el canvas.</p>
+      <div class="prop-row">
+        <div class="prop-label">Título</div>
+        <input class="prop-val editable" id="chart-title" type="text" value="Gráfica" />
+      </div>
+      <div class="wizard-grid">
+        <div class="prop-row">
+          <div class="prop-label">Tipo</div>
+          <div class="seg-toggle" role="group" aria-label="Tipo de gráfica">
+            <label class="seg-opt" title="Barras"><input type="radio" name="chart-type" value="bar" checked /><span class="seg-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19V10h4v9M10 19V5h4v14M15 19v-7h4v7M3 19h18"/></svg></span></label>
+            <label class="seg-opt" title="Línea"><input type="radio" name="chart-type" value="line" /><span class="seg-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 15l5-6 4 4 6-8"/><path d="M3 19h18"/></svg></span></label>
+            <label class="seg-opt" title="Dona"><input type="radio" name="chart-type" value="donut" /><span class="seg-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3"/></svg></span></label>
+          </div>
+        </div>
+        <div class="prop-row">
+          <div class="prop-label">Color</div>
+          <input class="prop-val" id="chart-color" type="color" value="#0dbfa6" style="height:31px;padding:3px" />
+        </div>
+      </div>
+      <div class="prop-row">
+        <div class="prop-label">Valores separados por coma</div>
+        <input class="prop-val editable" id="chart-values" type="text" value="25, 50, 35, 80, 60" />
+      </div>
+      <div class="prop-row" style="margin-bottom:0">
+        <div class="prop-label">Tamaño</div>
+        <div class="prop-pair">
+          <input class="prop-val coord" id="chart-width" type="number" min="120" max="1000" value="240" />
+          <span style="color:var(--text3)">×</span>
+          <input class="prop-val coord" id="chart-height" type="number" min="100" max="800" value="160" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-left">
+        <button class="tb-btn" onclick="closeChartWizard()">Cancelar</button>
+      </div>
+      <div class="modal-footer-right">
+        <button class="tb-btn primary" id="chart-wizard-save" onclick="saveChartWizard()">Crear y colocar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="map-modal" role="dialog" aria-modal="true" aria-labelledby="map-modal-title">
+  <div class="modal-card map-modal-panel">
+    <div class="modal-header">
+      <span class="modal-icon">🗺️</span>
+      <span class="modal-title" id="map-modal-title">Mapas guardados</span>
+      <button class="modal-close" onclick="closeMapModal()" title="Cerrar (Esc)">✕</button>
+    </div>
+    <div class="map-modal-body">
+      <div class="map-modal-search">
+        <span class="map-modal-search-icon">⌕</span>
+        <input id="map-modal-search" type="text" placeholder="Buscar mapa…" oninput="filterMapModal(this.value)" autocomplete="off" />
+      </div>
+      <div id="map-modal-grid"></div>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-left">
+        <button class="tb-btn" onclick="openMapPicker();closeMapModal()">📂 Importar JSON</button>
+      </div>
+      <div class="modal-footer-right">
+        <button class="tb-btn" onclick="closeMapModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-backdrop" id="confirm-modal" role="alertdialog" aria-modal="true">
+  <div class="modal-card" style="width:min(400px,100%)">
+    <div class="modal-header">
+      <span class="modal-icon">⚠️</span>
+      <span class="modal-title" id="confirm-modal-title">¿Confirmar?</span>
+      <button class="modal-close" onclick="resolveConfirm(false)" title="Cancelar (Esc)">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-modal-msg" style="color:var(--text2);font-size:13px;line-height:1.6"></p>
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-left">
+        <button class="tb-btn" onclick="resolveConfirm(false)">Cancelar</button>
+      </div>
+      <div class="modal-footer-right">
+        <button class="tb-btn primary" id="confirm-modal-ok" onclick="resolveConfirm(true)">Aceptar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Prompt modal -->
+<div class="modal-backdrop" id="prompt-modal" role="dialog" aria-modal="true">
+  <div class="modal-card" style="width:min(420px,100%)">
+    <div class="modal-header">
+      <span class="modal-icon">✏️</span>
+      <span class="modal-title" id="prompt-modal-title">Nombre</span>
+      <button class="modal-close" onclick="resolvePrompt(null)" title="Cancelar (Esc)">✕</button>
+    </div>
+    <div class="modal-body">
+      <input id="prompt-modal-input" type="text" class="prop-val editable"
+             style="width:100%;box-sizing:border-box"
+             onkeydown="if(event.key==='Enter')resolvePrompt();if(event.key==='Escape')resolvePrompt(null)" />
+    </div>
+    <div class="modal-footer">
+      <div class="modal-footer-left">
+        <button class="tb-btn" onclick="resolvePrompt(null)">Cancelar</button>
+      </div>
+      <div class="modal-footer-right">
+        <button class="tb-btn primary" onclick="resolvePrompt()">Aceptar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hotkeys modal -->
+<div class="modal-backdrop" id="hotkeys-modal" role="dialog" aria-modal="true" aria-labelledby="hotkeys-modal-title">
+  <div class="modal-card hotkeys-modal-card">
+    <div class="modal-header">
+      <span class="modal-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h.01M11 9h.01M15 9h.01M18 9h.01M7 13h.01M10 13h.01M17 13h.01M8 16h8"/></svg></span>
+      <span class="modal-title" id="hotkeys-modal-title">Atajos de herramientas</span>
+      <button class="modal-close" onclick="closeHotkeysModal()" title="Cerrar (Esc)">✕</button>
+    </div>
+    <div class="modal-body hotkeys-modal-body">
+      <div class="hotkeys-intro"><strong>Tu flujo, a tu manera</strong><span>Selecciona un atajo y presiona una letra o número. Los duplicados se intercambian automáticamente.</span></div>
+      <div id="hotkeys-list"></div>
+    </div>
+    <div class="modal-footer">
+      <div><button class="tb-btn" onclick="resetHotkeysDraft()">Restablecer</button></div>
+      <div><button class="tb-btn" onclick="closeHotkeysModal()">Cancelar</button><button class="tb-btn primary" onclick="saveHotkeys()">Guardar atajos</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container" role="region" aria-label="Notificaciones" aria-live="polite"></div>
