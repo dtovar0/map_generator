@@ -1551,6 +1551,19 @@ function buildVertices(allPts, fromPort) {
   return v;
 }
 
+function endpointApproachPoint(point, port, distance = Math.max(12, GRID)) {
+  if (port === 'top') return {x:point.x, y:point.y-distance};
+  if (port === 'bottom') return {x:point.x, y:point.y+distance};
+  if (port === 'left') return {x:point.x-distance, y:point.y};
+  if (port === 'right') return {x:point.x+distance, y:point.y};
+  return {...point};
+}
+
+function uniqueVertices(vertices) {
+  return vertices.filter((point, index) => index === 0 ||
+    point.x !== vertices[index-1].x || point.y !== vertices[index-1].y);
+}
+
 // A point contact is valid; sharing a positive-length collinear segment is not.
 function segmentsShareLength(a, b, c, d, epsilon = 0.01) {
   const abHorizontal = Math.abs(a.y - b.y) <= epsilon;
@@ -1589,23 +1602,27 @@ function getLinkVertices(link) {
   if (!from || !to) return [];
   const fp = getLinkPortPos(from, link.fromPort || 'center', link.fromOffset || 0);
   const tp = getLinkPortPos(to, link.toPort || 'center', link.toOffset || 0);
+  const fromPort = link.fromPort || 'center';
+  const toPort = link.toPort || 'center';
+  const startApproach = endpointApproachPoint(fp, fromPort);
+  const endApproach = endpointApproachPoint(tp, toPort);
   if (!(link.waypoints || []).length && link.routeLane) {
     const laneOffset = link.routeLane * GRID;
-    const fromPort = link.fromPort || 'center';
     const verticalExit = fromPort === 'top' || fromPort === 'bottom' ||
-      (fromPort === 'center' && Math.abs(tp.y - fp.y) >= Math.abs(tp.x - fp.x));
+      (fromPort === 'center' && Math.abs(endApproach.y - startApproach.y) >= Math.abs(endApproach.x - startApproach.x));
     let verts;
-    if (verticalExit && Math.abs(fp.x - tp.x) < 0.01)
-      verts = [fp, {x:fp.x+laneOffset,y:fp.y}, {x:tp.x+laneOffset,y:tp.y}, tp];
-    else if (!verticalExit && Math.abs(fp.y - tp.y) < 0.01)
-      verts = [fp, {x:fp.x,y:fp.y+laneOffset}, {x:tp.x,y:tp.y+laneOffset}, tp];
+    if (verticalExit && Math.abs(startApproach.x - endApproach.x) < 0.01)
+      verts = [startApproach, {x:startApproach.x+laneOffset,y:startApproach.y}, {x:endApproach.x+laneOffset,y:endApproach.y}, endApproach];
+    else if (!verticalExit && Math.abs(startApproach.y - endApproach.y) < 0.01)
+      verts = [startApproach, {x:startApproach.x,y:startApproach.y+laneOffset}, {x:endApproach.x,y:endApproach.y+laneOffset}, endApproach];
     else
       verts = verticalExit
-        ? [fp, {x:fp.x, y:(fp.y+tp.y)/2 + laneOffset}, {x:tp.x, y:(fp.y+tp.y)/2 + laneOffset}, tp]
-        : [fp, {x:(fp.x+tp.x)/2 + laneOffset, y:fp.y}, {x:(fp.x+tp.x)/2 + laneOffset, y:tp.y}, tp];
-    return verts.filter((p, i) => i === 0 || p.x !== verts[i-1].x || p.y !== verts[i-1].y);
+        ? [startApproach, {x:startApproach.x, y:(startApproach.y+endApproach.y)/2 + laneOffset}, {x:endApproach.x, y:(startApproach.y+endApproach.y)/2 + laneOffset}, endApproach]
+        : [startApproach, {x:(startApproach.x+endApproach.x)/2 + laneOffset, y:startApproach.y}, {x:(startApproach.x+endApproach.x)/2 + laneOffset, y:endApproach.y}, endApproach];
+    return uniqueVertices([fp, ...verts, tp]);
   }
-  return buildVertices([fp, ...(link.waypoints || []), tp], link.fromPort || 'center');
+  const controls = uniqueVertices([fp, startApproach, ...(link.waypoints || []), endApproach, tp]);
+  return uniqueVertices(buildVertices(controls, fromPort));
 }
 
 function findLinkOverlap(onlyLinkId = null) {
@@ -2098,6 +2115,8 @@ function renderLinks() {
     const outC = presentationMode ? getColor(link.outPct, linkScale) : EDITOR_OUT_COLOR;
     const isSel = link.id === selectedLinkId || selectedLinkIds.has(link.id);
     const baseW = Math.max(1, Math.min(24, Number(link.width) || 6));
+    const hasRealTelemetry = !!link.dataSource && link.telemetryTimestamp != null && !link.telemetryError;
+    const hasRealCapacity = !!link.dataSource && Number(link.dataSource.capacityBps) > 0;
     const W = baseW + (isSel ? 2 : 0);
 
     const g = document.createElementNS('http://www.w3.org/2000/svg','g');
@@ -2229,18 +2248,18 @@ function renderLinks() {
       }
     }
 
-    // Editor uses fictitious values; presentation uses real utilization.
+    // Both editor and presentation use real telemetry when a datasource is available.
     {
       const unit = link.capacityUnit || 'Mbps';
       const labelFormat = link.usageLabelFormat === 'human' ? 'human' : 'percentage';
-      const inPercentage = presentationMode ? link.inPct : (link.editorInPct ?? 0);
-      const outPercentage = presentationMode ? link.outPct : (link.editorOutPct ?? 0);
-      const inValue = presentationMode ? link.inUsage : (Number(link.capacity) || 100) * inPercentage / 100;
-      const outValue = presentationMode ? link.outUsage : (Number(link.capacity) || 100) * outPercentage / 100;
+      const inPercentage = link.inPct;
+      const outPercentage = link.outPct;
+      const inValue = link.inUsage;
+      const outValue = link.outUsage;
       const labelPosition = ['center','above','below'].includes(link.usageLabelPosition) ? link.usageLabelPosition : 'above';
       const labelData = [
-        ['in', metricsAtPolylinePercentage(firstVerts, link.usageLabelInPosition ?? 50), inC, formatUsageLabel(labelFormat, inPercentage, inValue, unit)],
-        ['out', metricsAtPolylinePercentage(secondVerts, link.usageLabelOutPosition ?? 50), outC, formatUsageLabel(labelFormat, outPercentage, outValue, unit)]
+        ['in', metricsAtPolylinePercentage(firstVerts, link.usageLabelInPosition ?? 50), inC, hasRealTelemetry ? formatUsageLabel(labelFormat, inPercentage, inValue, unit) : 'NS'],
+        ['out', metricsAtPolylinePercentage(secondVerts, link.usageLabelOutPosition ?? 50), outC, hasRealTelemetry ? formatUsageLabel(labelFormat, outPercentage, outValue, unit) : 'NS']
       ];
       labelData.forEach(([sideName, metrics, col, txt]) => {
         const routeRadians = metrics.angle * Math.PI / 180;
@@ -2303,7 +2322,7 @@ function renderLinks() {
       const side = ['above','below','left','right'].includes(link.capacityLabelSide) ? link.capacityLabelSide : 'right';
       const fontSize = Math.max(8, Math.min(72, Number(link.capacityLabelFontSize) || 11));
       const height = fontSize + 6;
-      const txt = link.dataSource
+      const txt = hasRealCapacity
         ? `${formatUtilization(link.capacity)} ${shortCapacityUnit(link.capacityUnit || 'Mbps')}`
         : 'NS';
       const width = txt.length * fontSize * 0.59 + 12;
@@ -5180,6 +5199,7 @@ async function openServerMap(id, requestedDate = null) {
     if (!response.ok) throw new Error(result.error || 'No se pudo abrir');
     cancelPlacing(); cancelLink();
     applySnapshot(result.snapshot);
+    await refreshCactiMetrics().catch(error => console.error('Cacti telemetry:', error));
     rememberCurrentServerMap(result.map.id, result.map.name, result.date);
     selectedMapDate = result.date;
     document.getElementById('presentation-date').value = selectedMapDate;
