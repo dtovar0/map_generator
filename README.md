@@ -32,9 +32,9 @@ colector Python se ejecuta después del poller de Cacti, detecta las fuentes usa
 mapas, lee únicamente esos RRD y guarda una muestra. El navegador conserva referencias por
 `localDataId`, nunca rutas arbitrarias.
 
-`CACTI_METRICS_SOURCE` selecciona la fuente de valores: `db` (predeterminado) consulta
-`mapgen_rrd_samples` y requiere el colector Python; `rrd` ejecuta `rrdtool` durante la petición
-y no requiere esa tabla. Ambos modos consultan el catálogo de Cacti en la base de datos. En
+`CACTI_METRICS_SOURCE` selecciona la fuente de valores: `rrd` (predeterminado) ejecuta
+`rrdtool` durante la petición y no requiere la tabla `mapgen_rrd_samples`; `db` consulta esa
+tabla y requiere el colector Python. Ambos modos consultan el catálogo de Cacti en la base de datos. En
 modo `rrd`, el usuario que ejecuta Next.js necesita permiso de lectura sobre los RRD y permiso
 para ejecutar el binario configurado en `CACTI_RRDTOOL`.
 

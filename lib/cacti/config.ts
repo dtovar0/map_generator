@@ -25,7 +25,7 @@ function list(value: string | undefined): string[] {
 
 export function getCactiConfig(): CactiConfig {
   const socketPath = process.env.CACTI_DB_SOCKET?.trim();
-  const metricsSource = process.env.CACTI_METRICS_SOURCE?.trim().toLowerCase() === "rrd" ? "rrd" : "db";
+  const metricsSource = process.env.CACTI_METRICS_SOURCE?.trim().toLowerCase() === "db" ? "db" : "rrd";
   return {
     enabled: process.env.CACTI_ENABLED !== "false",
     metricsSource,
