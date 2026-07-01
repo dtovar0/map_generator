@@ -490,6 +490,10 @@
   /* Link mode: default port dots are invisible (enlarged) click targets;
      the numbered/next hint circles on the overlay are the visible connection points. */
   body.linking .node-port { opacity: 0; width: 18px; height: 18px; border-radius: 50%; }
+  body.linking .node-port.top,
+  body.linking .node-port.bottom { width: 100%; height: 18px; }
+  body.linking .node-port.left,
+  body.linking .node-port.right { width: 18px; height: 100%; }
   .node-port.top    { top:-5px;    left:50%;  transform:translate(-50%, 0); }
   .node-port.bottom { bottom:-5px; left:50%;  transform:translate(-50%, 0); }
   .node-port.left   { left:-5px;   top:50%;   transform:translate(0, -50%); }

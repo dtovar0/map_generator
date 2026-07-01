@@ -50,7 +50,7 @@ function loadToolHotkeys() {
 }
 let toolHotkeys = loadToolHotkeys();
 let hotkeyDraft = null;
-const GRID = 20, DEFAULT_LINK_PADDING = 12; let zoom = 1;
+const GRID = 20, DEFAULT_LINK_PADDING = 12, PORT_SLOT_COUNT = 10; let zoom = 1;
 const EDITOR_IN_COLOR = '#2D8CFF', EDITOR_OUT_COLOR = '#F06432';
 const DEFAULT_GENERAL_CONFIG = {
   nodeWidth: 120, nodeHeight: 120, linkPadding: DEFAULT_LINK_PADDING,
@@ -295,6 +295,7 @@ function applySnapshot(snap) {
   linkCounter = Number.isInteger(snap.linkCounter) ? snap.linkCounter : maxIdNumber(links);
   document.getElementById('canvas').innerHTML = '';
   nodes.forEach(n => renderNode(n));
+  nodes.forEach(n => distributePortLinks(n.id));
   renderScaleUI();
   renderConfigUI();
   clearSelection(); renderLinks(); updateHint(); updateCounter();
@@ -752,22 +753,24 @@ function renderNode(n) {
       if (e.target.classList.contains('node-port')) {
         if (currentTool !== 'link') return;
         const port = e.target.dataset.port;
+        const pointer = getCanvasPos(e);
         if (!linkStart) {
           // START link from this port
-          startLink(n.id, port);
+          startLink(n.id, port, pointer);
         } else if (linkStart.nodeId !== n.id) {
           // COMPLETE link to a different node's port
-          onNodeClickForLink(n.id, port);
+          onNodeClickForLink(n.id, port, pointer);
         }
         // Same node → ignore (no self-links)
         return;
       }
 
       if (currentTool === 'link') {
+        const pointer = getCanvasPos(e);
         if (!linkStart) {
-          startLink(n.id, 'center');
+          startLink(n.id, 'center', pointer);
         } else if (linkStart.nodeId !== n.id) {
-          onNodeClickForLink(n.id, 'center');
+          onNodeClickForLink(n.id, 'center', pointer);
         }
         return;
       }
@@ -782,9 +785,12 @@ function renderNode(n) {
       if (nodeDraggedFlag) return; // was a select+drag, not a real double-click
       e.stopPropagation();
       if (n.type === 'text') { startInlineTextEdit(n.id); return; }
-      // Double-click a node → enter "create links" mode (shows the connection points).
+      // Double-click a node → edit its existing endpoints on the 10-position grid.
+      setTool('select');
       selectNode(n.id);
-      setTool('link');
+      setConnHandlesMode(true);
+      renderLinks();
+      setStatus('Grid de 10 posiciones activo · arrastra un enlace arriba o abajo');
     });
 
     document.getElementById('canvas').appendChild(el);
@@ -993,24 +999,39 @@ document.getElementById('canvas-wrap').addEventListener('click', e => {
   }
   if (!onNode) {
     if (linkStart) {
-      // Add a waypoint (quiebre) at the clicked position
       const pos = getCanvasPos(e);
-      const wp = { x: snap(pos.x), y: snap(pos.y) };
-      linkWaypoints.push(wp);
-      // Draw a small dot marker at this waypoint
-      const svg = document.getElementById('links-svg');
-      const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
-      dot.setAttribute('cx', wp.x); dot.setAttribute('cy', wp.y); dot.setAttribute('r', '5');
-      dot.setAttribute('fill', '#0DBFA6'); dot.setAttribute('stroke', '#070C13');
-      dot.setAttribute('stroke-width', '2'); dot.setAttribute('pointer-events', 'none');
-      dot.classList.add('link-wp-dot');
-      svg.appendChild(dot);
-      setStatus(`Quiebre añadido (${wp.x}, ${wp.y}) — ${linkWaypoints.length} quiebre(s) · clic en destino para conectar`);
+      commitLinkWaypoint({ x:snap(pos.x), y:snap(pos.y) });
       return;
     }
     clearSelection();
   }
 });
+
+function renderPendingLinkWaypoints() {
+  document.querySelectorAll('.link-wp-dot').forEach(dot => dot.remove());
+  const svg = document.getElementById('links-svg');
+  linkWaypoints.forEach(wp => {
+    const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx', wp.x); dot.setAttribute('cy', wp.y); dot.setAttribute('r', '5');
+    dot.setAttribute('fill', '#0DBFA6'); dot.setAttribute('stroke', '#070C13');
+    dot.setAttribute('stroke-width', '2'); dot.setAttribute('pointer-events', 'none');
+    dot.classList.add('link-wp-dot');
+    svg.appendChild(dot);
+  });
+}
+
+function commitLinkWaypoint(point) {
+  if (!linkStart) return;
+  const from = nodes.find(node => node.id === linkStart.nodeId); if (!from) return;
+  const start = getLinkPortPos(from, linkStart.port || 'center', linkStart.fromOffset || 0);
+  // Store the real orthogonal vertices already shown to the user. Future mouse
+  // movement may extend the route, but can no longer reinterpret prior bends.
+  const committed = buildVertices([start, ...linkWaypoints, point], linkStart.port || 'center');
+  linkWaypoints = committed.slice(1).filter((current, index, list) =>
+    index === 0 || current.x !== list[index - 1].x || current.y !== list[index - 1].y);
+  renderPendingLinkWaypoints();
+  setStatus(`Tramo fijado en (${point.x}, ${point.y}) — ${linkWaypoints.length} punto(s) · clic en destino para conectar`);
+}
 
 // ════════════════════════════════════════════════════
 // MOUSE MOVE
@@ -1131,11 +1152,21 @@ document.addEventListener('mousemove', e => {
       }, {side:'bottom', score:-Infinity});
       const newPort = best.side;
       const isHoriz = newPort === 'top' || newPort === 'bottom';
-      const maxOff  = (isHoriz ? n.w : n.h) * 0.4;
       const raw     = isHoriz ? (pos.x - n.x) : (pos.y - n.y);
-      const off     = Math.max(-maxOff, Math.min(maxOff, snap(raw)));
-      if (isFrom) { l.fromPort = newPort; l.fromOffset = off; l.fromPortLocked = true; }
-      else        { l.toPort   = newPort; l.toOffset   = off; l.toPortLocked = true; }
+      const allSlots = Array.from({length:PORT_SLOT_COUNT}, (_, i) => i + 1);
+      const slot = allSlots.reduce((bestSlot, candidate) =>
+        Math.abs(portSlotOffset(n, newPort, candidate) - raw) < Math.abs(portSlotOffset(n, newPort, bestSlot) - raw)
+          ? candidate : bestSlot, allSlots[0]);
+      if (usedPortSlots(nodeId, newPort, l.id).has(slot)) {
+        if (draggingConnHandle.collisionSlot !== `${newPort}:${slot}`) {
+          draggingConnHandle.collisionSlot = `${newPort}:${slot}`;
+          showToast(`La posición ${slot} del lado ${portSideLabel(newPort)} ya está ocupada.`, 'error');
+        }
+        setStatus(`⚠ Posición ${slot} ocupada`);
+        return;
+      }
+      draggingConnHandle.collisionSlot = null;
+      setEndpointSlot(l, nodeId, newPort, slot);
       renderLinks();
     }
     return;
@@ -1230,7 +1261,8 @@ document.addEventListener('mouseup', () => {
 
   // Commit after any completed drag — push AFTER the change so history is correct
   if (wasDraggingNode || wasResizing || wasRotating || wasDraggingWp || wasDraggingConn) {
-    const reverted = geometryChangeSnapshot && revertIfLinksOverlap(geometryChangeSnapshot, preferredLinkIds);
+    // Endpoint-grid edits are explicit user placement; never reroute them automatically.
+    const reverted = !wasDraggingConn && geometryChangeSnapshot && revertIfLinksOverlap(geometryChangeSnapshot, preferredLinkIds);
     if (!reverted) {
       pushHistory();
       // For node/resize drags, clear the cancel snapshot — for waypoint/conn drags
@@ -1315,12 +1347,19 @@ function onTextRotateStart(e, id) {
   document.getElementById(id)?.classList.add('rotating-text');
   setStatus('Arrastra el rombo para girar · Shift ajusta cada 15°');
 }
-function startLink(nodeId, port) {
+function startLink(nodeId, requestedPort, pointer = null) {
   linkWaypoints = [];
   document.querySelectorAll('.link-wp-dot').forEach(d => d.remove());
   const n = nodes.find(x => x.id === nodeId);
-  const pp = getLinkPortPos(n, port);
-  linkStart = { nodeId, port, px: pp.x, py: pp.y };
+  const port = resolvePointerPort(n, requestedPort, pointer);
+  const slot = closestFreePortSlot(nodeId, port, pointer);
+  if (slot === null) {
+    showAlert(`El lado ${portSideLabel(port)} de "${n.name}" ya tiene ${PORT_SLOT_COUNT} enlaces. Selecciona otro lado o reorganiza sus posiciones.`, 'Lado completo');
+    return;
+  }
+  const fromOffset = portSlotOffset(n, port, slot);
+  const pp = getLinkPortPos(n, port, fromOffset);
+  linkStart = { nodeId, port, fromSlot:slot, fromOffset, px: pp.x, py: pp.y };
   if (!linkPreviewEl) {
     linkPreviewEl = document.createElementNS('http://www.w3.org/2000/svg','path');
     linkPreviewEl.classList.add('link-preview');
@@ -1330,15 +1369,24 @@ function startLink(nodeId, port) {
   setStatus(`Origen: ${n.name} (${portName}) — clic para quiebre · clic en destino para conectar · Esc cancela`);
 }
 
-function onNodeClickForLink(toId, toPort) {
+function onNodeClickForLink(toId, requestedPort, pointer = null) {
   if (!linkStart || linkStart.nodeId === toId) return;
+  const target = nodes.find(node => node.id === toId);
+  const toPort = resolvePointerPort(target, requestedPort, pointer);
+  const toSlot = closestFreePortSlot(toId, toPort, pointer);
+  if (toSlot === null) {
+    showAlert(`El lado ${portSideLabel(toPort)} de "${target?.name || 'este nodo'}" ya tiene ${PORT_SLOT_COUNT} enlaces. Selecciona otro lado o reorganiza sus posiciones.`, 'Lado completo');
+    return;
+  }
   linkCounter++;
   const newLinkId = 'l' + linkCounter;
   const iP = Math.floor(Math.random()*100), oP = Math.floor(Math.random()*100);
   links.push({
     id: newLinkId,
-    from: linkStart.nodeId, fromPort: linkStart.port || 'center', fromOffset: 0,
-    to: toId,               toPort:  toPort || 'center',         toOffset:   0,
+    from: linkStart.nodeId, fromPort: linkStart.port || 'center', fromSlot:linkStart.fromSlot,
+    fromOffset: linkStart.fromOffset,
+    to: toId, toPort:toPort || 'center', toSlot,
+    toOffset: portSlotOffset(target, toPort, toSlot),
     fromPortLocked: (linkStart.port || 'center') !== 'center', toPortLocked: (toPort || 'center') !== 'center',
     inPct:0, outPct:0, editorInPct:iP, editorOutPct:oP,
     usageLabelInPosition:50, usageLabelOutPosition:50,
@@ -1361,8 +1409,7 @@ function onNodeClickForLink(toId, toPort) {
     waypoints: [...linkWaypoints]
   });
   const newLink = links[links.length - 1];
-  // Spread the links on each involved node's edge so every link gets its OWN exit point
-  // (never stacked on an occupied center) — local to these two nodes only.
+  // Assign only missing legacy slots. Existing endpoints never move when a link is added.
   distributePortLinks(linkStart.nodeId);
   distributePortLinks(toId);
   // Keep the planned route: only make room for double-arrow markers, do NOT auto-reroute.
@@ -1394,6 +1441,77 @@ function getPortPos(node, port, offset = 0) {
     case 'right':  return { x: node.x + hw, y: node.y + ov };
     default:       return { x: node.x,      y: node.y      };
   }
+}
+
+function portSlotOffset(node, port, slot) {
+  const normalizedSlot = Math.max(1, Math.min(PORT_SLOT_COUNT, Number(slot) || 1));
+  const isHoriz = port === 'top' || port === 'bottom';
+  const limit = ((isHoriz ? node.w : node.h) / 2) * 0.75;
+  return -limit + (normalizedSlot - 1) * ((limit * 2) / (PORT_SLOT_COUNT - 1));
+}
+
+function endpointSlot(link, nodeId) {
+  return link.from === nodeId ? Number(link.fromSlot) : Number(link.toSlot);
+}
+
+function usedPortSlots(nodeId, port, exceptLinkId = null) {
+  return new Set(links.flatMap(link => {
+    if (link.id === exceptLinkId) return [];
+    if (link.from === nodeId && (link.fromPort || 'center') === port && Number.isInteger(Number(link.fromSlot)))
+      return [Number(link.fromSlot)];
+    if (link.to === nodeId && (link.toPort || 'center') === port && Number.isInteger(Number(link.toSlot)))
+      return [Number(link.toSlot)];
+    return [];
+  }).filter(slot => slot >= 1 && slot <= PORT_SLOT_COUNT));
+}
+
+function firstFreePortSlot(nodeId, port, exceptLinkId = null) {
+  const used = usedPortSlots(nodeId, port, exceptLinkId);
+  for (let slot = 1; slot <= PORT_SLOT_COUNT; slot++) if (!used.has(slot)) return slot;
+  return null;
+}
+
+function resolvePointerPort(node, requestedPort, pointer) {
+  if (!node || requestedPort !== 'center' || !pointer) return requestedPort;
+  const distances = {
+    top:Math.abs(pointer.y - (node.y - node.h / 2)),
+    bottom:Math.abs(pointer.y - (node.y + node.h / 2)),
+    left:Math.abs(pointer.x - (node.x - node.w / 2)),
+    right:Math.abs(pointer.x - (node.x + node.w / 2))
+  };
+  return Object.keys(distances).reduce((best, side) => distances[side] < distances[best] ? side : best, 'top');
+}
+
+function closestFreePortSlot(nodeId, port, pointer = null, exceptLinkId = null) {
+  const node = nodes.find(item => item.id === nodeId);
+  if (!node) return null;
+  const used = usedPortSlots(nodeId, port, exceptLinkId);
+  const available = Array.from({length:PORT_SLOT_COUNT}, (_, index) => index + 1).filter(slot => !used.has(slot));
+  if (!available.length) return null;
+  if (!pointer) {
+    // Programmatic calls default to the physical center, not the left/top edge.
+    pointer = {x:node.x, y:node.y};
+  }
+  const requestedOffset = port === 'top' || port === 'bottom' ? pointer.x - node.x : pointer.y - node.y;
+  return available.reduce((best, candidate) =>
+    Math.abs(portSlotOffset(node, port, candidate) - requestedOffset) < Math.abs(portSlotOffset(node, port, best) - requestedOffset)
+      ? candidate : best, available[0]);
+}
+
+function portSideLabel(port) {
+  return {top:'superior', bottom:'inferior', left:'izquierdo', right:'derecho'}[port] || port;
+}
+
+function setEndpointSlot(link, nodeId, port, slot) {
+  const node = nodes.find(item => item.id === nodeId);
+  if (!node || !slot) return false;
+  const offset = portSlotOffset(node, port, slot);
+  if (link.from === nodeId) {
+    link.fromPort = port; link.fromSlot = slot; link.fromOffset = offset; link.fromPortLocked = true;
+  } else if (link.to === nodeId) {
+    link.toPort = port; link.toSlot = slot; link.toOffset = offset; link.toPortLocked = true;
+  } else return false;
+  return true;
 }
 
 function getLinkPortPos(node, port, offset = 0) {
@@ -1449,6 +1567,18 @@ function segmentsShareLength(a, b, c, d, epsilon = 0.01) {
     return overlap > epsilon;
   }
   return false;
+}
+
+function pointToPolylineDistance(point, vertices) {
+  let best = Infinity;
+  for (let i = 0; i < vertices.length - 1; i++) {
+    const a = vertices[i], b = vertices[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lengthSq = dx * dx + dy * dy;
+    const t = lengthSq ? Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSq)) : 0;
+    best = Math.min(best, Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy)));
+  }
+  return best;
 }
 
 function getLinkVertices(link) {
@@ -1697,10 +1827,10 @@ function ensureDoubleArrowRoom(link) {
 
 // ─── Draggable connection-point handles on selected node ───
 function clearConnectionHandles() {
-  document.querySelectorAll('.conn-handle').forEach(h => h.remove());
+  document.querySelectorAll('.conn-handle, .conn-slot-grid').forEach(h => h.remove());
 }
-// Link mode: per side of every node show one numbered circle per existing link + one empty
-// circle at the slot where the NEXT link would attach — on both endpoints.
+// Link mode: show only occupied fixed slots. Empty/next circles are intentionally hidden
+// to keep the canvas quiet; a new link takes the first available slot automatically.
 function renderLinkPointHints() {
   const svg = document.getElementById('overlay-svg');
   svg.querySelectorAll('.link-hint').forEach(el => el.remove());
@@ -1712,37 +1842,29 @@ function renderLinkPointHints() {
       const onSide = links.filter(l =>
         (l.from === node.id && (l.fromPort || 'center') === side) ||
         (l.to === node.id && (l.toPort || 'center') === side)
-      ).map(l => (l.from === node.id ? (l.fromOffset || 0) : (l.toOffset || 0)))
-       .sort((a, b) => a - b);
-      const N = onSide.length;
-      const total = N + 1;                       // existing + next available
-      const isHoriz = side === 'top' || side === 'bottom';
-      const clampMax = ((isHoriz ? node.w : node.h) / 2) * 0.75;
-      const step = total > 1 ? (clampMax * 2) / (total - 1) : 0;
+      ).map(l => ({
+        slot: endpointSlot(l, node.id),
+        offset: l.from === node.id ? (l.fromOffset || 0) : (l.toOffset || 0)
+      })).sort((a, b) => a.slot - b.slot);
       const col = sideCol[side];
-      for (let i = 0; i < total; i++) {
-        const off = total > 1 ? -clampMax + i * step : 0;
-        const pos = getLinkPortPos(node, side, off);
-        const isNext = i === total - 1;
+      onSide.forEach(item => {
+        const pos = getLinkPortPos(node, side, item.offset);
         const g = document.createElementNS(ns, 'g'); g.classList.add('link-hint');
         const c = document.createElementNS(ns, 'circle');
         c.setAttribute('cx', pos.x); c.setAttribute('cy', pos.y); c.setAttribute('r', '9');
-        c.setAttribute('fill', isNext ? 'rgba(11,17,25,0.85)' : col);
-        c.setAttribute('stroke', isNext ? col : '#070C13');
+        c.setAttribute('fill', col);
+        c.setAttribute('stroke', '#070C13');
         c.setAttribute('stroke-width', '1.5');
-        if (isNext) c.setAttribute('stroke-dasharray', '3 2');
         g.appendChild(c);
-        if (!isNext) {
-          const t = document.createElementNS(ns, 'text');
-          t.setAttribute('x', pos.x); t.setAttribute('y', pos.y + 3.2);
-          t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '10');
-          t.setAttribute('font-weight', '700'); t.setAttribute('fill', '#070C13');
-          t.setAttribute('font-family', 'Consolas,monospace');
-          t.textContent = String(i + 1);
-          g.appendChild(t);
-        }
+        const t = document.createElementNS(ns, 'text');
+        t.setAttribute('x', pos.x); t.setAttribute('y', pos.y + 3.2);
+        t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '10');
+        t.setAttribute('font-weight', '700'); t.setAttribute('fill', '#070C13');
+        t.setAttribute('font-family', 'Consolas,monospace');
+        t.textContent = String(item.slot);
+        g.appendChild(t);
         svg.appendChild(g);
-      }
+      });
     });
   });
 }
@@ -1751,6 +1873,25 @@ function renderConnectionHandles(nodeId) {
   if (currentTool !== 'select') return;
   const n = nodes.find(x => x.id === nodeId); if (!n) return;
   const svg = document.getElementById('overlay-svg'); // renders above HTML nodes
+
+  // Ten fixed positions per side. Occupied positions are solid; available ones
+  // remain hollow so the user can see exactly where an endpoint may be moved.
+  const grid = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  grid.classList.add('conn-slot-grid');
+  const sideColors = {top:'#0DBFA6', bottom:'#28C97A', left:'#F09A38', right:'#E86060'};
+  ['top','bottom','left','right'].forEach(side => {
+    const occupied = usedPortSlots(nodeId, side);
+    for (let slot = 1; slot <= PORT_SLOT_COUNT; slot++) {
+      const pos = getPortPos(n, side, portSlotOffset(n, side, slot));
+      const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      dot.setAttribute('cx', pos.x); dot.setAttribute('cy', pos.y); dot.setAttribute('r', occupied.has(slot) ? '5' : '3.5');
+      dot.setAttribute('fill', occupied.has(slot) ? sideColors[side] : 'rgba(7,12,19,.78)');
+      dot.setAttribute('stroke', sideColors[side]); dot.setAttribute('stroke-width', occupied.has(slot) ? '1.5' : '1');
+      dot.setAttribute('pointer-events', 'none');
+      grid.appendChild(dot);
+    }
+  });
+  svg.appendChild(grid);
 
   links.forEach(link => {
     // When a link is selected, only show handles for that specific link
@@ -1958,13 +2099,16 @@ function renderLinks() {
     const W = baseW + (isSel ? 2 : 0);
 
     const g = document.createElementNS('http://www.w3.org/2000/svg','g');
-    g.classList.add('link-group'); g.dataset.linkId = link.id; g.style.cursor = 'pointer';
+    g.classList.add('link-group'); g.dataset.linkId = link.id; g.style.cursor = 'default';
     if (link.description) {
       const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
       title.textContent = link.description;
       g.appendChild(title);
     }
     g.addEventListener('click', e => {
+      const clickPoint = getCanvasPos(e);
+      const tolerance = Math.max(5, baseW / 2 + 2);
+      if (pointToPolylineDistance(clickPoint, routeVerts) > tolerance) return;
       e.stopPropagation(); e.preventDefault();
       if (presentationMode) showPresentationLinkInfo(link.id);
       else if (e.shiftKey || e.ctrlKey || e.metaKey) toggleLinkSelection(link.id);
@@ -2006,15 +2150,16 @@ function renderLinks() {
       p.setAttribute('d', d); p.setAttribute('stroke', stroke);
       p.setAttribute('stroke-width', W); p.setAttribute('fill', 'none');
       p.setAttribute('stroke-linecap', 'square');
+      p.style.cursor = 'pointer';
       return p;
     };
     g.appendChild(mkHalf(firstHalf,  inC));
     g.appendChild(mkHalf(secondHalf, outC));
 
-    // Wide transparent hit area — drag when selected to insert a waypoint bend
+    // Hit area matches the visible width; empty canvas must keep its normal cursor.
     const hit = document.createElementNS('http://www.w3.org/2000/svg','path');
     hit.setAttribute('d', fullD);
-    hit.setAttribute('stroke', 'transparent'); hit.setAttribute('stroke-width', String(Math.max(22, W + 12)));
+    hit.setAttribute('stroke', 'transparent'); hit.setAttribute('stroke-width', String(baseW));
     hit.setAttribute('fill', 'none'); hit.setAttribute('pointer-events', 'all');
     if (isSel) {
       hit.style.cursor = 'crosshair';
@@ -2038,7 +2183,7 @@ function renderLinks() {
         renderLinks();
         draggingWaypoint = { linkId: l.id, wpIndex: insertIdx };
       });
-    }
+    } else hit.style.cursor = 'pointer';
     g.appendChild(hit);
 
     // Connection point dots — rendered in overlay-svg so they appear above HTML nodes
@@ -3075,10 +3220,8 @@ function autoAssignPort(link, nodeId) {
   const isLocked = isFrom ? link.fromPortLocked : link.toPortLocked;
   if (isLocked) return;
   const port = isFrom ? (link.fromPort || 'center') : (link.toPort || 'center');
-  // Links with user-placed waypoints: only assign if still 'center'; respect manual routing
-  // Links WITHOUT waypoints: always recalculate so ports adapt when nodes are moved
-  const hasWaypoints = (link.waypoints || []).length > 0;
-  if (port !== 'center' && hasWaypoints) return;
+  // Once a side has been chosen it remains fixed, even if either node moves.
+  if (port !== 'center') return;
   const self  = nodes.find(x => x.id === nodeId);
   const other = nodes.find(x => x.id === (isFrom ? link.to : link.from));
   if (!self || !other) return;
@@ -3086,12 +3229,13 @@ function autoAssignPort(link, nodeId) {
   const p = Math.abs(dx) >= Math.abs(dy)
     ? (dx >= 0 ? 'right' : 'left')
     : (dy >= 0 ? 'bottom' : 'top');
-  if (isFrom) link.fromPort = p; else link.toPort = p;
+  if (isFrom) { link.fromPort = p; link.fromPortLocked = true; }
+  else { link.toPort = p; link.toPortLocked = true; }
 }
 
 function distributePortLinks(nodeId) {
   const n = nodes.find(x => x.id === nodeId); if (!n) return;
-  // Auto-assign center-port links to the correct directional port
+  // Migration only: legacy center endpoints receive a side once.
   links.forEach(l => {
     if (l.from === nodeId || l.to === nodeId) autoAssignPort(l, nodeId);
   });
@@ -3101,18 +3245,29 @@ function distributePortLinks(nodeId) {
       (l.to   === nodeId && (l.toPort   || 'center') === port)
     );
     if (pl.length === 0) return;
-    const isHoriz = port === 'top' || port === 'bottom';
-    // Stay within getPortPos clamp range (hw/hh * 0.8)
-    const clampMax = ((isHoriz ? n.w : n.h) / 2) * 0.75;
-    // Reserve one extra slot for the black "next link" hint.  The hint overlay
-    // uses existing links + one available point, so the real endpoints must use
-    // that same spacing or their numbered circles drift away from the lines.
-    const totalSlots = pl.length + 1;
-    const step = totalSlots > 1 ? (clampMax * 2) / (totalSlots - 1) : 0;
-    pl.forEach((l, i) => {
-      const off = -clampMax + i * step;
-      if (l.from === nodeId && (l.fromPort || 'center') === port) l.fromOffset = off;
-      if (l.to   === nodeId && (l.toPort   || 'center') === port) l.toOffset   = off;
+    const used = new Set();
+    const pending = [];
+    pl.forEach(link => {
+      const slot = endpointSlot(link, nodeId);
+      if (Number.isInteger(slot) && slot >= 1 && slot <= PORT_SLOT_COUNT && !used.has(slot)) {
+        used.add(slot);
+        setEndpointSlot(link, nodeId, port, slot);
+      } else pending.push(link);
+    });
+    // Preserve legacy visual order by choosing the nearest available fixed slot.
+    pending.sort((a, b) => {
+      const ao = a.from === nodeId ? Number(a.fromOffset) || 0 : Number(a.toOffset) || 0;
+      const bo = b.from === nodeId ? Number(b.fromOffset) || 0 : Number(b.toOffset) || 0;
+      return ao - bo;
+    }).forEach(link => {
+      const oldOffset = link.from === nodeId ? Number(link.fromOffset) || 0 : Number(link.toOffset) || 0;
+      const available = Array.from({length:PORT_SLOT_COUNT}, (_, i) => i + 1).filter(slot => !used.has(slot));
+      if (!available.length) return;
+      const slot = available.reduce((best, candidate) =>
+        Math.abs(portSlotOffset(n, port, candidate) - oldOffset) < Math.abs(portSlotOffset(n, port, best) - oldOffset)
+          ? candidate : best, available[0]);
+      used.add(slot);
+      setEndpointSlot(link, nodeId, port, slot);
     });
   });
 }
@@ -3144,7 +3299,7 @@ function renderArrangeOverlays() {
         `background:${col};border:1.5px solid #070C13;display:flex;align-items:center;` +
         `justify-content:center;font-size:9px;font-weight:700;color:#070C13;` +
         `pointer-events:none;z-index:50;font-family:Consolas,monospace;`;
-      badge.textContent = String(i + 1);
+      badge.textContent = String(item.slot);
       canvas.appendChild(badge);
     });
   });
@@ -3158,23 +3313,21 @@ function _arrangeDrop(e, targetSide, targetIdx) {
   if (_dragSide === null || _dragIdx === null) return;
   const srcSide = _dragSide, srcIdx = _dragIdx;
   _dragSide = null; _dragIdx = null;
-  const savedGroups = structuredClone(_arrangeState.groups);
   const srcGrp = _arrangeState.groups[srcSide];
   const tgtGrp = _arrangeState.groups[targetSide];
-  const [item] = srcGrp.splice(srcIdx, 1);
-  // Dropping onto a later item places it after that item; onto an earlier item places it before.
-  const insertAt = Math.min(targetIdx, tgtGrp.length);
-  tgtGrp.splice(insertAt, 0, item);
-  _previewArrange();
-  if (findLinkOverlap()) {
-    if (accommodateLinkOverlaps([item.linkId])) {
-      renderLinks(); setStatus('✓ Enlaces acomodados automáticamente');
-    } else {
-      _arrangeState.groups = savedGroups;
-      _previewArrange();
-      setStatus('⚠ Reordenamiento no disponible para estas rutas manuales');
-    }
+  const item = srcGrp[srcIdx], target = tgtGrp[targetIdx];
+  if (!item || !target) return;
+  if (srcSide === targetSide) {
+    [item.slot, target.slot] = [target.slot, item.slot];
+  } else {
+    const freeSlot = firstFreeArrangeSlot(targetSide);
+    if (freeSlot === null) { showArrangeSideFull(targetSide); return; }
+    srcGrp.splice(srcIdx, 1);
+    item.slot = freeSlot; tgtGrp.push(item);
   }
+  sortArrangeGroups();
+  _previewArrange();
+  setStatus('Posición actualizada sin modificar la ruta');
   renderArrangeForm();
 }
 function _arrangeDropOnSection(e, side) {
@@ -3182,21 +3335,30 @@ function _arrangeDropOnSection(e, side) {
   if (_dragSide === null || _dragIdx === null) return;
   const srcSide = _dragSide, srcIdx = _dragIdx;
   _dragSide = null; _dragIdx = null;
-  const savedGroups = structuredClone(_arrangeState.groups);
   const [item] = _arrangeState.groups[srcSide].splice(srcIdx, 1);
-  // Dropping on the section itself appends the link, including within the same side.
-  _arrangeState.groups[side].push(item);
-  _previewArrange();
-  if (findLinkOverlap()) {
-    if (accommodateLinkOverlaps([item.linkId])) {
-      renderLinks(); setStatus('✓ Enlaces acomodados automáticamente');
-    } else {
-      _arrangeState.groups = savedGroups;
-      _previewArrange();
-      setStatus('⚠ Reordenamiento no disponible para estas rutas manuales');
-    }
+  const freeSlot = firstFreeArrangeSlot(side);
+  if (freeSlot === null) {
+    _arrangeState.groups[srcSide].splice(srcIdx, 0, item);
+    showArrangeSideFull(side); return;
   }
+  item.slot = freeSlot;
+  _arrangeState.groups[side].push(item);
+  sortArrangeGroups();
+  _previewArrange();
+  setStatus('Lado actualizado sin modificar la ruta');
   renderArrangeForm();
+}
+
+function firstFreeArrangeSlot(side) {
+  const used = new Set((_arrangeState?.groups[side] || []).map(item => item.slot));
+  for (let slot = 1; slot <= PORT_SLOT_COUNT; slot++) if (!used.has(slot)) return slot;
+  return null;
+}
+function sortArrangeGroups() {
+  Object.values(_arrangeState?.groups || {}).forEach(group => group.sort((a, b) => a.slot - b.slot));
+}
+function showArrangeSideFull(side) {
+  showAlert(`El lado ${portSideLabel(side)} ya tiene ${PORT_SLOT_COUNT} enlaces. Libera una posición o selecciona otro lado.`, 'Lado completo');
 }
 
 // Third view: "ordenamiento". Mutually exclusive with select and link views.
@@ -3225,13 +3387,14 @@ function showArrangeForm(nodeId, embedded = false) {
     if (!isFrom && !isTo) return;
     const port   = isFrom ? (l.fromPort || 'center') : (l.toPort || 'center');
     const offset = isFrom ? (l.fromOffset || 0) : (l.toOffset || 0);
+    const slot = endpointSlot(l, nodeId);
     const other  = nodes.find(x => x.id === (isFrom ? l.to : l.from));
     if (!groups[port]) return; // skip center
-    groups[port].push({ linkId: l.id, offset, name: other?.name || '?' });
+    groups[port].push({ linkId: l.id, slot, offset, name: other?.name || '?' });
   });
 
-  // Sort each group by current offset so list reflects visual order
-  Object.values(groups).forEach(g => g.sort((a, b) => a.offset - b.offset));
+  // Fixed positions may contain gaps; keep their real slot numbers visible.
+  Object.values(groups).forEach(g => g.sort((a, b) => a.slot - b.slot));
 
   _arrangeState = { nodeId, groups: structuredClone(groups) };
   renderArrangeForm();
@@ -3245,7 +3408,7 @@ function renderArrangeForm() {
   const sideLabel = { top:'↑ Arriba', bottom:'↓ Abajo', left:'← Izq', right:'→ Der' };
   const sideHint  = { top:'izq → der', bottom:'izq → der', left:'arriba → abajo', right:'arriba → abajo' };
 
-  let html = `<div class="arrange-guide"><strong>Distribución por lados</strong><span>Arrastra cada enlace para definir su lado y prioridad visual.</span></div>`;
+  let html = `<div class="arrange-guide"><strong>10 posiciones fijas por lado</strong><span>Mueve cada enlace sin redistribuir ni regenerar las rutas existentes.</span></div>`;
 
   ['top','bottom','left','right'].forEach(side => {
     const grp = groups[side];
@@ -3267,7 +3430,7 @@ function renderArrangeForm() {
           ondrop="_arrangeDrop(event,'${side}',${i})"
           class="arrange-row">
           <span class="arrange-grip">⠿</span>
-          <span class="arrange-index" style="background:${col}">${i+1}</span>
+          <span class="arrange-index" style="background:${col}" title="Posición fija ${item.slot} de ${PORT_SLOT_COUNT}">${item.slot}</span>
           <span class="arrange-item-name" title="${item.name}">${item.name}</span>
           <select class="arrange-side-select" title="Cambiar lado" onchange="_arrangeMoveToSide('${side}',${i},this.value)">
             <option value="top" ${side==='top'?'selected':''}>↑</option>
@@ -3275,8 +3438,8 @@ function renderArrangeForm() {
             <option value="left" ${side==='left'?'selected':''}>←</option>
             <option value="right" ${side==='right'?'selected':''}>→</option>
           </select>
-          <button class="tb-btn compact-icon" ${i===0?'disabled':''} onclick="_arrangeMoveUp('${side}',${i})">↑</button>
-          <button class="tb-btn compact-icon" ${i===grp.length-1?'disabled':''} onclick="_arrangeMoveDown('${side}',${i})">↓</button>
+          <button class="tb-btn compact-icon" ${item.slot===1?'disabled':''} onclick="_arrangeMoveUp('${side}',${i})">↑</button>
+          <button class="tb-btn compact-icon" ${item.slot===PORT_SLOT_COUNT?'disabled':''} onclick="_arrangeMoveDown('${side}',${i})">↓</button>
         </div>`;
       });
     }
@@ -3312,14 +3475,9 @@ function _previewArrange() {
   const n = nodes.find(x => x.id === nodeId); if (!n) return;
   ['top','bottom','left','right'].forEach(side => {
     const grp = groups[side]; if (!grp.length) return;
-    const isHoriz = side === 'top' || side === 'bottom';
-    const halfNode = ((isHoriz ? n.w : n.h) / 2) * 0.75;
-    const step = grp.length > 1 ? (halfNode * 2) / (grp.length - 1) : 0;
-    grp.forEach((item, i) => {
-      const off = grp.length > 1 ? Math.round(-halfNode + i * step) : 0;
+    grp.forEach(item => {
       const l = links.find(x => x.id === item.linkId); if (!l) return;
-      if (l.from === nodeId) { l.fromPort = side; l.fromOffset = off; l.fromPortLocked = true; }
-      if (l.to   === nodeId) { l.toPort   = side; l.toOffset   = off; l.toPortLocked = true; }
+      setEndpointSlot(l, nodeId, side, item.slot);
     });
   });
   renderLinks();
@@ -3328,56 +3486,37 @@ function _previewArrange() {
 
 function _arrangeMoveUp(side, idx) {
   const grp = _arrangeState.groups[side];
-  if (idx < 1) return;
-  const movedId = grp[idx].linkId;
-  [grp[idx-1], grp[idx]] = [grp[idx], grp[idx-1]];
+  const item = grp[idx]; if (!item || item.slot <= 1) return;
+  const neighbor = grp.find(other => other.slot === item.slot - 1);
+  if (neighbor) neighbor.slot++;
+  item.slot--;
+  sortArrangeGroups();
   _previewArrange();
-  if (findLinkOverlap()) {
-    if (accommodateLinkOverlaps([movedId])) {
-      renderLinks(); setStatus('✓ Enlaces acomodados automáticamente');
-    } else {
-      [grp[idx-1], grp[idx]] = [grp[idx], grp[idx-1]];
-      _previewArrange();
-      setStatus('⚠ Reordenamiento no disponible para estas rutas manuales');
-    }
-  }
+  setStatus('Posición movida hacia arriba');
   renderArrangeForm();
 }
 function _arrangeMoveToSide(sourceSide, idx, targetSide) {
   if (sourceSide === targetSide || !_arrangeState?.groups[targetSide]) return;
-  const savedGroups = structuredClone(_arrangeState.groups);
+  const freeSlot = firstFreeArrangeSlot(targetSide);
+  if (freeSlot === null) { showArrangeSideFull(targetSide); renderArrangeForm(); return; }
   const [item] = _arrangeState.groups[sourceSide].splice(idx, 1);
   if (!item) return;
+  item.slot = freeSlot;
   _arrangeState.groups[targetSide].push(item);
+  sortArrangeGroups();
   _previewArrange();
-  if (findLinkOverlap()) {
-    if (accommodateLinkOverlaps([item.linkId])) {
-      renderLinks(); setStatus('✓ Enlaces acomodados automáticamente');
-    } else {
-      _arrangeState.groups = savedGroups;
-      _previewArrange();
-      setStatus('⚠ Reordenamiento no disponible para estas rutas manuales');
-    }
-  } else {
-    setStatus(`Enlace movido a ${targetSide}`);
-  }
+  setStatus(`Enlace movido a ${targetSide} sin modificar la ruta`);
   renderArrangeForm();
 }
 function _arrangeMoveDown(side, idx) {
   const grp = _arrangeState.groups[side];
-  if (idx >= grp.length - 1) return;
-  const movedId = grp[idx].linkId;
-  [grp[idx], grp[idx+1]] = [grp[idx+1], grp[idx]];
+  const item = grp[idx]; if (!item || item.slot >= PORT_SLOT_COUNT) return;
+  const neighbor = grp.find(other => other.slot === item.slot + 1);
+  if (neighbor) neighbor.slot--;
+  item.slot++;
+  sortArrangeGroups();
   _previewArrange();
-  if (findLinkOverlap()) {
-    if (accommodateLinkOverlaps([movedId])) {
-      renderLinks(); setStatus('✓ Enlaces acomodados automáticamente');
-    } else {
-      [grp[idx], grp[idx+1]] = [grp[idx+1], grp[idx]];
-      _previewArrange();
-      setStatus('⚠ Reordenamiento no disponible para estas rutas manuales');
-    }
-  }
+  setStatus('Posición movida hacia abajo');
   renderArrangeForm();
 }
 function _cancelArrange() {
@@ -4138,6 +4277,10 @@ document.addEventListener('keydown', e => {
   if (document.getElementById('search-bar')?.classList.contains('open') && e.key==='Escape') {
     e.preventDefault(); closeSearch(); return;
   }
+  if (document.getElementById('alert-modal')?.classList.contains('open')) {
+    if (e.key === 'Escape' || e.key === 'Enter') { e.preventDefault(); closeAlert(); }
+    return;
+  }
   if (document.getElementById('confirm-modal')?.classList.contains('open')) {
     if (e.key === 'Escape') { e.preventDefault(); resolveConfirm(false); }
     return;
@@ -4219,6 +4362,18 @@ document.getElementById('canvas-wrap').addEventListener('wheel', e => {
 // ════════════════════════════════════════════════════
 // MODALS & TOASTS
 // ════════════════════════════════════════════════════
+function showAlert(message, title = 'Aviso') {
+  const modal = document.getElementById('alert-modal');
+  if (!modal) { window.alert(message); return; }
+  document.getElementById('alert-modal-title').textContent = title;
+  document.getElementById('alert-modal-msg').textContent = message;
+  modal.classList.add('open');
+  setTimeout(() => modal.querySelector('.primary')?.focus(), 60);
+}
+function closeAlert() {
+  document.getElementById('alert-modal')?.classList.remove('open');
+}
+
 let _confirmResolve = null;
 function showConfirm(message, title = '¿Confirmar?', okLabel = 'Aceptar') {
   const modal = document.getElementById('confirm-modal');

@@ -473,6 +473,24 @@
   </div>
 </div>
 
+<!-- Alert modal -->
+<div class="modal-backdrop" id="alert-modal" role="alertdialog" aria-modal="true">
+  <div class="modal-card" style="width:min(400px,100%)">
+    <div class="modal-header">
+      <span class="modal-icon">⚠️</span>
+      <span class="modal-title" id="alert-modal-title">Aviso</span>
+      <button class="modal-close" onclick="closeAlert()" title="Cerrar (Esc)">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="alert-modal-msg" style="color:var(--text2);font-size:13px;line-height:1.6"></p>
+    </div>
+    <div class="modal-footer">
+      <div></div>
+      <div class="modal-footer-right"><button class="tb-btn primary" onclick="closeAlert()">Entendido</button></div>
+    </div>
+  </div>
+</div>
+
 <!-- Confirm modal -->
 <div class="modal-backdrop" id="confirm-modal" role="alertdialog" aria-modal="true">
   <div class="modal-card" style="width:min(400px,100%)">
