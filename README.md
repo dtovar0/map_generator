@@ -48,11 +48,13 @@ para ejecutar el binario configurado en `CACTI_RRDTOOL`.
    python3 scripts/collect_cacti_metrics.py --init-schema
    ```
 
-4. El usuario requiere `SELECT` sobre `host`, `data_local`, `data_template_data`,
-   `poller_item` y `SELECT, INSERT, UPDATE, DELETE` sobre `mapgen_rrd_samples`.
+4. El usuario requiere `SELECT` sobre `host`, `host_snmp_cache`, `data_local`,
+   `data_template_data`, `poller_item` y `SELECT, INSERT, UPDATE, DELETE` sobre
+   `mapgen_rrd_samples` cuando se utilice el modo `db`.
 
    ```sql
    GRANT SELECT ON cacti.host TO 'cacti_map_reader'@'localhost';
+   GRANT SELECT ON cacti.host_snmp_cache TO 'cacti_map_reader'@'localhost';
    GRANT SELECT ON cacti.data_local TO 'cacti_map_reader'@'localhost';
    GRANT SELECT ON cacti.data_template_data TO 'cacti_map_reader'@'localhost';
    GRANT SELECT ON cacti.poller_item TO 'cacti_map_reader'@'localhost';

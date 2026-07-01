@@ -2303,7 +2303,9 @@ function renderLinks() {
       const side = ['above','below','left','right'].includes(link.capacityLabelSide) ? link.capacityLabelSide : 'right';
       const fontSize = Math.max(8, Math.min(72, Number(link.capacityLabelFontSize) || 11));
       const height = fontSize + 6;
-      const txt = `${formatUtilization(link.capacity)} ${shortCapacityUnit(link.capacityUnit || 'Mbps')}`;
+      const txt = link.dataSource
+        ? `${formatUtilization(link.capacity)} ${shortCapacityUnit(link.capacityUnit || 'Mbps')}`
+        : 'NS';
       const width = txt.length * fontSize * 0.59 + 12;
       const markerGap = Math.max(10, W + 5);
       const x = metrics.point.x + (side === 'left' ? -(width/2 + markerGap) : side === 'right' ? (width/2 + markerGap) : 0);
@@ -2688,26 +2690,26 @@ const cactiDemoCatalog = {
   graphs: new Map([
     [901, [
       {id:19001, hostId:901, name:'Traffic - TenGigabitEthernet1/1 uplink ISP', dataSources:[
-        {localDataId:99001, name:'Te1/1 · uplink ISP', snmpIndex:'TenGigabitEthernet1/1', dataSourceNames:['traffic_in','traffic_out']}
+        {localDataId:99001, name:'Te1/1 · uplink ISP', snmpIndex:'TenGigabitEthernet1/1', dataSourceNames:['traffic_in','traffic_out'], capacityBps:10000000000}
       ]},
       {id:19002, hostId:901, name:'Traffic - Port-channel10 backbone', dataSources:[
-        {localDataId:99002, name:'Po10 · backbone', snmpIndex:'Port-channel10', dataSourceNames:['traffic_in','traffic_out']}
+        {localDataId:99002, name:'Po10 · backbone', snmpIndex:'Port-channel10', dataSourceNames:['traffic_in','traffic_out'], capacityBps:20000000000}
       ]}
     ]],
     [902, [
       {id:29001, hostId:902, name:'Traffic - WAN MPLS', dataSources:[
-        {localDataId:99011, name:'Gi0/0 · WAN MPLS', snmpIndex:'GigabitEthernet0/0', dataSourceNames:['traffic_in','traffic_out']}
+        {localDataId:99011, name:'Gi0/0 · WAN MPLS', snmpIndex:'GigabitEthernet0/0', dataSourceNames:['traffic_in','traffic_out'], capacityBps:1000000000}
       ]},
       {id:29002, hostId:902, name:'Traffic - Internet DIA', dataSources:[
-        {localDataId:99012, name:'Gi0/1 · Internet DIA', snmpIndex:'GigabitEthernet0/1', dataSourceNames:['bytes_in','bytes_out']}
+        {localDataId:99012, name:'Gi0/1 · Internet DIA', snmpIndex:'GigabitEthernet0/1', dataSourceNames:['bytes_in','bytes_out'], capacityBps:1000000000}
       ]}
     ]],
     [903, [
       {id:39001, hostId:903, name:'Traffic - Outside interface', dataSources:[
-        {localDataId:99021, name:'outside · public', snmpIndex:'outside', dataSourceNames:['in','out']}
+        {localDataId:99021, name:'outside · public', snmpIndex:'outside', dataSourceNames:['in','out'], capacityBps:1000000000}
       ]},
       {id:39002, hostId:903, name:'Traffic - Inside trunk', dataSources:[
-        {localDataId:99022, name:'inside · trunk', snmpIndex:'inside', dataSourceNames:['traffic_in','traffic_out']}
+        {localDataId:99022, name:'inside · trunk', snmpIndex:'inside', dataSourceNames:['traffic_in','traffic_out'], capacityBps:10000000000}
       ]}
     ]]
   ])
@@ -3025,7 +3027,10 @@ async function applyCactiBinding(linkId, hostId, localDataId, graphId = null) {
   link.dataSource = { provider:'cacti', hostId:Number(hostId), localDataId:Number(localDataId),
     deviceName:device?.name || '', graphId:graph?.id || source.graphId || null, graphName:graph?.name || source.graphName || '', sourceName:source.name,
     inDs:document.getElementById(`cacti-in-${linkId}`)?.value || '', outDs:document.getElementById(`cacti-out-${linkId}`)?.value || '',
-    multiplier:8 };
+    multiplier:8, capacityBps:Number(source.capacityBps) > 0 ? Number(source.capacityBps) : null };
+  if (Number(source.capacityBps) > 0) {
+    link.capacity = bpsToLinkUnit(Number(source.capacityBps), link.capacityUnit || 'Mbps');
+  }
   link.telemetryError = null; pushHistory(); updatePropsPanel();
   closeCactiBindingModal();
   if (cactiCatalog.demo) {

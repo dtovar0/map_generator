@@ -15,7 +15,18 @@ export interface CactiDataSource {
   snmpIndex: string;
   rrdPath: string;
   dataSourceNames: string[];
+  capacityBps: number | null;
 }
+
+const capacitySql = `(SELECT MAX(CASE
+    WHEN hsc.field_name = 'ifHighSpeed' AND CAST(hsc.field_value AS UNSIGNED) > 0
+      THEN CAST(hsc.field_value AS UNSIGNED) * 1000000
+    WHEN hsc.field_name = 'ifSpeed' AND CAST(hsc.field_value AS UNSIGNED) > 0
+      THEN CAST(hsc.field_value AS UNSIGNED)
+  END)
+  FROM host_snmp_cache hsc
+  WHERE hsc.host_id = dl.host_id AND hsc.snmp_index = dl.snmp_index
+    AND hsc.field_name IN ('ifHighSpeed', 'ifSpeed'))`;
 
 export interface CactiGraph {
   id: number;
@@ -56,7 +67,7 @@ export async function listDataSources(hostId: number, search = ""): Promise<Cact
   const [rows] = await cactiPool().query<RowDataPacket[]>(
     `SELECT dl.id AS local_data_id, dl.host_id, dl.snmp_index,
             COALESCE(NULLIF(dtd.name, ''), CONCAT('Data source ', dl.id)) AS data_name,
-            dtd.data_source_path,
+            dtd.data_source_path, ${capacitySql} AS capacity_bps,
             GROUP_CONCAT(DISTINCT pi.rrd_name ORDER BY pi.rrd_name SEPARATOR ',') AS rrd_names
        FROM data_local dl
        JOIN data_template_data dtd ON dtd.local_data_id = dl.id
@@ -74,6 +85,7 @@ export async function listDataSources(hostId: number, search = ""): Promise<Cact
     snmpIndex: String(row.snmp_index || ""),
     rrdPath: String(row.data_source_path || ""),
     dataSourceNames: String(row.rrd_names || "").split(",").filter(Boolean),
+    capacityBps: Number(row.capacity_bps) > 0 ? Number(row.capacity_bps) : null,
   }));
 }
 
@@ -84,7 +96,7 @@ export async function listGraphs(hostId: number, search = ""): Promise<CactiGrap
             COALESCE(NULLIF(gtg.title_cache, ''), CONCAT('Graph ', gl.id)) AS graph_name,
             dl.id AS local_data_id, dl.snmp_index,
             COALESCE(NULLIF(dtd.name, ''), CONCAT('Data source ', dl.id)) AS data_name,
-            dtd.data_source_path, dtr.data_source_name
+            dtd.data_source_path, dtr.data_source_name, ${capacitySql} AS capacity_bps
        FROM graph_local gl
        JOIN graph_templates_graph gtg ON gtg.local_graph_id = gl.id
        JOIN graph_templates_item gti ON gti.local_graph_id = gl.id AND gti.task_item_id > 0
@@ -107,7 +119,8 @@ export async function listGraphs(hostId: number, search = ""): Promise<CactiGrap
     let source = graph.dataSources.find((item) => item.localDataId === localDataId);
     if (!source) {
       source = { localDataId, hostId:Number(row.host_id), name:String(row.data_name),
-        snmpIndex:String(row.snmp_index || ""), rrdPath:String(row.data_source_path || ""), dataSourceNames:[] };
+        snmpIndex:String(row.snmp_index || ""), rrdPath:String(row.data_source_path || ""), dataSourceNames:[],
+        capacityBps:Number(row.capacity_bps) > 0 ? Number(row.capacity_bps) : null };
       graph.dataSources.push(source);
     }
     const dsName = String(row.data_source_name || "");
@@ -120,7 +133,7 @@ export async function getDataSource(localDataId: number): Promise<CactiDataSourc
   const [rows] = await cactiPool().query<RowDataPacket[]>(
     `SELECT dl.id AS local_data_id, dl.host_id, dl.snmp_index,
             COALESCE(NULLIF(dtd.name, ''), CONCAT('Data source ', dl.id)) AS data_name,
-            dtd.data_source_path,
+            dtd.data_source_path, ${capacitySql} AS capacity_bps,
             GROUP_CONCAT(DISTINCT pi.rrd_name ORDER BY pi.rrd_name SEPARATOR ',') AS rrd_names
        FROM data_local dl
        JOIN data_template_data dtd ON dtd.local_data_id = dl.id
@@ -136,6 +149,7 @@ export async function getDataSource(localDataId: number): Promise<CactiDataSourc
     name: String(row.data_name), snmpIndex: String(row.snmp_index || ""),
     rrdPath: String(row.data_source_path || ""),
     dataSourceNames: String(row.rrd_names || "").split(",").filter(Boolean),
+    capacityBps: Number(row.capacity_bps) > 0 ? Number(row.capacity_bps) : null,
   };
 }
 
