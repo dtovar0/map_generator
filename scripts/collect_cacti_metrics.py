@@ -38,6 +38,11 @@ def env(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
 
 
+def project_path(value: Path) -> Path:
+    """Resolve configurable paths relative to the Map Generator repository."""
+    return value if value.is_absolute() else BASE_DIR / value
+
+
 def database_connection():
     options = {
         "user": env("CACTI_DB_USER", "cacti_map_reader"),
@@ -168,8 +173,15 @@ def main() -> int:
         print("MapGen: ya hay un colector en ejecución; se omite este ciclo")
         return 0
 
-    maps_dir = (args.maps_dir or Path(env("MAPGEN_MAPS_DIR", str(BASE_DIR / "data" / "maps")))).resolve()
-    roots = [Path(item).resolve() for item in env("CACTI_RRD_ROOTS", "/var/lib/cacti/rra").split(os.pathsep) if item]
+    maps_dir = project_path(args.maps_dir or Path(env("MAPGEN_MAPS_DIR", "data/maps"))).resolve()
+    maps_dir.mkdir(parents=True, exist_ok=True)
+    rrd_paths = env("CACTI_RRD_PATH", "/var/lib/cacti/rra")
+    roots = [Path(item.strip()).resolve() for item in rrd_paths.split(",") if item.strip()]
+    if not roots:
+        raise ValueError("CACTI_RRD_PATH no puede estar vacío")
+    missing_roots = [str(root) for root in roots if not root.is_dir()]
+    if missing_roots:
+        raise FileNotFoundError(f"No existe el directorio RRD de Cacti: {', '.join(missing_roots)}")
     rrdtool = env("CACTI_RRDTOOL", "/usr/bin/rrdtool")
     retention_days = max(1, int(env("MAPGEN_METRICS_RETENTION_DAYS", "400")))
 

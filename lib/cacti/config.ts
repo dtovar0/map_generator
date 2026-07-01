@@ -17,7 +17,7 @@ export interface CactiConfig {
 
 function list(value: string | undefined): string[] {
   return (value || "/var/lib/cacti/rra")
-    .split(path.delimiter)
+    .split(",")
     .map((entry) => path.resolve(entry.trim()))
     .filter(Boolean);
 }
@@ -34,7 +34,7 @@ export function getCactiConfig(): CactiConfig {
       database: process.env.CACTI_DB_NAME || "cacti",
       ...(socketPath ? { socketPath } : {}),
     },
-    rrdRoots: list(process.env.CACTI_RRD_ROOTS),
+    rrdRoots: list(process.env.CACTI_RRD_PATH),
     rrdTool: process.env.CACTI_RRDTOOL || "/usr/bin/rrdtool",
     cacheSeconds: Math.max(5, Number(process.env.CACTI_CACHE_SECONDS) || 30),
   };

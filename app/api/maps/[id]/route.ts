@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 
@@ -21,6 +21,7 @@ export async function GET(request: Request, context: { params: { id: string } })
     return NextResponse.json({ error: "Identificador inválido" }, { status: 400 });
   }
   try {
+    await mkdir(mapsDirectory, { recursive: true });
     const record = JSON.parse(await readFile(path.join(mapsDirectory, `${id}.json`), "utf8")) as MapRecord;
     const dates = Object.keys(record.days || {}).sort();
     const requestedDate = new URL(request.url).searchParams.get("date");

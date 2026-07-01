@@ -31,7 +31,9 @@ archivos RRD durante una petición web. El colector Python se ejecuta después d
 Cacti, detecta las fuentes usadas por los mapas, lee únicamente esos RRD y guarda una muestra.
 El navegador conserva referencias por `localDataId`, nunca rutas arbitrarias.
 
-1. Copia `.env.example` a `.env.local` y ajusta la conexión y la ruta RRD.
+1. Copia `.env.example` a `.env.local`, ajusta la conexión y configura
+   `CACTI_RRD_PATH` con uno o más directorios locales donde Cacti guarda los archivos RRD,
+   separados por comas cuando exista más de uno.
 2. Instala las dependencias Python con `pip install -r ../requirements.txt`.
 3. Crea la tabla ejecutando `scripts/schema.mysql.sql`, o una sola vez con:
 
