@@ -2,6 +2,7 @@ import path from "node:path";
 
 export interface CactiConfig {
   enabled: boolean;
+  metricsSource: "db" | "rrd";
   db: {
     host: string;
     port: number;
@@ -24,8 +25,10 @@ function list(value: string | undefined): string[] {
 
 export function getCactiConfig(): CactiConfig {
   const socketPath = process.env.CACTI_DB_SOCKET?.trim();
+  const metricsSource = process.env.CACTI_METRICS_SOURCE?.trim().toLowerCase() === "rrd" ? "rrd" : "db";
   return {
     enabled: process.env.CACTI_ENABLED !== "false",
+    metricsSource,
     db: {
       host: process.env.CACTI_DB_HOST || "127.0.0.1",
       port: Number(process.env.CACTI_DB_PORT) || 3306,

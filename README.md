@@ -26,10 +26,17 @@ Los mapas se guardan mediante `/api/maps` en `data/maps`, con snapshots independ
 
 ## Integración con Cacti
 
-La aplicación consulta el catálogo y las métricas ya recolectadas en MySQL/MariaDB. No lee
-archivos RRD durante una petición web. El colector Python se ejecuta después del poller de
-Cacti, detecta las fuentes usadas por los mapas, lee únicamente esos RRD y guarda una muestra.
-El navegador conserva referencias por `localDataId`, nunca rutas arbitrarias.
+La aplicación consulta el catálogo en MySQL/MariaDB. Según el modo configurado, obtiene las
+métricas almacenadas en la base de datos o lee los archivos RRD locales. En modo `db`, el
+colector Python se ejecuta después del poller de Cacti, detecta las fuentes usadas por los
+mapas, lee únicamente esos RRD y guarda una muestra. El navegador conserva referencias por
+`localDataId`, nunca rutas arbitrarias.
+
+`CACTI_METRICS_SOURCE` selecciona la fuente de valores: `db` (predeterminado) consulta
+`mapgen_rrd_samples` y requiere el colector Python; `rrd` ejecuta `rrdtool` durante la petición
+y no requiere esa tabla. Ambos modos consultan el catálogo de Cacti en la base de datos. En
+modo `rrd`, el usuario que ejecuta Next.js necesita permiso de lectura sobre los RRD y permiso
+para ejecutar el binario configurado en `CACTI_RRDTOOL`.
 
 1. Copia `.env.example` a `.env.local`, ajusta la conexión y configura
    `CACTI_RRD_PATH` con uno o más directorios locales donde Cacti guarda los archivos RRD,

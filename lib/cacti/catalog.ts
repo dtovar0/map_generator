@@ -146,6 +146,20 @@ export interface StoredMetric {
   valueRaw: number | null;
 }
 
+export async function getDataSourcePaths(localDataIds: number[]): Promise<Map<number, string>> {
+  const ids = [...new Set(localDataIds.filter((id) => Number.isInteger(id) && id > 0))];
+  if (!ids.length) return new Map();
+  const placeholders = ids.map(() => "?").join(",");
+  const [rows] = await cactiPool().query<RowDataPacket[]>(
+    `SELECT dl.id AS local_data_id, dtd.data_source_path
+       FROM data_local dl
+       JOIN data_template_data dtd ON dtd.local_data_id = dl.id
+      WHERE dl.id IN (${placeholders})`,
+    ids,
+  );
+  return new Map(rows.map((row) => [Number(row.local_data_id), String(row.data_source_path || "")]));
+}
+
 export async function getStoredMetrics(localDataIds: number[], date?: string): Promise<StoredMetric[]> {
   const ids = [...new Set(localDataIds.filter((id) => Number.isInteger(id) && id > 0))];
   if (!ids.length) return [];

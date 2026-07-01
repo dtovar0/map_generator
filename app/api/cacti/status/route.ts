@@ -9,6 +9,7 @@ export async function GET() {
   const config = getCactiConfig();
   const result = {
     enabled: config.enabled,
+    metricsSource: config.metricsSource,
     database: { ok: false, host: config.db.socketPath || config.db.host, name: config.db.database, error: "" },
     collector: { ok: false, lastSample: null as string | null, error: "" },
   };
@@ -16,6 +17,10 @@ export async function GET() {
   try {
     await cactiPool().query("SELECT 1");
     result.database.ok = true;
+    if (config.metricsSource === "rrd") {
+      result.collector.ok = true;
+      return NextResponse.json(result);
+    }
     const [rows] = await cactiPool().query<Array<{ last_sample: Date | null } & import("mysql2").RowDataPacket>>(
       "SELECT MAX(sample_time) AS last_sample FROM mapgen_rrd_samples",
     );
