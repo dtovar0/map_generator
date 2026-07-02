@@ -31,6 +31,9 @@ let nodeCounter = 0, linkCounter = 0;
 let gridEnabled = lsGet('mapgen_grid_enabled') !== 'false';
 let snapEnabled = lsGet('mapgen_snap_enabled') !== 'false';
 let autoOrderEnabled = lsGet('mapgen_auto_order_enabled') === 'true';
+// Hide link tags (usage + capacity labels) in the editor only; presentation
+// always shows them. Persisted so the choice survives reloads.
+let editorTagsHidden = lsGet('mapgen_editor_tags_hidden') === 'true';
 let presentationMode = false;
 let presentationViewMode = lsGet('mapgen_presentation_view_mode') === 'day' ? 'day' : 'live';
 const PRESENTATION_REFRESH_OPTIONS = [5,10,15,30,60];
@@ -1223,14 +1226,16 @@ document.addEventListener('mousemove', e => {
         Math.abs(portSlotOffset(n, newPort, candidate) - raw) < Math.abs(portSlotOffset(n, newPort, bestSlot) - raw)
           ? candidate : bestSlot, allSlots[0]);
       if (usedPortSlots(nodeId, newPort, l.id).has(slot)) {
-        if (draggingConnHandle.collisionSlot !== `${newPort}:${slot}`) {
-          draggingConnHandle.collisionSlot = `${newPort}:${slot}`;
-          showToast(`La posición ${slot} del lado ${portSideLabel(newPort)} ya está ocupada.`, 'error');
-        }
+        // Defer the toast until the drag is released so sweeping across several
+        // occupied slots doesn't stack up error toasts mid-drag; the status bar
+        // gives live feedback in the meantime.
+        draggingConnHandle.collisionSlot = `${newPort}:${slot}`;
+        draggingConnHandle.pendingToast = `La posición ${slot} del lado ${portSideLabel(newPort)} ya está ocupada.`;
         setStatus(`⚠ Posición ${slot} ocupada`);
         return;
       }
       draggingConnHandle.collisionSlot = null;
+      draggingConnHandle.pendingToast = null;
       setEndpointSlot(l, nodeId, newPort, slot);
       renderLinks();
     }
@@ -1290,6 +1295,7 @@ document.addEventListener('mouseup', () => {
   const wasRotating        = !!rotatingTextNode && textRotatedFlag;
   const wasDraggingWp      = !!draggingWaypoint;
   const wasDraggingConn    = !!draggingConnHandle;
+  const connPendingToast   = draggingConnHandle?.pendingToast || null;
   const dividerDrag = draggingDivider;
   const wasDraggingDivider = !!dividerDrag;
   const usageLabelDrag = draggingUsageLabel;
@@ -1313,6 +1319,7 @@ document.addEventListener('mouseup', () => {
   if (rotatedId) document.getElementById(rotatedId)?.classList.remove('rotating-text');
   if (draggingWaypoint)    { draggingWaypoint = null; renderLinks(); }
   if (draggingConnHandle)  { draggingConnHandle = null; }
+  if (connPendingToast) showToast(connPendingToast, 'error');
   draggingDivider = null;
   draggingUsageLabel = null;
   if (isPanning) { isPanning = false; document.getElementById('canvas-wrap').style.cursor = ''; }
@@ -2444,7 +2451,8 @@ function renderLinks() {
     }
 
     // Both editor and presentation use real telemetry when a datasource is available.
-    {
+    // Tags stay visible in presentation; in the editor they follow editorTagsHidden.
+    if (presentationMode || !editorTagsHidden) {
       const unit = link.capacityUnit || 'Mbps';
       const labelFormat = link.usageLabelFormat === 'human' ? 'human' : 'percentage';
       const inPercentage = link.inPct;
@@ -2498,7 +2506,7 @@ function renderLinks() {
     }
 
     // Capacity tag — fixed in one of four quadrants around the divider.
-    if (link.capacityLabelVisible !== false) {
+    if (link.capacityLabelVisible !== false && (presentationMode || !editorTagsHidden)) {
       const metrics = metricsAtPolylinePercentage(routeVerts, link.dividerPosition ?? 50);
       const radians = metrics.angle * Math.PI / 180;
       const side = ['above','below','left','right'].includes(link.capacityLabelSide) ? link.capacityLabelSide : 'right';
@@ -5087,6 +5095,20 @@ function setAutoOrderEnabled(enabled) {
 function toggleGrid() { setGridEnabled(!gridEnabled); }
 function toggleSnap() { setSnapEnabled(!snapEnabled); }
 function toggleAutoOrder() { setAutoOrderEnabled(!autoOrderEnabled); }
+function syncTagsToggleBtn() {
+  const btn = document.getElementById('tool-tags');
+  if (!btn) return;
+  btn.classList.toggle('active', editorTagsHidden);
+  btn.setAttribute('aria-pressed', String(editorTagsHidden));
+  btn.title = editorTagsHidden ? 'Mostrar etiquetas de enlaces' : 'Ocultar etiquetas de enlaces';
+}
+function toggleEditorTags() {
+  editorTagsHidden = !editorTagsHidden;
+  lsSet('mapgen_editor_tags_hidden', String(editorTagsHidden));
+  syncTagsToggleBtn();
+  renderLinks();
+  setStatus(editorTagsHidden ? 'Etiquetas de enlaces ocultas' : 'Etiquetas de enlaces visibles');
+}
 function deleteSelected() {
   const removingNodes = new Set(selectedNodeIds);
   const removingLinks = new Set(selectedLinkIds);
@@ -5995,6 +6017,7 @@ document.getElementById('presentation-date').value = selectedMapDate;
 document.getElementById('presentation-refresh').value = String(presentationRefreshMinutes);
 updatePresentationViewControls();
 updatePaletteHotkeyTitles();
+syncTagsToggleBtn();
 // Seed history with the initial state so undo can't go below it
 history = [getSnapshot()]; historyIdx = 0; updateUndoBtns();
 if (localDraftRestored) {
