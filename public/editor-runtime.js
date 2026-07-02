@@ -75,7 +75,7 @@ function loadToolHotkeys() {
 }
 let toolHotkeys = loadToolHotkeys();
 let hotkeyDraft = null;
-const GRID = 20, DEFAULT_LINK_PADDING = 12, PORT_SLOT_COUNT = 10; let zoom = 1;
+const GRID = 20, DEFAULT_LINK_PADDING = 12, PORT_SLOT_COUNT = 11; let zoom = 1;
 const EDITOR_IN_COLOR = '#2D8CFF', EDITOR_OUT_COLOR = '#F06432';
 const DEFAULT_GENERAL_CONFIG = {
   nodeWidth: 120, nodeHeight: 120, linkPadding: DEFAULT_LINK_PADDING,
