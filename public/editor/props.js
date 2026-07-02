@@ -367,7 +367,7 @@ function startCustomAlignment() {
   };
   document.body.classList.add('custom-aligning');
   alignment.nodes.forEach(node => document.getElementById(node.id)?.classList.add('custom-align-candidate'));
-  setStatus(`Alineación custom ${alignment.orientation}: selecciona el nodo de referencia`);
+  setStatus('Alineación custom: elige el nodo de referencia (esquina); cada nodo se alineará a su fila o columna');
 }
 function alignSelectionToReferenceNode(referenceId) {
   const pending = customAlignmentPending;
@@ -378,20 +378,24 @@ function alignSelectionToReferenceNode(referenceId) {
   }
   const reference = getNode(referenceId);
   if (!reference) { cancelCustomAlignment(); return; }
-  const field = pending.orientation === 'horizontal' ? 'y' : 'x';
-  const target = reference[field];
+  // Align each node to the reference on whichever axis it is already closer to:
+  // a node beside the reference snaps to its row (same y), a node above/below
+  // snaps to its column (same x). Forcing every node onto a single axis made
+  // 3+ nodes collapse onto one line and overlap; per-axis alignment lets them
+  // form a row/column (an L around the reference) instead.
   let affected = 0;
   nodes.forEach(node => {
     if (!pending.nodeIds.has(node.id) || node.id === referenceId) return;
-    if (node[field] !== target) affected++;
-    node[field] = target;
+    const field = Math.abs(node.x - reference.x) <= Math.abs(node.y - reference.y) ? 'x' : 'y';
+    if (node[field] !== reference[field]) affected++;
+    node[field] = reference[field];
     renderNode(node);
   });
   cancelCustomAlignment();
   renderLinks();
   if (affected) pushHistory();
   updatePropsPanel();
-  setStatus(`Alineación custom ${pending.orientation} usando ${reference.name} como referencia`);
+  setStatus(`Alineación custom: ${affected} nodo${affected === 1 ? '' : 's'} alineado${affected === 1 ? '' : 's'} a ${reference.name}`);
 }
 function selectedAlignmentNodes() {
   return nodes.filter(node => selectedNodeIds.has(node.id));
