@@ -242,7 +242,7 @@ function mountConfigTabs() {
   rows.forEach(row => {
     const label = row.querySelector('.prop-label')?.textContent.trim() || '';
     const key = /nodos de texto/i.test(label) ? 'text'
-      : /Apariencia predeterminada · nodos/i.test(label) ? 'nodes'
+      : /Tamaño predeterminado del nodo|Apariencia predeterminada · nodos/i.test(label) ? 'nodes'
       : /Texto de utilización|Tag de capacidad/i.test(label) ? 'labels'
       : 'general';
     stage.querySelector(`[data-panel="${key}"]`)?.appendChild(row);

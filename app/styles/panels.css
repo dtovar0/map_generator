@@ -95,6 +95,39 @@
   .props-tab-panel > .tb-btn { width: 100% !important; margin: 5px 0 10px !important; }
   .props-tab-panel .prop-label:first-child { color: var(--text2); font-weight: 750; }
   #props-content > .prop-empty { margin: 16px; padding: 22px 14px; border: 1px dashed var(--border); border-radius: 14px; background: color-mix(in srgb, var(--surface2) 45%, transparent); text-align: center; }
+
+  /* ── Config panel polish: titled cards with an accent section header ── */
+  .config-tabs-shell { background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 34%, var(--surface)), var(--surface) 150px); }
+  .config-tab-panel > .prop-row {
+    padding: 0 12px 13px; margin-bottom: 11px; overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--border) 90%, transparent); border-radius: 13px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--surface2) 62%, transparent), color-mix(in srgb, var(--surface2) 40%, transparent));
+    box-shadow: 0 6px 16px rgba(0,0,0,.14), inset 0 1px rgba(255,255,255,.03);
+    transition: border-color .16s, box-shadow .16s;
+  }
+  .config-tab-panel > .prop-row:hover { border-color: color-mix(in srgb, var(--accent) 20%, var(--border)); box-shadow: 0 8px 22px rgba(0,0,0,.18), inset 0 1px rgba(255,255,255,.04); }
+  .config-tab-panel > .prop-row > .prop-label:first-child {
+    position: relative; display: flex; align-items: center; gap: 8px;
+    margin: 0 -12px 12px; padding: 9px 12px 8px 22px;
+    font-size: 9.5px; font-weight: 770; letter-spacing: .07em; text-transform: uppercase; color: var(--text);
+    background: color-mix(in srgb, var(--surface3) 34%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  }
+  .config-tab-panel > .prop-row > .prop-label:first-child::before {
+    content: ''; position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 12px; border-radius: 3px; background: var(--accent);
+    box-shadow: 0 0 7px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  /* Title text takes the room; an inline live value (e.g. divider %) becomes a pill. */
+  .config-tab-panel > .prop-row > .prop-label:first-child > span:first-child { flex: 1; min-width: 0; }
+  .config-tab-panel > .prop-row > .prop-label:first-child > span + span {
+    flex-shrink: 0; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 700;
+    letter-spacing: 0; text-transform: none; color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+  /* Sub-labels inside a card read as quiet field captions. */
+  .config-tab-panel > .prop-row .prop-label:not(:first-child) { color: var(--text2); font-weight: 640; letter-spacing: .01em; }
   @keyframes inspector-orbit { to { transform: rotate(360deg); } }
   @keyframes empty-inspector-in { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
