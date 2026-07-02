@@ -120,8 +120,10 @@ let dragGroupStart = [];           // [{id,x,y}] start positions for group move
 let dragGroupWps = [];             // [{id,wps:[{x,y}]}] waypoint snapshots of fully-moving links
 let marquee = null;                // area selection: {x0,y0,x1,y1,additive}
 let justMarqueed = false;          // suppress the click that follows a marquee drag
+let customAlignmentPending = null; // {nodeIds:Set, orientation} while choosing the anchor node
 let resizingNode = null, resizeDir = '', resizeStartX = 0, resizeStartY = 0;
 let resizeOrigW = 0, resizeOrigH = 0, resizeOrigX = 0, resizeOrigY = 0;
+let resizeGroupStart = [];         // selected nodes resized together from the same handle
 let rotatingTextNode = null, textRotateStartPointer = 0, textRotateStartAngle = 0, textRotatedFlag = false;
 let linkStart = null, linkPreviewEl = null, linkWaypoints = [];
 let isPanning = false, panX = 0, panY = 0, panStartMouseX = 0, panStartMouseY = 0, panStartX = 0, panStartY = 0, panMoved = false;
@@ -231,6 +233,7 @@ function revertCancel() {
   applySnapshot(savedStateForCancel); savedStateForCancel = null;
   // Clear all drag states so mouseup won't push a stale history entry
   draggingNode = null; resizingNode = null; resizeDir = '';
+  resizeGroupStart = [];
   rotatingTextNode = null;
   textRotatedFlag = false;
   draggingWaypoint = null; draggingConnHandle = null; nodeDraggedFlag = false;
@@ -751,6 +754,12 @@ function renderNode(n) {
       if (presentationMode) { showPresentationNodeInfo(n.id); return; }
       if (e.target.classList.contains('resize-handle') || e.target.classList.contains('text-rotate-handle')) return;
 
+      if (customAlignmentPending) {
+        e.stopPropagation(); e.preventDefault();
+        alignSelectionToReferenceNode(n.id);
+        return;
+      }
+
       if (e.target.classList.contains('node-port')) {
         if (currentTool !== 'link') return;
         const port = e.target.dataset.port;
@@ -1111,30 +1120,40 @@ document.addEventListener('mousemove', e => {
     if (!n) return;
     const dx = pos.x - resizeStartX, dy = pos.y - resizeStartY;
     const dir = resizeDir;
-    const textMinimum = n.type === 'text' ? getTextNodeAutoSize(n) : {w:32,h:32};
-    const minW = textMinimum.w, minH = textMinimum.h;
-    let nW = resizeOrigW, nH = resizeOrigH, nX = resizeOrigX, nY = resizeOrigY;
-    if (dir.includes('e')) {
-      nW = Math.max(minW, snap(resizeOrigW + dx));
-      nX = resizeOrigX + (nW - resizeOrigW) / 2;
-    }
-    if (dir.includes('s')) {
-      nH = Math.max(minH, snap(resizeOrigH + dy));
-      nY = resizeOrigY + (nH - resizeOrigH) / 2;
-    }
-    if (dir.includes('w')) {
-      nW = Math.max(minW, snap(resizeOrigW - dx));
-      nX = resizeOrigX + (resizeOrigW - nW) / 2;
-    }
-    if (dir.includes('n')) {
-      nH = Math.max(minH, snap(resizeOrigH - dy));
-      nY = resizeOrigY + (resizeOrigH - nH) / 2;
-    }
-    n.w = nW; n.h = nH; n.x = nX; n.y = nY;
-    n.sizeOverride = true;
-    distributePortLinks(n.id);
-    renderNode(n); renderLinks(); showPosBadge(n.x, n.y); updatePropsPanel();
-    setStatus(`Tamaño: ${n.w}×${n.h}  pos: ${n.x},${n.y}`);
+    const resizeTargets = resizeGroupStart.length ? resizeGroupStart : [{id:n.id,w:resizeOrigW,h:resizeOrigH,x:resizeOrigX,y:resizeOrigY}];
+    const centeredGroupResize = resizeTargets.length > 1;
+    resizeTargets.forEach(original => {
+      const target = nodes.find(node => node.id === original.id); if (!target) return;
+      const textMinimum = target.type === 'text' ? getTextNodeAutoSize(target) : {w:32,h:32};
+      let nextW = original.w, nextH = original.h, nextX = original.x, nextY = original.y;
+      if (dir.includes('e')) {
+        nextW = Math.max(textMinimum.w, snap(original.w + dx));
+        nextX = original.x + (nextW - original.w) / 2;
+      }
+      if (dir.includes('s')) {
+        nextH = Math.max(textMinimum.h, snap(original.h + dy));
+        nextY = original.y + (nextH - original.h) / 2;
+      }
+      if (dir.includes('w')) {
+        nextW = Math.max(textMinimum.w, snap(original.w - dx));
+        nextX = original.x + (original.w - nextW) / 2;
+      }
+      if (dir.includes('n')) {
+        nextH = Math.max(textMinimum.h, snap(original.h - dy));
+        nextY = original.y + (original.h - nextH) / 2;
+      }
+      // A multi-resize changes only dimensions. Keeping every center fixed
+      // prevents connected links from being dragged or rerouted by a corner.
+      if (centeredGroupResize) { nextX = original.x; nextY = original.y; }
+      target.w = nextW; target.h = nextH; target.x = nextX; target.y = nextY;
+      target.sizeOverride = true;
+      if (!centeredGroupResize) distributePortLinks(target.id);
+      renderNode(target);
+    });
+    renderLinks(); showPosBadge(n.x, n.y); updatePropsPanel();
+    setStatus(resizeTargets.length > 1
+      ? `Redimensionando ${resizeTargets.length} nodos`
+      : `Tamaño: ${n.w}×${n.h}  pos: ${n.x},${n.y}`);
     return;
   }
 
@@ -1231,7 +1250,8 @@ document.addEventListener('mouseup', () => {
   const usageLabelDrag = draggingUsageLabel;
   const wasDraggingUsageLabel = !!usageLabelDrag;
   const groupDragIds = (draggingNode && nodeDraggedFlag && dragGroupStart.length > 1) ? dragGroupStart.map(g => g.id) : null;
-  const movedNodeIds = groupDragIds || (draggingNode || resizingNode || rotatingTextNode ? [draggingNode || resizingNode || rotatingTextNode] : []);
+  const resizedNodeIds = resizingNode ? (resizeGroupStart.length ? resizeGroupStart.map(item => item.id) : [resizingNode]) : [];
+  const movedNodeIds = groupDragIds || (draggingNode ? [draggingNode] : resizedNodeIds.length ? resizedNodeIds : rotatingTextNode ? [rotatingTextNode] : []);
   const preferredLinkIds = draggingWaypoint ? [draggingWaypoint.linkId]
     : draggingConnHandle ? [draggingConnHandle.linkId]
     : movedNodeIds.length
@@ -1253,7 +1273,10 @@ document.addEventListener('mouseup', () => {
   if (isPanning) { isPanning = false; document.getElementById('canvas-wrap').style.cursor = ''; }
 
   // After resize or move: redistribute link offsets to match new size/position
-  if (resizedId) { distributePortLinks(resizedId); renderLinks(); }
+  if (resizedId) {
+    if (resizedNodeIds.length === 1) resizedNodeIds.forEach(distributePortLinks);
+    renderLinks();
+  }
   if (draggedId) { (groupDragIds || [draggedId]).forEach(distributePortLinks); renderLinks(); }
   if (rotatedId) {
     const n = nodes.find(x => x.id === rotatedId);
@@ -1283,12 +1306,14 @@ document.addEventListener('mouseup', () => {
   }
   if (rotatedId && !wasRotating) savedStateForCancel = null;
   geometryChangeSnapshot = null;
+  resizeGroupStart = [];
 });
 
 // ════════════════════════════════════════════════════
 // DRAG / RESIZE / LINK START
 // ════════════════════════════════════════════════════
 function onNodeMouseDown(e, id) {
+  if (customAlignmentPending) { e.stopPropagation(); e.preventDefault(); return; }
   if (e.button !== 0 || currentTool === 'link' || placingItem) return;
   e.stopPropagation(); e.preventDefault();
   // Modifier-click is a selection gesture (handled in click), not a drag.
@@ -1330,7 +1355,12 @@ function onResizeStart(e, id, dir) {
   const pos = getCanvasPos(e);
   resizeStartX = pos.x; resizeStartY = pos.y;
   resizeOrigW = n.w; resizeOrigH = n.h; resizeOrigX = n.x; resizeOrigY = n.y;
-  selectNode(id);
+  const resizeIds = selectedNodeIds.has(id) && selectedNodeIds.size > 1 ? [...selectedNodeIds] : [id];
+  resizeGroupStart = resizeIds.map(nodeId => {
+    const node = nodes.find(item => item.id === nodeId);
+    return node ? {id:node.id, w:node.w, h:node.h, x:node.x, y:node.y} : null;
+  }).filter(Boolean);
+  if (resizeIds.length === 1) selectNode(id);
 }
 function onTextRotateStart(e, id) {
   if (e.button !== 0 || currentTool === 'link' || placingItem) return;
@@ -1564,6 +1594,83 @@ function uniqueVertices(vertices) {
     point.x !== vertices[index-1].x || point.y !== vertices[index-1].y);
 }
 
+// Remove a short terminal "step" without rebuilding the route. The adjacent
+// straight run is shifted by only the height/width of that step, so the link
+// reaches and leaves the node as one clean segment.
+function straightenTerminalHooks(vertices, tolerance = GRID) {
+  const result = vertices.map(point => ({...point}));
+  const horizontal = (a, b) => a.y === b.y && a.x !== b.x;
+  const vertical = (a, b) => a.x === b.x && a.y !== b.y;
+
+  if (result.length >= 4) {
+    const p0 = result[0], p1 = result[1], p2 = result[2];
+    if (horizontal(p0, p1) && vertical(p1, p2) && Math.abs(p2.y - p1.y) <= tolerance) {
+      const oldY = p2.y;
+      for (let index = 2; index < result.length; index++) {
+        if (index > 2 && result[index].y !== oldY) break;
+        result[index].y = p0.y;
+      }
+    } else if (vertical(p0, p1) && horizontal(p1, p2) && Math.abs(p2.x - p1.x) <= tolerance) {
+      const oldX = p2.x;
+      for (let index = 2; index < result.length; index++) {
+        if (index > 2 && result[index].x !== oldX) break;
+        result[index].x = p0.x;
+      }
+    }
+  }
+
+  if (result.length >= 4) {
+    const last = result.length - 1;
+    const p0 = result[last], p1 = result[last - 1], p2 = result[last - 2];
+    if (horizontal(p1, p0) && vertical(p2, p1) && Math.abs(p2.y - p1.y) <= tolerance) {
+      const oldY = p2.y;
+      for (let index = last - 2; index >= 0; index--) {
+        if (index < last - 2 && result[index].y !== oldY) break;
+        result[index].y = p0.y;
+      }
+    } else if (vertical(p1, p0) && horizontal(p2, p1) && Math.abs(p2.x - p1.x) <= tolerance) {
+      const oldX = p2.x;
+      for (let index = last - 2; index >= 0; index--) {
+        if (index < last - 2 && result[index].x !== oldX) break;
+        result[index].x = p0.x;
+      }
+    }
+  }
+  return uniqueVertices(result);
+}
+
+function automaticEndpointRoute(fromPoint, toPoint, fromPort, toPort, laneOffset = 0) {
+  const dx = toPoint.x - fromPoint.x, dy = toPoint.y - fromPoint.y;
+  const horizontal = port => port === 'left' || port === 'right' ||
+    (port === 'center' && Math.abs(dx) >= Math.abs(dy));
+  const fromHorizontal = horizontal(fromPort);
+  const toHorizontal = horizontal(toPort);
+  let vertices;
+  if (fromHorizontal && toHorizontal) {
+    // Close endpoints should share one axis even when a previous overlap pass
+    // assigned a lane. Keeping that stale lane creates a tiny hook next to
+    // the node; averaging the coordinate preserves the route almost exactly.
+    if (Math.abs(dy) <= GRID) {
+      const alignedY = (fromPoint.y + toPoint.y) / 2;
+      return [{x:fromPoint.x, y:alignedY}, {x:toPoint.x, y:alignedY}];
+    }
+    const middleX = (fromPoint.x + toPoint.x) / 2 + laneOffset;
+    vertices = [fromPoint, {x:middleX, y:fromPoint.y}, {x:middleX, y:toPoint.y}, toPoint];
+  } else if (!fromHorizontal && !toHorizontal) {
+    if (Math.abs(dx) <= GRID) {
+      const alignedX = (fromPoint.x + toPoint.x) / 2;
+      return [{x:alignedX, y:fromPoint.y}, {x:alignedX, y:toPoint.y}];
+    }
+    const middleY = (fromPoint.y + toPoint.y) / 2 + laneOffset;
+    vertices = [fromPoint, {x:fromPoint.x, y:middleY}, {x:toPoint.x, y:middleY}, toPoint];
+  } else if (fromHorizontal) {
+    vertices = [fromPoint, {x:toPoint.x, y:fromPoint.y}, toPoint];
+  } else {
+    vertices = [fromPoint, {x:fromPoint.x, y:toPoint.y}, toPoint];
+  }
+  return uniqueVertices(vertices);
+}
+
 // A point contact is valid; sharing a positive-length collinear segment is not.
 function segmentsShareLength(a, b, c, d, epsilon = 0.01) {
   const abHorizontal = Math.abs(a.y - b.y) <= epsilon;
@@ -1604,25 +1711,13 @@ function getLinkVertices(link) {
   const tp = getLinkPortPos(to, link.toPort || 'center', link.toOffset || 0);
   const fromPort = link.fromPort || 'center';
   const toPort = link.toPort || 'center';
+  if (!(link.waypoints || []).length) {
+    return straightenTerminalHooks(automaticEndpointRoute(fp, tp, fromPort, toPort, (link.routeLane || 0) * GRID));
+  }
   const startApproach = endpointApproachPoint(fp, fromPort);
   const endApproach = endpointApproachPoint(tp, toPort);
-  if (!(link.waypoints || []).length && link.routeLane) {
-    const laneOffset = link.routeLane * GRID;
-    const verticalExit = fromPort === 'top' || fromPort === 'bottom' ||
-      (fromPort === 'center' && Math.abs(endApproach.y - startApproach.y) >= Math.abs(endApproach.x - startApproach.x));
-    let verts;
-    if (verticalExit && Math.abs(startApproach.x - endApproach.x) < 0.01)
-      verts = [startApproach, {x:startApproach.x+laneOffset,y:startApproach.y}, {x:endApproach.x+laneOffset,y:endApproach.y}, endApproach];
-    else if (!verticalExit && Math.abs(startApproach.y - endApproach.y) < 0.01)
-      verts = [startApproach, {x:startApproach.x,y:startApproach.y+laneOffset}, {x:endApproach.x,y:endApproach.y+laneOffset}, endApproach];
-    else
-      verts = verticalExit
-        ? [startApproach, {x:startApproach.x, y:(startApproach.y+endApproach.y)/2 + laneOffset}, {x:endApproach.x, y:(startApproach.y+endApproach.y)/2 + laneOffset}, endApproach]
-        : [startApproach, {x:(startApproach.x+endApproach.x)/2 + laneOffset, y:startApproach.y}, {x:(startApproach.x+endApproach.x)/2 + laneOffset, y:endApproach.y}, endApproach];
-    return uniqueVertices([fp, ...verts, tp]);
-  }
   const controls = uniqueVertices([fp, startApproach, ...(link.waypoints || []), endApproach, tp]);
-  return uniqueVertices(buildVertices(controls, fromPort));
+  return straightenTerminalHooks(uniqueVertices(buildVertices(controls, fromPort)));
 }
 
 function findLinkOverlap(onlyLinkId = null) {
@@ -2139,6 +2234,8 @@ function renderLinks() {
     g.addEventListener('mouseleave', () => g.classList.remove('hover'));
 
     const routeVerts = getLinkVertices(link);
+    const renderedFromPoint = routeVerts[0] || fp;
+    const renderedToPoint = routeVerts[routeVerts.length - 1] || tp;
     const fullD = verticesToPath(routeVerts);
 
     // Two color halves through all waypoints
@@ -2223,8 +2320,8 @@ function renderLinks() {
       });
       return c;
     };
-    overlaySvg.appendChild(mkConnDot(fp, inC, true));
-    overlaySvg.appendChild(mkConnDot(tp, outC, false));
+    overlaySvg.appendChild(mkConnDot(renderedFromPoint, inC, true));
+    overlaySvg.appendChild(mkConnDot(renderedToPoint, outC, false));
 
     // Configurable marker separating both colored halves.
     const midMarker = createMidpointMarker(midPt, nextMidPoint, markerType, W, inC, outC);
@@ -2484,6 +2581,7 @@ function selectLink(id) {
   showPropsPanel(); renderLinks(); updatePropsPanel(); hidePosBadge();
 }
 function clearSelection() {
+  cancelCustomAlignment();
   activeUsageLabel = null; draggingUsageLabel = null;
   selectedId = null; selectedLinkId = null; selectedNodeIds = new Set(); selectedLinkIds = new Set();
   setConnHandlesMode(false); clearConnectionHandles();
@@ -3247,6 +3345,19 @@ function enhanceCheckControls(root = document) {
     label.replaceChildren(icon, content, input);
     label.dataset.premiumCheck = 'true';
   });
+  root.querySelectorAll('.prop-row').forEach(row => {
+    const children = Array.from(row.children);
+    for (let index = 0; index < children.length;) {
+      if (!children[index].classList.contains('prop-check')) { index++; continue; }
+      const run = [];
+      while (index < children.length && children[index].classList.contains('prop-check')) run.push(children[index++]);
+      if (run.length < 2 || run[0].parentElement?.classList.contains('prop-check-row')) continue;
+      const checkRow = document.createElement('div');
+      checkRow.className = 'prop-check-row';
+      run[0].before(checkRow);
+      run.forEach(control => checkRow.appendChild(control));
+    }
+  });
 }
 function propertyTabForElement(element, profile) {
   const label = element.querySelector('.prop-label')?.textContent.trim() || '';
@@ -3255,7 +3366,7 @@ function propertyTabForElement(element, profile) {
   if (profile === 'link') {
     if (/^Enlace$|^Descripción$|^Capacidad del enlace/.test(label)) return 'data';
     if (/^Etiqueta de capacidad$|^Texto de utilización$/.test(label)) return 'labels';
-    if (/^Grosor visual|^Marcador intermedio$|^Posición del divisor/.test(label) || source.includes('useGeneralLinkConfig')) return 'style';
+    if (/^Alineación|^Acciones del enlace|^Grosor visual|^Marcador intermedio$|^Posición del divisor/.test(label) || source.includes('useGeneralLinkConfig')) return 'style';
     return 'thresholds';
   }
   if (profile === 'text') {
@@ -3375,8 +3486,200 @@ function inspectorEmptyHtml() {
     </footer>
   </div>`;
 }
+function automaticAlignmentInfo() {
+  // Alignment is strictly a node operation. Selected links must keep their
+  // routes and must never pull their unselected endpoint nodes into the task.
+  const alignmentNodes = nodes.filter(node => selectedNodeIds.has(node.id));
+  if (alignmentNodes.length < 2) return null;
+  const xs = alignmentNodes.map(node => node.x);
+  const ys = alignmentNodes.map(node => node.y);
+  const horizontal = Math.max(...xs) - Math.min(...xs) > Math.max(...ys) - Math.min(...ys);
+  const crossField = horizontal ? 'y' : 'x';
+  const crossSize = horizontal ? 'h' : 'w';
+  const groups = [];
+  const orderedNodes = [...alignmentNodes].sort((a, b) => a[crossField] - b[crossField]);
+
+  // Nodes whose perpendicular bounds substantially overlap belong to the same
+  // row/column. This keeps separate rows and columns from collapsing together.
+  orderedNodes.forEach(node => {
+    let bestGroup = null;
+    let bestDistance = Infinity;
+    groups.forEach(group => {
+      const distance = Math.abs(node[crossField] - group.coordinate);
+      const overlapTolerance = (node[crossSize] + group.averageSize) * .45;
+      if (distance <= overlapTolerance && distance < bestDistance) {
+        bestGroup = group;
+        bestDistance = distance;
+      }
+    });
+    if (!bestGroup) {
+      groups.push({ nodes:[node], coordinate:node[crossField], averageSize:node[crossSize] });
+      return;
+    }
+    bestGroup.nodes.push(node);
+    bestGroup.coordinate = bestGroup.nodes.reduce((sum, item) => sum + item[crossField], 0) / bestGroup.nodes.length;
+    bestGroup.averageSize = bestGroup.nodes.reduce((sum, item) => sum + item[crossSize], 0) / bestGroup.nodes.length;
+  });
+
+  // With only two elements there is no evidence of multiple rows/columns.
+  if (alignmentNodes.length === 2 && groups.length === 2) {
+    groups.splice(0, groups.length, {
+      nodes:alignmentNodes,
+      coordinate:alignmentNodes.reduce((sum, node) => sum + node[crossField], 0) / 2,
+      averageSize:alignmentNodes.reduce((sum, node) => sum + node[crossSize], 0) / 2
+    });
+  }
+  return {
+    nodes: alignmentNodes,
+    orientation: horizontal ? 'horizontal' : 'vertical',
+    groups
+  };
+}
+function alignSelectionAutomatically() {
+  const alignment = automaticAlignmentInfo();
+  if (!alignment) {
+    setStatus('Selecciona al menos dos nodos; los enlaces no participan en la alineación');
+    return;
+  }
+  let changed = false;
+  const field = alignment.orientation === 'horizontal' ? 'y' : 'x';
+  alignment.groups.forEach(group => {
+    if (group.nodes.length < 2) return;
+    const target = snap(group.coordinate);
+    group.nodes.forEach(node => {
+      if (node[field] === target) return;
+      node[field] = target;
+      changed = true;
+      renderNode(node);
+    });
+  });
+  if (!changed) {
+    setStatus(`La selección ya está alineada en ${alignment.orientation}`);
+    return;
+  }
+  renderLinks();
+  pushHistory();
+  updatePropsPanel();
+  const alignedGroups = alignment.groups.filter(group => group.nodes.length > 1).length;
+  const groupName = alignment.orientation === 'horizontal' ? 'fila' : 'columna';
+  setStatus(`Alineación ${alignment.orientation}: ${alignedGroups} ${groupName}${alignedGroups === 1 ? '' : 's'}`);
+}
+function cancelCustomAlignment() {
+  customAlignmentPending = null;
+  document.body.classList.remove('custom-aligning');
+  document.querySelectorAll('.custom-align-candidate').forEach(element => element.classList.remove('custom-align-candidate'));
+}
+function startCustomAlignment() {
+  const alignment = automaticAlignmentInfo();
+  if (!alignment) {
+    setStatus('Selecciona al menos dos nodos; los enlaces conservarán su recorrido');
+    return;
+  }
+  cancelCustomAlignment();
+  customAlignmentPending = {
+    nodeIds:new Set(alignment.nodes.map(node => node.id)),
+    orientation:alignment.orientation
+  };
+  document.body.classList.add('custom-aligning');
+  alignment.nodes.forEach(node => document.getElementById(node.id)?.classList.add('custom-align-candidate'));
+  setStatus(`Alineación custom ${alignment.orientation}: selecciona el nodo de referencia`);
+}
+function alignSelectionToReferenceNode(referenceId) {
+  const pending = customAlignmentPending;
+  if (!pending) return;
+  if (!pending.nodeIds.has(referenceId)) {
+    setStatus('El nodo de referencia debe pertenecer a la selección de nodos');
+    return;
+  }
+  const reference = nodes.find(node => node.id === referenceId);
+  if (!reference) { cancelCustomAlignment(); return; }
+  const field = pending.orientation === 'horizontal' ? 'y' : 'x';
+  const target = reference[field];
+  let affected = 0;
+  nodes.forEach(node => {
+    if (!pending.nodeIds.has(node.id) || node.id === referenceId) return;
+    if (node[field] !== target) affected++;
+    node[field] = target;
+    renderNode(node);
+  });
+  cancelCustomAlignment();
+  renderLinks();
+  if (affected) pushHistory();
+  updatePropsPanel();
+  setStatus(`Alineación custom ${pending.orientation} usando ${reference.name} como referencia`);
+}
+function selectedAlignmentNodes() {
+  return nodes.filter(node => selectedNodeIds.has(node.id));
+}
+function multiSelectionDimension(field) {
+  const selectedNodes = selectedAlignmentNodes();
+  if (!selectedNodes.length) return '';
+  const values = selectedNodes.map(node => Math.round(node[field]));
+  return values.every(value => value === values[0]) ? values[0] : Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+function resizeSelectedNodes(field, rawValue) {
+  const selectedNodes = selectedAlignmentNodes();
+  const requested = Number(rawValue);
+  if (!selectedNodes.length || !Number.isFinite(requested)) return;
+  selectedNodes.forEach(node => {
+    const minimum = node.type === 'text' ? getTextNodeAutoSize(node) : {w:32,h:32};
+    node[field] = Math.max(minimum[field], Math.min(2000, Math.round(requested)));
+    node.sizeOverride = true;
+    renderNode(node);
+  });
+  renderLinks(); pushHistory(); updatePropsPanel();
+  setStatus(`${field === 'w' ? 'Ancho' : 'Alto'} aplicado a ${selectedNodes.length} nodos`);
+}
+function multiSelectionSpacing(alignment) {
+  if (!alignment) return 0;
+  const horizontal = alignment.orientation === 'horizontal';
+  const positionField = horizontal ? 'x' : 'y';
+  const sizeField = horizontal ? 'w' : 'h';
+  const gaps = [];
+  alignment.groups.forEach(group => {
+    const ordered = [...group.nodes].sort((a, b) => a[positionField] - b[positionField]);
+    for (let index = 1; index < ordered.length; index++) {
+      gaps.push(ordered[index][positionField] - ordered[index - 1][positionField]
+        - ordered[index][sizeField] / 2 - ordered[index - 1][sizeField] / 2);
+    }
+  });
+  return gaps.length ? Math.max(0, Math.round(gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length)) : 0;
+}
+function setMultiSelectionSpacing(rawValue) {
+  const alignment = automaticAlignmentInfo();
+  const spacing = Math.max(0, Math.min(2000, Math.round(Number(rawValue) || 0)));
+  if (!alignment) return;
+  const horizontal = alignment.orientation === 'horizontal';
+  const positionField = horizontal ? 'x' : 'y';
+  const sizeField = horizontal ? 'w' : 'h';
+  let affected = 0;
+  alignment.groups.forEach(group => {
+    const ordered = [...group.nodes].sort((a, b) => a[positionField] - b[positionField]);
+    if (ordered.length < 2) return;
+    const oldMin = Math.min(...ordered.map(node => node[positionField] - node[sizeField] / 2));
+    const oldMax = Math.max(...ordered.map(node => node[positionField] + node[sizeField] / 2));
+    const totalSize = ordered.reduce((sum, node) => sum + node[sizeField], 0) + spacing * (ordered.length - 1);
+    let cursor = (oldMin + oldMax - totalSize) / 2;
+    ordered.forEach(node => {
+      node[positionField] = cursor + node[sizeField] / 2;
+      cursor += node[sizeField] + spacing;
+      renderNode(node);
+      affected++;
+    });
+  });
+  if (!affected) { setStatus('No hay una fila o columna con varios nodos'); return; }
+  renderLinks(); pushHistory(); updatePropsPanel();
+  setStatus(`Separación ${horizontal ? 'horizontal' : 'vertical'}: ${spacing}px`);
+}
 function multiSelectPanelHtml(count) {
-  return `<div class="ins-panel">
+  const alignment = automaticAlignmentInfo();
+  const alignedGroups = alignment?.groups.filter(group => group.nodes.length > 1).length || 0;
+  const groupName = alignment?.orientation === 'horizontal' ? 'fila' : 'columna';
+  const spacingDirection = alignment?.orientation === 'horizontal' ? 'Horizontal' : 'Vertical';
+  const alignmentLabel = alignment
+    ? `Alinear ${alignedGroups > 1 ? `${alignedGroups} ${groupName}s` : alignment.orientation === 'horizontal' ? 'horizontalmente' : 'verticalmente'}`
+    : 'Alinear automáticamente';
+  return `<div class="ins-panel ins-panel--multi">
     <header class="ins-head">
       <span class="ins-head-icon"><svg viewBox="0 0 24 24"><path d="m12 3 8 4-8 4-8-4z"/><path d="m4 12 8 4 8-4M4 16.5l8 4 8-4"/></svg></span>
       <span class="ins-head-text"><strong>Selección múltiple</strong><small>Inspector contextual</small></span>
@@ -3386,8 +3689,19 @@ function multiSelectPanelHtml(count) {
       <div class="ins-hero"><span class="ins-hero-icon">${count}</span></div>
       <span class="ins-kicker"><b></b> Selección activa</span>
       <strong class="ins-title">${count} elementos seleccionados</strong>
-      <p class="ins-copy">Arrástralos juntos para moverlos, o elimínalos en bloque.</p>
-      <div class="ins-actions"><button class="tb-btn" onclick="deleteSelected()">Eliminar selección</button></div>
+      <p class="ins-copy">Arrástralos juntos o deja que el editor detecte si forman una fila o una columna.</p>
+      <div class="ins-batch-controls">
+        <label><span>Ancho</span><input type="number" min="32" max="2000" value="${multiSelectionDimension('w')}" onchange="resizeSelectedNodes('w',this.value)"><small>px</small></label>
+        <label><span>Alto</span><input type="number" min="32" max="2000" value="${multiSelectionDimension('h')}" onchange="resizeSelectedNodes('h',this.value)"><small>px</small></label>
+        <label class="ins-spacing-control"><span>Separación ${spacingDirection}</span><input type="number" min="0" max="2000" value="${multiSelectionSpacing(alignment)}" onchange="setMultiSelectionSpacing(this.value)"><small>px</small></label>
+      </div>
+      <div class="ins-actions">
+        <button class="tb-btn ins-align-btn" onclick="alignSelectionAutomatically()" ${alignment ? '' : 'disabled'}
+                title="Detecta la orientación dominante y alinea los centros">${alignmentLabel}</button>
+        <button class="tb-btn" onclick="startCustomAlignment()" ${alignment ? '' : 'disabled'}
+                title="Después selecciona el nodo que servirá como referencia">Alineación custom</button>
+        <button class="tb-btn" onclick="deleteSelected()">Eliminar selección</button>
+      </div>
     </div>
     <footer class="ins-footer">
       <span class="ins-footer-label">Atajos</span>
@@ -3576,6 +3890,13 @@ function updatePropsPanel() {
       <div class="prop-row">
         <div class="prop-label">Enlace</div>
         <div class="prop-val" style="font-size:11px">${escapeHtml(from?.name)} → ${escapeHtml(to?.name)}</div>
+      </div>
+      <div class="prop-row">
+        <div class="prop-label">Acciones del enlace</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <button class="tb-btn" onclick="redrawLink('${l.id}')" title="Regenera únicamente la geometría de la ruta">Redibujar</button>
+          <button class="tb-btn" onclick="cloneLink('${l.id}')" title="Copia el enlace y conserva su configuración">Clonar enlace</button>
+        </div>
       </div>
       <div class="prop-row">
         <div class="prop-label">Descripción</div>
@@ -4150,6 +4471,60 @@ function updateLinkDescription(id, description) {
   setStatus('Descripción del enlace actualizada');
 }
 
+function redrawLink(id) {
+  const link = links.find(item => item.id === id); if (!link) return;
+  const from = nodes.find(node => node.id === link.from);
+  const to = nodes.find(node => node.id === link.to);
+  if (!from || !to) return;
+  const beforeRedraw = getSnapshot();
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const fromPort = Math.abs(dx) >= Math.abs(dy) ? (dx >= 0 ? 'right' : 'left') : (dy >= 0 ? 'bottom' : 'top');
+  const toPort = fromPort === 'right' ? 'left' : fromPort === 'left' ? 'right' : fromPort === 'bottom' ? 'top' : 'bottom';
+  const fromSlot = closestFreePortSlot(from.id, fromPort, {x:to.x,y:to.y}, id);
+  const toSlot = closestFreePortSlot(to.id, toPort, {x:from.x,y:from.y}, id);
+  if (fromSlot !== null) setEndpointSlot(link, from.id, fromPort, fromSlot);
+  if (toSlot !== null) setEndpointSlot(link, to.id, toPort, toSlot);
+  link.waypoints = [];
+  link.routeLane = 0;
+  ensureDoubleArrowRoom(link);
+  accommodateLinkOverlaps([id]);
+  renderLinks(); updatePropsPanel(); pushHistory();
+  setStatus('Enlace redibujado; sus datos y configuración se conservaron');
+}
+
+function cloneLink(id) {
+  const source = links.find(item => item.id === id); if (!source) return;
+  const from = nodes.find(node => node.id === source.from);
+  const to = nodes.find(node => node.id === source.to);
+  if (!from || !to) return;
+  const fromPort = source.fromPort || 'center';
+  const toPort = source.toPort || 'center';
+  const fromSlot = fromPort === 'center' ? null : closestFreePortSlot(from.id, fromPort, getPortPos(from, fromPort, source.fromOffset || 0));
+  const toSlot = toPort === 'center' ? null : closestFreePortSlot(to.id, toPort, getPortPos(to, toPort, source.toOffset || 0));
+  if ((fromPort !== 'center' && fromSlot === null) || (toPort !== 'center' && toSlot === null)) {
+    showAlert('No hay otra posición libre en uno de los lados del enlace. Reorganiza los puertos antes de clonarlo.', 'Lado completo');
+    return;
+  }
+  linkCounter++;
+  const clone = structuredClone(source);
+  clone.id = `l${linkCounter}`;
+  clone.waypoints = [];
+  clone.routeLane = 0;
+  if (fromSlot !== null) {
+    clone.fromSlot = fromSlot;
+    clone.fromOffset = portSlotOffset(from, fromPort, fromSlot);
+  }
+  if (toSlot !== null) {
+    clone.toSlot = toSlot;
+    clone.toOffset = portSlotOffset(to, toPort, toSlot);
+  }
+  links.push(clone);
+  ensureDoubleArrowRoom(clone);
+  accommodateLinkOverlaps([clone.id]);
+  renderLinks(); updateCounter(); pushHistory(); selectLink(clone.id);
+  setStatus('Enlace clonado; cambia únicamente la interfaz o fuente de datos');
+}
+
 function recalculateLinkUtilization(link) {
   const capacity = Math.max(.01, Number(link.capacity) || .01);
   link.capacity = capacity;
@@ -4437,13 +4812,11 @@ function updateGeneralConfig(field, rawValue) {
   } else if (['capacityLabelVisible','capacityLabelRotate','capacityLabelFlip'].includes(field)) {
     value = !!rawValue;
   } else return;
-  if (generalConfig[field] === value) { renderConfigUI(); return; }
-
   const beforeConfig = getSnapshot();
   generalConfig[field] = value;
   if (appearanceMeta) {
     const [target, nodeField] = appearanceMeta;
-    nodes.filter(n => !n.appearanceOverride && (target === 'text' ? n.type === 'text' : n.type !== 'text')).forEach(n => {
+    nodes.filter(n => target === 'text' ? n.type === 'text' : n.type !== 'text').forEach(n => {
       n[nodeField] = value;
       if (n.type === 'text' && ['fontSize','fontFamily','fontBold','fontItalic','textBorderWidth','textBorderHidden'].includes(nodeField)) autoFitTextNode(n);
       renderNode(n);
@@ -4451,39 +4824,38 @@ function updateGeneralConfig(field, rawValue) {
     });
   } else if (field === 'nodeWidth' || field === 'nodeHeight') {
     const dimension = field === 'nodeWidth' ? 'w' : 'h';
-    nodes.filter(n => !n.sizeOverride).forEach(n => { n[dimension] = value; renderNode(n); });
+    nodes.forEach(n => { n[dimension] = value; renderNode(n); });
     nodes.forEach(n => distributePortLinks(n.id));
   } else if (field === 'linkPadding') {
-    nodes.filter(n => !n.linkPaddingOverride).forEach(n => { n.linkPadding = value; });
+    nodes.forEach(n => { n.linkPadding = value; });
   } else if (field === 'linkWidth') {
-    links.filter(l => !l.styleOverride).forEach(l => { l.width = value; });
+    links.forEach(l => { l.width = value; });
   } else if (field === 'dividerPosition') {
-    links.filter(l => !l.dividerPositionOverride).forEach(l => { l.dividerPosition = value; });
+    links.forEach(l => { l.dividerPosition = value; });
   } else if (['usageLabelFormat','usageLabelPosition','usageLabelRotate','usageLabelFlip'].includes(field)) {
-    links.filter(l => !l.usageLabelOverride).forEach(l => { l[field] = value; });
+    links.forEach(l => { l[field] = value; });
   } else if (['capacityLabelVisible','capacityLabelSide','capacityLabelRotate','capacityLabelFlip','capacityLabelFontSize'].includes(field)) {
-    links.filter(l => !l.capacityLabelOverride).forEach(l => { l[field] = value; });
+    links.forEach(l => { l[field] = value; });
   } else {
-    links.filter(l => !l.styleOverride).forEach(l => { l[field] = value; });
+    links.forEach(l => { l[field] = value; });
   }
-  links.filter(l => !l.styleOverride).forEach(ensureDoubleArrowRoom);
+  links.forEach(ensureDoubleArrowRoom);
 
   renderLinks(); renderConfigUI();
   if (!revertIfLinksOverlap(beforeConfig, links.map(l => l.id))) {
     pushHistory();
     if (placingItem)
       document.getElementById('preview-box').style.cssText = `width:${generalConfig.nodeWidth}px;height:${generalConfig.nodeHeight}px`;
-    setStatus('Configuración general actualizada');
+    setStatus('Configuración general forzada en todos los elementos');
   }
 }
 
 function updateGeneralCapacityLabelPlacement(placement) {
   if (!['above','below','left','right'].includes(placement)) return;
-  if (generalConfig.capacityLabelSide === placement) return;
   generalConfig.capacityLabelSide = placement;
-  links.filter(l => !l.capacityLabelOverride).forEach(l => { l.capacityLabelSide = placement; });
+  links.forEach(l => { l.capacityLabelSide = placement; });
   renderLinks(); renderConfigUI(); pushHistory();
-  setStatus('Posición general de la capacidad actualizada');
+  setStatus('Posición general forzada en todos los enlaces');
 }
 
 function useGeneralNodeConfig(id) {

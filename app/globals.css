@@ -410,6 +410,8 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(13,191,166,0.25), 0 0 16px rgba(13,191,166,0.15);
   }
+  body.custom-aligning #canvas-wrap { cursor: crosshair; }
+  body.custom-aligning .node.custom-align-candidate .node-box { border-color: var(--accent) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent), 0 0 18px color-mix(in srgb, var(--accent) 28%, transparent) !important; cursor: crosshair; }
   .node-label {
     position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 5px;
     font-size: 11px; color: var(--text2); white-space: nowrap;
@@ -753,6 +755,15 @@
   .ins-kicker b { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
   .ins-title { color: var(--text); font-size: 16px; line-height: 1.25; font-weight: 780; letter-spacing: -.025em; }
   .ins-copy { max-width: 215px; margin-top: 8px; color: var(--text2); font-size: 10px; line-height: 1.55; }
+  .ins-panel--multi .ins-body { justify-content: flex-start; overflow-y: auto; }
+  .ins-panel--multi .ins-hero { flex-shrink: 0; margin-top: 2px; margin-bottom: 10px; }
+  .ins-batch-controls { width: 100%; margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; text-align: left; }
+  .ins-batch-controls label { min-width: 0; padding: 8px; display: grid; grid-template-columns: minmax(0,1fr) 26px; gap: 5px; align-items: center; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--surface2) 70%, transparent); }
+  .ins-batch-controls label > span { grid-column: 1 / -1; color: var(--text3); font-size: 8px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+  .ins-batch-controls input { width: 100%; min-width: 0; height: 30px; padding: 0 7px; border: 1px solid var(--border-hi); border-radius: 7px; background: var(--surface); color: var(--text); font: 700 10px/1 'Consolas','SF Mono',monospace; }
+  .ins-batch-controls input:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+  .ins-batch-controls small { color: var(--text3); font-size: 8px; text-align: center; }
+  .ins-batch-controls .ins-spacing-control { grid-column: 1 / -1; grid-template-columns: minmax(0,1fr) 26px; }
   .ins-actions { width: 100%; margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
   .ins-actions .tb-btn { width: 100%; justify-content: center; }
   /* Footer */
@@ -1070,6 +1081,12 @@
   input[type='checkbox']:disabled { opacity: .4; cursor: not-allowed; }
 
   .prop-check[data-premium-check] { flex: 1; width: 100%; min-width: 0; min-height: 42px; margin: 0 0 6px; padding: 7px 8px; display: grid; grid-template-columns: 29px minmax(0,1fr) 19px; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--surface) 68%, transparent); color: var(--text2); cursor: pointer; box-shadow: inset 0 1px rgba(255,255,255,.025); transition: transform .16s, border-color .16s, background .16s, box-shadow .16s; }
+  .prop-check-row { width: 100%; margin: 7px 0 6px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+  .prop-check-row .prop-check[data-premium-check] { min-height: 50px; margin: 0 !important; padding: 6px; grid-template-columns: 25px minmax(0,1fr) 17px; gap: 5px; }
+  .prop-check-row .prop-check-icon { width: 25px; height: 25px; border-radius: 7px; }
+  .prop-check-row .prop-check-icon svg { width: 13px; height: 13px; }
+  .prop-check-row .prop-check-copy { font-size: 8px; line-height: 1.25; }
+  .prop-check-row .prop-check input[type='checkbox'] { width: 17px; min-width: 17px; height: 17px; }
   .prop-check[data-premium-check]:hover { transform: translateY(-1px); border-color: var(--border-hi); background: var(--surface); box-shadow: 0 7px 16px rgba(0,0,0,.07); }
   .prop-check[data-premium-check]:has(input:checked) { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
   .prop-check[data-premium-check]:has(input:disabled) { opacity: .5; cursor: not-allowed; transform: none; }
