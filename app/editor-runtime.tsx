@@ -1,7 +1,6 @@
 "use client";
 
-import Script from "next/script";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 declare global {
   interface Window {
@@ -11,9 +10,23 @@ declare global {
   }
 }
 
-export default function EditorRuntime() {
-  const [runtimeReady, setRuntimeReady] = useState(false);
+// The editor runtime is split by concern across these classic scripts. They
+// share one global scope and must run in this order (state/helpers first,
+// immediate init last), so they are injected with async=false which guarantees
+// in-order execution for dynamically inserted scripts.
+const RUNTIME_PARTS = [
+  "/editor/core.js",
+  "/editor/history.js",
+  "/editor/nodes.js",
+  "/editor/links.js",
+  "/editor/selection.js",
+  "/editor/props.js",
+  "/editor/ui.js",
+  "/editor/maps.js",
+  "/editor/init.js",
+];
 
+export default function EditorRuntime() {
   useEffect(() => {
     let active = true;
 
@@ -26,7 +39,15 @@ export default function EditorRuntime() {
       window.Chart = Chart;
       window.htmlToImage = htmlToImage;
       window.jsPDF = jsPDF;
-      setRuntimeReady(true);
+      // Guard against double-injection (e.g. React strict-mode remount).
+      if (document.querySelector('script[data-editor-runtime]')) return;
+      for (const src of RUNTIME_PARTS) {
+        const script = document.createElement("script");
+        script.src = src;
+        script.async = false; // preserve execution order
+        script.dataset.editorRuntime = "";
+        document.body.appendChild(script);
+      }
     });
 
     return () => {
@@ -34,7 +55,5 @@ export default function EditorRuntime() {
     };
   }, []);
 
-  if (!runtimeReady) return null;
-
-  return <Script src="/editor-runtime.js" strategy="afterInteractive" />;
+  return null;
 }
