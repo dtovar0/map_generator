@@ -5948,4 +5948,6 @@ if (localDraftRestored) {
 if (currentServerMapId && !localDraftRestored) openServerMap(currentServerMapId, selectedMapDate);
 window.addEventListener('beforeunload', () => {
   if (localDraftEnabled) saveLocalDraft();
+  if (localDraftTimer) clearTimeout(localDraftTimer);
+  if (presentationRefreshTimer) clearInterval(presentationRefreshTimer);
 });
