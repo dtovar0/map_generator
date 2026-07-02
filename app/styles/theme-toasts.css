@@ -1,0 +1,53 @@
+  /* ── TOASTS ── */
+  #toast-container {
+    position: fixed; top: auto; bottom: 44px; right: 18px; z-index: 99999;
+    display: flex; flex-direction: column; gap: 12px; pointer-events: none; width: min(410px, calc(100vw - 36px));
+  }
+  .toast {
+    --toast-accent: var(--accent);
+    position: relative; display: grid; grid-template-columns: 46px 1fr 32px; align-items: center; gap: 13px;
+    min-height: 86px;
+    overflow: hidden; background: color-mix(in srgb, var(--surface) 92%, transparent);
+    border: 1px solid color-mix(in srgb, var(--toast-accent) 28%, var(--border));
+    color: var(--text); padding: 14px 12px 15px 16px;
+    border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,.5), 0 8px 18px rgba(0,0,0,.2), inset 0 1px rgba(255,255,255,.06);
+    backdrop-filter: blur(22px) saturate(145%); opacity: 0; transform: translate(30px, 18px) scale(.96);
+    transition: opacity .24s ease, transform .32s cubic-bezier(.16,1,.3,1);
+    max-width: 410px; pointer-events: auto; isolation: isolate;
+  }
+  .toast::before {
+    content: ''; position: absolute; inset: 0 auto 0 0; width: 4px;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--toast-accent) 70%, white), var(--toast-accent));
+    box-shadow: 0 0 18px color-mix(in srgb, var(--toast-accent) 42%, transparent);
+  }
+  .toast::after {
+    content: ''; position: absolute; z-index: -1; width: 130px; height: 130px; left: -48px; top: -62px;
+    border-radius: 50%; background: var(--toast-accent); opacity: .09; filter: blur(16px); pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(0); }
+  .toast-icon {
+    width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--toast-accent) 20%, var(--surface2)), color-mix(in srgb, var(--toast-accent) 8%, var(--surface2)));
+    border: 1px solid color-mix(in srgb, var(--toast-accent) 35%, var(--border));
+    color: var(--toast-accent); box-shadow: inset 0 1px rgba(255,255,255,.08), 0 8px 18px color-mix(in srgb, var(--toast-accent) 12%, transparent);
+  }
+  .toast-icon svg { width: 22px; height: 22px; display: block; stroke: currentColor; }
+  .toast-content { min-width: 0; }
+  .toast-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .toast-title { color: var(--text); font-size: 13px; line-height: 1.2; font-weight: 760; }
+  .toast-meta { color: var(--toast-accent); font-size: 9px; line-height: 1; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; opacity: .88; }
+  .toast-msg { color: var(--text2); font-size: 12px; line-height: 1.42; overflow-wrap: anywhere; }
+  .toast-close {
+    width: 28px; height: 28px; border-radius: 8px; border: 1px solid transparent;
+    background: transparent; color: var(--text2); opacity: .7;
+    cursor: pointer; font-size: 16px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: opacity .12s, background .12s, border-color .12s; font-family: inherit;
+  }
+  .toast-close:hover { opacity: 1; background: var(--surface3); border-color: var(--border); }
+  .toast-progress { position: absolute; left: 4px; right: 0; bottom: 0; height: 3px; background: linear-gradient(90deg, var(--toast-accent), color-mix(in srgb, var(--toast-accent) 55%, white)); transform-origin: left; animation: toast-countdown var(--toast-duration, 4000ms) linear forwards; }
+  .toast:hover .toast-progress { animation-play-state: paused; }
+  .toast-success { --toast-accent: var(--ok); }
+  .toast-error   { --toast-accent: var(--danger); }
+  .toast-info    { --toast-accent: var(--accent); }
+  @keyframes toast-countdown { to { transform: scaleX(0); } }
