@@ -150,6 +150,29 @@ function setConnHandlesMode(active) {
 let nodeDraggedFlag = false;    // true if node was actually dragged since last mousedown
 
 // ════════════════════════════════════════════════════
+// ID INDEX
+// ════════════════════════════════════════════════════
+// O(1) lookup by id. The cache rebuilds when the array reference or length
+// changes; ids are immutable once assigned and every add/remove changes the
+// length, so this stays correct without touching every mutation site.
+let _nodeIndex = null, _nodeIndexRef = null, _nodeIndexLen = -1;
+let _linkIndex = null, _linkIndexRef = null, _linkIndexLen = -1;
+function getNode(id) {
+  if (_nodeIndexRef !== nodes || _nodeIndexLen !== nodes.length) {
+    _nodeIndex = new Map(nodes.map(n => [n.id, n]));
+    _nodeIndexRef = nodes; _nodeIndexLen = nodes.length;
+  }
+  return _nodeIndex.get(id);
+}
+function getLink(id) {
+  if (_linkIndexRef !== links || _linkIndexLen !== links.length) {
+    _linkIndex = new Map(links.map(l => [l.id, l]));
+    _linkIndexRef = links; _linkIndexLen = links.length;
+  }
+  return _linkIndex.get(id);
+}
+
+// ════════════════════════════════════════════════════
 // UNDO / REDO
 // ════════════════════════════════════════════════════
 let history = [], historyIdx = -1;
@@ -547,7 +570,7 @@ function toggleMultiPlacement() {
 
 function openChartWizard(nodeId = null) {
   chartWizardEditingId = nodeId || null;
-  const n = nodeId ? nodes.find(x => x.id === nodeId) : null;
+  const n = nodeId ? getNode(nodeId) : null;
   const cfg = n?.graphConfig || {type:'bar',color:'#0dbfa6',values:[25,50,35,80,60],title:'Gráfica'};
   document.getElementById('chart-title').value = cfg.title || n?.name || 'Gráfica';
   syncSegToggle('chart-type', cfg.type || 'bar');
@@ -602,7 +625,7 @@ function saveChartWizard() {
   const width = Math.max(120, Math.min(1000, Number(document.getElementById('chart-width').value) || 240));
   const height = Math.max(100, Math.min(800, Number(document.getElementById('chart-height').value) || 160));
   if (chartWizardEditingId) {
-    const n = nodes.find(x => x.id === chartWizardEditingId); if (!n) return closeChartWizard();
+    const n = getNode(chartWizardEditingId); if (!n) return closeChartWizard();
     const before = getSnapshot();
     n.graphConfig = graphConfig; n.name = title; n.w = width; n.h = height; n.sizeOverride = true;
     distributePortLinks(n.id); renderNode(n); renderLinks(); updatePropsPanel();
@@ -901,7 +924,7 @@ function applyInlineTextSize(node, textEl) {
 }
 
 function startInlineTextEdit(id) {
-  const node = nodes.find(n => n.id===id); if (!node || node.type!=='text') return;
+  const node = getNode(id); if (!node || node.type!=='text') return;
   if (editingTextNodeId && editingTextNodeId !== id) finishInlineTextEdit(true);
   selectNode(id);
   const host = document.getElementById(id), textEl = host?.querySelector('.text-node-content');
@@ -932,7 +955,7 @@ function finishInlineTextEdit(commit) {
   if (!editingTextNodeId || finishingInlineText) return;
   finishingInlineText = true;
   const id = editingTextNodeId, snapshot = inlineTextSnapshot;
-  const node = nodes.find(n => n.id===id), host = document.getElementById(id);
+  const node = getNode(id), host = document.getElementById(id);
   const textEl = host?.querySelector('.text-node-content');
   if (textEl) {
     textEl.oninput = textEl.onkeydown = textEl.onblur = null;
@@ -945,7 +968,7 @@ function finishInlineTextEdit(commit) {
   } else if (node && snapshot) {
     node.name = (textEl?.textContent || '').trim() || 'Texto';
     autoFitTextNode(node); renderNode(node); distributePortLinks(id); renderLinks(); updatePropsPanel();
-    const old = snapshot.nodes.find(n => n.id===id);
+    const old = snapshot.getNode(id);
     const changed = !old || old.name!==node.name || old.w!==node.w || old.h!==node.h;
     const touching = links.filter(l => l.from===id || l.to===id).map(l => l.id);
     const reverted = changed && revertIfLinksOverlap(snapshot,touching);
@@ -1041,7 +1064,7 @@ function renderPendingLinkWaypoints() {
 
 function commitLinkWaypoint(point) {
   if (!linkStart) return;
-  const from = nodes.find(node => node.id === linkStart.nodeId); if (!from) return;
+  const from = getNode(linkStart.nodeId); if (!from) return;
   const start = getLinkPortPos(from, linkStart.port || 'center', linkStart.fromOffset || 0);
   // Store the real orthogonal vertices already shown to the user. Future mouse
   // movement may extend the route, but can no longer reinterpret prior bends.
@@ -1077,7 +1100,7 @@ document.addEventListener('mousemove', e => {
   document.getElementById('coord-display').textContent = `x:${Math.round(pos.x)}  y:${Math.round(pos.y)}`;
 
   if (rotatingTextNode) {
-    const n = nodes.find(x => x.id === rotatingTextNode);
+    const n = getNode(rotatingTextNode);
     if (!n) return;
     const pointerAngle = Math.atan2(pos.y - n.y, pos.x - n.x) * 180 / Math.PI;
     let angle = textRotateStartAngle + pointerAngle - textRotateStartPointer;
@@ -1097,7 +1120,7 @@ document.addEventListener('mousemove', e => {
   }
 
   if (draggingNode) {
-    const n = nodes.find(x => x.id === draggingNode);
+    const n = getNode(draggingNode);
     if (!n) return;
     nodeDraggedFlag = true;
     const newX = snap(pos.x - dragOffX), newY = snap(pos.y - dragOffY);
@@ -1105,12 +1128,12 @@ document.addEventListener('mousemove', e => {
       const primary = dragGroupStart.find(g => g.id === draggingNode);
       const dx = newX - primary.x, dy = newY - primary.y;
       dragGroupStart.forEach(g => {
-        const gn = nodes.find(x => x.id === g.id); if (!gn) return;
+        const gn = getNode(g.id); if (!gn) return;
         gn.x = g.x + dx; gn.y = g.y + dy;
         distributePortLinks(g.id); renderNode(gn);
       });
       dragGroupWps.forEach(g => {
-        const l = links.find(x => x.id === g.id); if (!l) return;
+        const l = getLink(g.id); if (!l) return;
         l.waypoints = g.wps.map(p => ({ x: snap(p.x + dx), y: snap(p.y + dy) }));
       });
       renderLinks(); showPosBadge(newX, newY); updatePropsPanel();
@@ -1125,14 +1148,14 @@ document.addEventListener('mousemove', e => {
   }
 
   if (resizingNode) {
-    const n = nodes.find(x => x.id === resizingNode);
+    const n = getNode(resizingNode);
     if (!n) return;
     const dx = pos.x - resizeStartX, dy = pos.y - resizeStartY;
     const dir = resizeDir;
     const resizeTargets = resizeGroupStart.length ? resizeGroupStart : [{id:n.id,w:resizeOrigW,h:resizeOrigH,x:resizeOrigX,y:resizeOrigY}];
     const centeredGroupResize = resizeTargets.length > 1;
     resizeTargets.forEach(original => {
-      const target = nodes.find(node => node.id === original.id); if (!target) return;
+      const target = getNode(original.id); if (!target) return;
       const textMinimum = target.type === 'text' ? getTextNodeAutoSize(target) : {w:32,h:32};
       let nextW = original.w, nextH = original.h, nextX = original.x, nextY = original.y;
       if (dir.includes('e')) {
@@ -1168,8 +1191,8 @@ document.addEventListener('mousemove', e => {
 
   if (draggingConnHandle) {
     const { linkId, isFrom, nodeId } = draggingConnHandle;
-    const l = links.find(x => x.id === linkId);
-    const n = nodes.find(x => x.id === nodeId);
+    const l = getLink(linkId);
+    const n = getNode(nodeId);
     if (l && n) {
       // Determine nearest side by projecting cursor onto each axis (normalized by half-dims)
       const dx = pos.x - n.x, dy = pos.y - n.y;
@@ -1202,7 +1225,7 @@ document.addEventListener('mousemove', e => {
   }
 
   if (draggingWaypoint) {
-    const l = links.find(x => x.id === draggingWaypoint.linkId); if (l) {
+    const l = getLink(draggingWaypoint.linkId); if (l) {
       l.waypoints[draggingWaypoint.wpIndex] = { x: snap(pos.x), y: snap(pos.y) };
       renderLinks();
     }
@@ -1210,7 +1233,7 @@ document.addEventListener('mousemove', e => {
   }
 
   if (draggingDivider) {
-    const l = links.find(x => x.id === draggingDivider.linkId);
+    const l = getLink(draggingDivider.linkId);
     if (l) {
       l.dividerPosition = closestPolylinePercentage(getLinkVertices(l), pos);
       l.dividerPositionOverride = true;
@@ -1225,7 +1248,7 @@ document.addEventListener('mousemove', e => {
   }
 
   if (draggingUsageLabel) {
-    const l = links.find(x => x.id === draggingUsageLabel.linkId);
+    const l = getLink(draggingUsageLabel.linkId);
     if (l) {
       const split = splitPathAtMidpoint(getLinkVertices(l), 'center', l.dividerPosition ?? 50);
       const sideVertices = draggingUsageLabel.side === 'in' ? split.first : split.second;
@@ -1238,7 +1261,7 @@ document.addEventListener('mousemove', e => {
   }
 
   if (linkStart && linkPreviewEl) {
-    const from = nodes.find(x => x.id === linkStart.nodeId);
+    const from = getNode(linkStart.nodeId);
     if (from) {
       const sp = getLinkPortPos(from, linkStart.port || 'center', linkStart.fromOffset || 0);
       const allPts = [sp, ...linkWaypoints, { x: pos.x, y: pos.y }];
@@ -1288,7 +1311,7 @@ document.addEventListener('mouseup', () => {
   }
   if (draggedId) { (groupDragIds || [draggedId]).forEach(distributePortLinks); renderLinks(); }
   if (rotatedId) {
-    const n = nodes.find(x => x.id === rotatedId);
+    const n = getNode(rotatedId);
     if (n) { autoFitTextNode(n); distributePortLinks(rotatedId); renderNode(n); renderLinks(); updatePropsPanel(); }
   }
 
@@ -1304,12 +1327,12 @@ document.addEventListener('mouseup', () => {
     }
   }
   if (wasDraggingDivider) {
-    const l = links.find(x => x.id === dividerDrag.linkId);
+    const l = getLink(dividerDrag.linkId);
     if (l && l.dividerPosition !== dividerDrag.startPosition) pushHistory();
     updatePropsPanel();
   }
   if (wasDraggingUsageLabel) {
-    const l = links.find(x => x.id === usageLabelDrag.linkId);
+    const l = getLink(usageLabelDrag.linkId);
     const field = usageLabelDrag.side === 'in' ? 'usageLabelInPosition' : 'usageLabelOutPosition';
     if (l && l[field] !== usageLabelDrag.startPosition) pushHistory();
   }
@@ -1341,12 +1364,12 @@ function onNodeMouseDown(e, id) {
     selectNode(id);
   }
   draggingNode = id;
-  const n = nodes.find(x => x.id === id);
+  const n = getNode(id);
   const pos = getCanvasPos(e);
   dragOffX = pos.x - n.x; dragOffY = pos.y - n.y;
   const dragIds = groupDrag ? [...effective] : [id];
   dragGroupStart = dragIds.map(sid => {
-    const sn = nodes.find(x => x.id === sid);
+    const sn = getNode(sid);
     return sn ? { id: sid, x: sn.x, y: sn.y } : null;
   }).filter(Boolean);
   // Links whose BOTH endpoints move: capture waypoints so they translate rigidly with the group.
@@ -1357,7 +1380,7 @@ function onNodeMouseDown(e, id) {
 }
 function onResizeStart(e, id, dir) {
   e.stopPropagation(); e.preventDefault();
-  const n = nodes.find(x => x.id === id); if (!n) return;
+  const n = getNode(id); if (!n) return;
   geometryChangeSnapshot = getSnapshot();
   saveForCancel();
   resizingNode = id; resizeDir = dir;
@@ -1366,7 +1389,7 @@ function onResizeStart(e, id, dir) {
   resizeOrigW = n.w; resizeOrigH = n.h; resizeOrigX = n.x; resizeOrigY = n.y;
   const resizeIds = selectedNodeIds.has(id) && selectedNodeIds.size > 1 ? [...selectedNodeIds] : [id];
   resizeGroupStart = resizeIds.map(nodeId => {
-    const node = nodes.find(item => item.id === nodeId);
+    const node = getNode(nodeId);
     return node ? {id:node.id, w:node.w, h:node.h, x:node.x, y:node.y} : null;
   }).filter(Boolean);
   if (resizeIds.length === 1) selectNode(id);
@@ -1374,7 +1397,7 @@ function onResizeStart(e, id, dir) {
 function onTextRotateStart(e, id) {
   if (e.button !== 0 || currentTool === 'link' || placingItem) return;
   e.stopPropagation(); e.preventDefault();
-  const n = nodes.find(x => x.id === id); if (!n || n.type !== 'text') return;
+  const n = getNode(id); if (!n || n.type !== 'text') return;
   if (editingTextNodeId === id) finishInlineTextEdit(true);
   geometryChangeSnapshot = getSnapshot();
   saveForCancel();
@@ -1390,7 +1413,7 @@ function onTextRotateStart(e, id) {
 function startLink(nodeId, requestedPort, pointer = null) {
   linkWaypoints = [];
   document.querySelectorAll('.link-wp-dot').forEach(d => d.remove());
-  const n = nodes.find(x => x.id === nodeId);
+  const n = getNode(nodeId);
   const port = resolvePointerPort(n, requestedPort, pointer);
   const slot = closestFreePortSlot(nodeId, port, pointer);
   if (slot === null) {
@@ -1411,7 +1434,7 @@ function startLink(nodeId, requestedPort, pointer = null) {
 
 function onNodeClickForLink(toId, requestedPort, pointer = null) {
   if (!linkStart || linkStart.nodeId === toId) return;
-  const target = nodes.find(node => node.id === toId);
+  const target = getNode(toId);
   const toPort = resolvePointerPort(target, requestedPort, pointer);
   const toSlot = closestFreePortSlot(toId, toPort, pointer);
   if (toSlot === null) {
@@ -1524,7 +1547,7 @@ function resolvePointerPort(node, requestedPort, pointer) {
 }
 
 function closestFreePortSlot(nodeId, port, pointer = null, exceptLinkId = null) {
-  const node = nodes.find(item => item.id === nodeId);
+  const node = getNode(nodeId);
   if (!node) return null;
   const used = usedPortSlots(nodeId, port, exceptLinkId);
   const available = Array.from({length:PORT_SLOT_COUNT}, (_, index) => index + 1).filter(slot => !used.has(slot));
@@ -1544,7 +1567,7 @@ function portSideLabel(port) {
 }
 
 function setEndpointSlot(link, nodeId, port, slot) {
-  const node = nodes.find(item => item.id === nodeId);
+  const node = getNode(nodeId);
   if (!node || !slot) return false;
   const offset = portSlotOffset(node, port, slot);
   if (link.from === nodeId) {
@@ -1713,8 +1736,8 @@ function pointToPolylineDistance(point, vertices) {
 }
 
 function getLinkVertices(link) {
-  const from = nodes.find(n => n.id === link.from);
-  const to = nodes.find(n => n.id === link.to);
+  const from = getNode(link.from);
+  const to = getNode(link.to);
   if (!from || !to) return [];
   const fp = getLinkPortPos(from, link.fromPort || 'center', link.fromOffset || 0);
   const tp = getLinkPortPos(to, link.toPort || 'center', link.toOffset || 0);
@@ -1994,7 +2017,7 @@ function renderLinkPointHints() {
 function renderConnectionHandles(nodeId) {
   clearConnectionHandles();
   if (currentTool !== 'select') return;
-  const n = nodes.find(x => x.id === nodeId); if (!n) return;
+  const n = getNode(nodeId); if (!n) return;
   const svg = document.getElementById('overlay-svg'); // renders above HTML nodes
 
   // Ten fixed positions per side. Occupied positions are solid; available ones
@@ -2062,7 +2085,7 @@ function renderConnectionHandles(nodeId) {
     circ.addEventListener('dblclick', ev => {
       ev.stopPropagation();
       draggingConnHandle = null; // cancel any pending drag
-      const l = links.find(x => x.id === link.id); if (!l) return;
+      const l = getLink(link.id); if (!l) return;
       geometryChangeSnapshot = getSnapshot();
       // Place initial waypoint one step outside the port
       const dir = { top:{x:0,y:-1}, bottom:{x:0,y:1}, left:{x:-1,y:0}, right:{x:1,y:0} }[port] || {x:0,y:0};
@@ -2079,7 +2102,7 @@ function renderConnectionHandles(nodeId) {
     g.appendChild(circ);
 
     // Port label
-    const other = isFrom ? nodes.find(x => x.id === link.to) : nodes.find(x => x.id === link.from);
+    const other = isFrom ? getNode(link.to) : getNode(link.from);
     if (other) {
       const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       lbl.setAttribute('x', pos.x + (isHoriz ? 0 : 9));
@@ -2206,7 +2229,7 @@ function renderLinks() {
   document.getElementById('overlay-svg').querySelectorAll('.conn-dot').forEach(el => el.remove());
 
   links.forEach(link => {
-    const from = nodes.find(n => n.id === link.from), to = nodes.find(n => n.id === link.to);
+    const from = getNode(link.from), to = getNode(link.to);
     if (!from || !to) return;
 
     const fp = getLinkPortPos(from, link.fromPort || 'center', link.fromOffset || 0);
@@ -2295,7 +2318,7 @@ function renderLinks() {
         e.stopPropagation(); e.preventDefault();
         const pos = getCanvasPos(e);
         const clickPt = { x: snap(pos.x), y: snap(pos.y) };
-        const l = links.find(x => x.id === link.id); if (!l) return;
+        const l = getLink(link.id); if (!l) return;
         geometryChangeSnapshot = getSnapshot();
         let insertIdx;
         if (l.routeLane && !(l.waypoints || []).length) {
@@ -2474,7 +2497,7 @@ function renderLinks() {
         });
         sq.addEventListener('dblclick', e => {
           e.stopPropagation();
-          const l = links.find(x => x.id === link.id); if (!l) return;
+          const l = getLink(link.id); if (!l) return;
           const beforeDelete = getSnapshot();
           l.waypoints.splice(wpIdx, 1);
           renderLinks(); updatePropsPanel();
@@ -2523,7 +2546,7 @@ function setNodeSelection(ids) {
   document.body.classList.remove('has-link-selected');
   if (selectedId) showPropsPanel();
   renderLinks(); updatePropsPanel();
-  const n = selectedId && nodes.find(x => x.id === selectedId);
+  const n = selectedId && getNode(selectedId);
   if (n && selectedNodeIds.size === 1) showPosBadge(n.x, n.y); else hidePosBadge();
 }
 function selectNode(id) {
@@ -2580,7 +2603,7 @@ function selectLink(id) {
   activeUsageLabel = null; draggingUsageLabel = null;
   selectedLinkId = id; selectedId = null; selectedNodeIds = new Set(); selectedLinkIds = new Set();
   nodes.forEach(n => document.getElementById(n.id)?.classList.remove('selected', 'link-endpoint'));
-  const l = links.find(x => x.id === id);
+  const l = getLink(id);
   if (l) {
     document.getElementById(l.from)?.classList.add('link-endpoint');
     document.getElementById(l.to)?.classList.add('link-endpoint');
@@ -2666,7 +2689,7 @@ function focusPresentationElement(element) {
 }
 function showPresentationNodeInfo(id) {
   if (!presentationMode) return;
-  const n = nodes.find(x => x.id === id); if (!n) return;
+  const n = getNode(id); if (!n) return;
   const typeNames = {switch:'Nodo',server:'Icono',text:'Texto',chart:'Gráfica'};
   const rows = [
     ['Nombre', n.name || 'Sin nombre'],
@@ -2686,8 +2709,8 @@ function showPresentationNodeInfo(id) {
 }
 function showPresentationLinkInfo(id) {
   if (!presentationMode) return;
-  const l = links.find(x => x.id === id); if (!l) return;
-  const from = nodes.find(n => n.id === l.from), to = nodes.find(n => n.id === l.to);
+  const l = getLink(id); if (!l) return;
+  const from = getNode(l.from), to = getNode(l.to);
   const markerNames = {circle:'Círculo',square:'Cuadrado',diamond:'Diamante',bar:'Barra',arrows:'Flechas',none:'Ninguno'};
   const labelPositionNames = {center:'Centro',above:'Arriba',below:'Abajo'};
   const rows = [
@@ -2866,7 +2889,7 @@ function cactiBindingHtml(link) {
 }
 
 function openCactiBindingModal(linkId) {
-  const link = links.find(item => item.id === linkId);
+  const link = getLink(linkId);
   if (!link) return;
   const modal = document.getElementById('cacti-binding-modal');
   const picker = document.getElementById('cacti-modal-picker');
@@ -3029,7 +3052,7 @@ async function loadCactiDevices(linkId) {
     if (cactiCatalog.demo) {
       setCactiModalState('Modo demo: Cacti todavía no está conectado, usando catálogo de ejemplo.', 'connected');
     }
-    const link = links.find(item => item.id === linkId);
+    const link = getLink(linkId);
     picker.innerHTML = `<div class="cacti-modal-grid">
       <label><span>Equipo</span><select class="prop-val" id="cacti-device-${linkId}" onchange="loadCactiGraphs('${linkId}',this.value)">
         <option value="">Selecciona un equipo…</option>${cactiCatalog.devices.map(device => `<option value="${device.id}" ${Number(link?.dataSource?.hostId)===device.id?'selected':''}>${escapeHtml(device.name)}${device.hostname ? ` · ${escapeHtml(device.hostname)}` : ''}</option>`).join('')}
@@ -3057,7 +3080,7 @@ async function loadCactiGraphs(linkId, rawHostId) {
         cactiCatalog.graphs.set(hostId, result.graphs);
       }
     }
-    const graphs = cactiCatalog.graphs.get(hostId), link = links.find(item => item.id === linkId);
+    const graphs = cactiCatalog.graphs.get(hostId), link = getLink(linkId);
     const sources = graphs.flatMap(graph => (graph.dataSources || []).map(source => ({
       ...source, graphId:graph.id, graphName:graph.name
     })));
@@ -3089,7 +3112,7 @@ function loadCactiGraphSources(linkId, hostId, rawGraphId) {
   const graph = (cactiCatalog.graphs.get(Number(hostId)) || []).find(item => item.id === graphId);
   if (!wrap || !graph) { if (wrap) wrap.innerHTML = ''; return; }
   cactiCatalog.sources.set(Number(hostId), graph.dataSources || []);
-  const link = links.find(item => item.id === linkId);
+  const link = getLink(linkId);
   wrap.innerHTML = `<div class="cacti-modal-grid">
     <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" onchange="renderCactiDsPicker('${linkId}',${hostId},this.value,${graphId})">
         <option value="">Selecciona una fuente…</option>${graph.dataSources.map(source => `<option value="${source.localDataId}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
@@ -3113,7 +3136,7 @@ async function loadCactiSources(linkId, rawHostId) {
       if (!response.ok) throw new Error(result.error || 'No se pudieron cargar las fuentes');
       cactiCatalog.sources.set(hostId, result.dataSources);
     }
-    const sources = cactiCatalog.sources.get(hostId), link = links.find(item => item.id === linkId);
+    const sources = cactiCatalog.sources.get(hostId), link = getLink(linkId);
     wrap.innerHTML = `<label class="prop-label" style="margin-top:8px">Interfaz / fuente</label>
       <select class="prop-val" id="cacti-source-${linkId}" onchange="renderCactiDsPicker('${linkId}',${hostId},this.value)">
         <option value="">Selecciona una fuente…</option>${sources.map(source => `<option value="${source.localDataId}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
@@ -3134,7 +3157,7 @@ function renderCactiDsPicker(linkId, hostId, rawLocalDataId, graphId = null) {
     </div>${cactiPreviewHtml('Selecciona una fuente y sus DS para ver valores de muestra.')}`;
     return;
   }
-  const link = links.find(item => item.id === linkId), names = source.dataSourceNames;
+  const link = getLink(linkId), names = source.dataSourceNames;
   const guess = side => names.find(name => new RegExp(`(^|_)${side}($|_)`, 'i').test(name)) || '';
   const inDs = link?.dataSource?.localDataId === localDataId ? link.dataSource.inDs : guess('in');
   const outDs = link?.dataSource?.localDataId === localDataId ? link.dataSource.outDs : guess('out');
@@ -3145,7 +3168,7 @@ function renderCactiDsPicker(linkId, hostId, rawLocalDataId, graphId = null) {
 }
 
 async function applyCactiBinding(linkId, hostId, localDataId, graphId = null) {
-  const link = links.find(item => item.id === linkId);
+  const link = getLink(linkId);
   const device = (cactiCatalog.devices || []).find(item => item.id === Number(hostId));
   const source = (cactiCatalog.sources.get(Number(hostId)) || []).find(item => item.localDataId === Number(localDataId));
   const graph = (cactiCatalog.graphs.get(Number(hostId)) || []).find(item => item.id === Number(graphId));
@@ -3174,7 +3197,7 @@ async function applyCactiBinding(linkId, hostId, localDataId, graphId = null) {
 }
 
 function clearCactiBinding(linkId) {
-  const link = links.find(item => item.id === linkId); if (!link) return;
+  const link = getLink(linkId); if (!link) return;
   link.dataSource = null; link.telemetryError = null; link.telemetryTimestamp = null;
   pushHistory(); updatePropsPanel(); renderLinks();
 }
@@ -3195,7 +3218,7 @@ async function refreshCactiMetrics(date = null, onlyLinkId = null) {
   if (!response.ok) throw new Error(result.error || 'No se pudieron consultar las métricas');
   let updated = 0, errors = 0;
   result.metrics.forEach(metric => {
-    const link = links.find(item => item.id === metric.linkId); if (!link) return;
+    const link = getLink(metric.linkId); if (!link) return;
     link.telemetryError = metric.error || null;
     if (metric.error) { errors++; return; }
     link.telemetryTimestamp = metric.timestamp;
@@ -3217,7 +3240,7 @@ async function testCactiBinding(linkId) {
     const result = await refreshCactiMetrics(null, linkId);
     setStatus(result.errors ? '⚠ El colector aún no ha guardado datos' : '✓ Fuente Cacti conectada');
   } catch (error) {
-    const link = links.find(item => item.id === linkId); if (link) link.telemetryError = error.message;
+    const link = getLink(linkId); if (link) link.telemetryError = error.message;
     updatePropsPanel(); setStatus('⚠ No se pudieron consultar las métricas');
   }
 }
@@ -3600,7 +3623,7 @@ function alignSelectionToReferenceNode(referenceId) {
     setStatus('El nodo de referencia debe pertenecer a la selección de nodos');
     return;
   }
-  const reference = nodes.find(node => node.id === referenceId);
+  const reference = getNode(referenceId);
   if (!reference) { cancelCustomAlignment(); return; }
   const field = pending.orientation === 'horizontal' ? 'y' : 'x';
   const target = reference[field];
@@ -3727,7 +3750,7 @@ function updatePropsPanel() {
     return;
   }
   if (selectedId) {
-    const n = nodes.find(x => x.id === selectedId); if (!n) return;
+    const n = getNode(selectedId); if (!n) return;
     const visualValue = n.image && !n.image.startsWith('data:') ? n.image : (n.image ? '' : n.icon || '');
     const nodeBg = n.nodeBackground || '#101e30';
     const nodeBgTransparent = !!n.nodeBackgroundTransparent;
@@ -3893,8 +3916,8 @@ function updatePropsPanel() {
       `;
     tabContext = {profile:n.type === 'text' ? 'text' : n.type === 'chart' ? 'chart' : 'regular', title:n.name, subtitle:n.type === 'text' ? 'Nodo de texto' : n.type === 'chart' ? 'Gráfica' : 'Nodo visual', entityId:n.id};
   } else if (selectedLinkId) {
-    const l = links.find(x => x.id === selectedLinkId); if (!l) return;
-    const from = nodes.find(x => x.id === l.from), to = nodes.find(x => x.id === l.to);
+    const l = getLink(selectedLinkId); if (!l) return;
+    const from = getNode(l.from), to = getNode(l.to);
     c.innerHTML = `
       <div class="prop-row">
         <div class="prop-label">Enlace</div>
@@ -3994,8 +4017,8 @@ function autoAssignPort(link, nodeId) {
   const port = isFrom ? (link.fromPort || 'center') : (link.toPort || 'center');
   // Once a side has been chosen it remains fixed, even if either node moves.
   if (port !== 'center') return;
-  const self  = nodes.find(x => x.id === nodeId);
-  const other = nodes.find(x => x.id === (isFrom ? link.to : link.from));
+  const self  = getNode(nodeId);
+  const other = getNode(isFrom ? link.to : link.from);
   if (!self || !other) return;
   const dx = other.x - self.x, dy = other.y - self.y;
   const p = Math.abs(dx) >= Math.abs(dy)
@@ -4006,7 +4029,7 @@ function autoAssignPort(link, nodeId) {
 }
 
 function distributePortLinks(nodeId) {
-  const n = nodes.find(x => x.id === nodeId); if (!n) return;
+  const n = getNode(nodeId); if (!n) return;
   // Migration only: legacy center endpoints receive a side once.
   links.forEach(l => {
     if (l.from === nodeId || l.to === nodeId) autoAssignPort(l, nodeId);
@@ -4053,12 +4076,12 @@ function renderArrangeOverlays() {
   if (!_arrangeState) return;
   if (!document.body.classList.contains('arranging')) return;   // arrange badges only in the "ordenamiento" view
   const { nodeId, groups } = _arrangeState;
-  const n = nodes.find(x => x.id === nodeId); if (!n) return;
+  const n = getNode(nodeId); if (!n) return;
   const canvas = document.getElementById('canvas');
   const sideColors = { top:'#63b3ed', bottom:'#68d391', left:'#f6ad55', right:'#fc8181' };
   ['top','bottom','left','right'].forEach(side => {
     groups[side].forEach((item, i) => {
-      const l = links.find(x => x.id === item.linkId); if (!l) return;
+      const l = getLink(item.linkId); if (!l) return;
       const isFrom = l.from === nodeId;
       const port   = isFrom ? (l.fromPort || 'center') : (l.toPort || 'center');
       const offset = isFrom ? (l.fromOffset || 0) : (l.toOffset || 0);
@@ -4148,7 +4171,7 @@ function exitArrangeView() {
   document.getElementById('mode-label').textContent = currentTool === 'link' ? 'Modo: Conectar' : 'Modo: Seleccionar';
 }
 function showArrangeForm(nodeId, embedded = false) {
-  const n = nodes.find(x => x.id === nodeId); if (!n) return;
+  const n = getNode(nodeId); if (!n) return;
   saveForCancel(); // snapshot for Cancelar revert
   arrangeEmbeddedInTab = embedded;
 
@@ -4160,7 +4183,7 @@ function showArrangeForm(nodeId, embedded = false) {
     const port   = isFrom ? (l.fromPort || 'center') : (l.toPort || 'center');
     const offset = isFrom ? (l.fromOffset || 0) : (l.toOffset || 0);
     const slot = endpointSlot(l, nodeId);
-    const other  = nodes.find(x => x.id === (isFrom ? l.to : l.from));
+    const other  = getNode(isFrom ? l.to : l.from);
     if (!groups[port]) return; // skip center
     groups[port].push({ linkId: l.id, slot, offset, name: other?.name || '?' });
   });
@@ -4175,7 +4198,7 @@ function showArrangeForm(nodeId, embedded = false) {
 function renderArrangeForm() {
   if (!_arrangeState) return;
   const { nodeId, groups } = _arrangeState;
-  const n = nodes.find(x => x.id === nodeId); if (!n) return;
+  const n = getNode(nodeId); if (!n) return;
 
   const sideLabel = { top:'↑ Arriba', bottom:'↓ Abajo', left:'← Izq', right:'→ Der' };
   const sideHint  = { top:'izq → der', bottom:'izq → der', left:'arriba → abajo', right:'arriba → abajo' };
@@ -4244,11 +4267,11 @@ function renderArrangeForm() {
 function _previewArrange() {
   if (!_arrangeState) return;
   const { nodeId, groups } = _arrangeState;
-  const n = nodes.find(x => x.id === nodeId); if (!n) return;
+  const n = getNode(nodeId); if (!n) return;
   ['top','bottom','left','right'].forEach(side => {
     const grp = groups[side]; if (!grp.length) return;
     grp.forEach(item => {
-      const l = links.find(x => x.id === item.linkId); if (!l) return;
+      const l = getLink(item.linkId); if (!l) return;
       setEndpointSlot(l, nodeId, side, item.slot);
     });
   });
@@ -4293,7 +4316,7 @@ function _arrangeMoveDown(side, idx) {
 }
 function _cancelArrange() {
   const nodeId = _arrangeState?.nodeId || null;
-  const node = nodeId ? nodes.find(item => item.id === nodeId) : null;
+  const node = nodeId ? getNode(nodeId) : null;
   revertCancel(); // revert to snapshot taken in showArrangeForm
   if (arrangeEmbeddedInTab && node) lsSet(`mapgen_props_tab_${node.type === 'text' ? 'text' : node.type === 'chart' ? 'chart' : 'regular'}`, node.type === 'text' ? 'transform' : 'layout');
   arrangeEmbeddedInTab = false;
@@ -4303,7 +4326,7 @@ function _cancelArrange() {
 
 function applyArrange() {
   if (!_arrangeState) return;
-  const node = nodes.find(item => item.id === _arrangeState.nodeId);
+  const node = getNode(_arrangeState.nodeId);
   _previewArrange(); // ensure final state is applied
   savedStateForCancel = null; // commit
   if (arrangeEmbeddedInTab && node) lsSet(`mapgen_props_tab_${node.type === 'text' ? 'text' : node.type === 'chart' ? 'chart' : 'regular'}`, node.type === 'text' ? 'transform' : 'layout');
@@ -4326,7 +4349,7 @@ function redistributeNode(nodeId) {
 }
 
 function renameNode(id, name) {
-  const n = nodes.find(x => x.id === id); if (!n) return;
+  const n = getNode(id); if (!n) return;
   const clean = name.trim();
   if (!clean || clean === n.name) { updatePropsPanel(); return; }
   n.name = clean;
@@ -4335,7 +4358,7 @@ function renameNode(id, name) {
 }
 
 function updateNodeAppearance(id, field, rawValue) {
-  const n = nodes.find(x => x.id === id); if (!n) return;
+  const n = getNode(id); if (!n) return;
   const numericLimits = {fontSize:[8,120], nodeBorderWidth:[0,12], textBorderWidth:[0,12]};
   const colorFields = ['textColor','nodeBackground','nodeBorderColor','textBackground','textBorderColor'];
   const booleanFields = ['fontBold','fontItalic','nodeBackgroundTransparent','textBackgroundTransparent','nodeBorderHidden','textBorderHidden'];
@@ -4371,7 +4394,7 @@ function updateNodeAppearance(id, field, rawValue) {
 }
 
 function useGeneralNodeAppearance(id) {
-  const n = nodes.find(x => x.id === id); if (!n) return;
+  const n = getNode(id); if (!n) return;
   const beforeReset = getSnapshot();
   Object.assign(n, getGeneralNodeAppearance(n.type));
   n.appearanceOverride = false;
@@ -4384,7 +4407,7 @@ function useGeneralNodeAppearance(id) {
 }
 
 function updateTextRotation(id, value) {
-  const n = nodes.find(x => x.id===id); if (!n || n.type!=='text') return;
+  const n = getNode(id); if (!n || n.type!=='text') return;
   const rotation = ((Math.round(Number(value) || 0) % 360) + 360) % 360;
   if (rotation === (Number(n.textRotation) || 0)) { updatePropsPanel(); return; }
   const beforeRotation = getSnapshot();
@@ -4397,7 +4420,7 @@ function updateTextRotation(id, value) {
 }
 
 function resizeNodeFromProps(id, dimension, value) {
-  const n = nodes.find(x => x.id === id); if (!n || !['w','h'].includes(dimension)) return;
+  const n = getNode(id); if (!n || !['w','h'].includes(dimension)) return;
   const textMinimum = n.type === 'text' ? getTextNodeAutoSize(n) : {w:32,h:32};
   const next = Math.max(textMinimum[dimension], Math.min(2000, Math.round(Number(value) || 32)));
   if (next === n[dimension]) { updatePropsPanel(); return; }
@@ -4417,7 +4440,7 @@ function resizeNodeFromProps(id, dimension, value) {
 }
 
 function updateNodeLinkPadding(id, value) {
-  const n = nodes.find(x => x.id === id); if (!n) return;
+  const n = getNode(id); if (!n) return;
   const padding = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
   if (padding === (n.linkPadding ?? DEFAULT_LINK_PADDING)) { updatePropsPanel(); return; }
   const beforePadding = getSnapshot();
@@ -4437,7 +4460,7 @@ function isImageSource(value) {
 }
 
 function setNodeVisual(id, value) {
-  const n = nodes.find(x => x.id === id); if (!n) return;
+  const n = getNode(id); if (!n) return;
   if (isImageSource(value)) n.image = value;
   else { n.image = null; n.icon = value || '⬜'; }
   renderNode(n); updatePropsPanel(); pushHistory();
@@ -4450,7 +4473,7 @@ function uploadNodeImage(id, input) {
   if (file.size > 2 * 1024 * 1024) { setStatus('⚠ La imagen debe pesar menos de 2 MB'); return; }
   const reader = new FileReader();
   reader.onload = () => {
-    const n = nodes.find(x => x.id === id); if (!n) return;
+    const n = getNode(id); if (!n) return;
     n.image = String(reader.result);
     renderNode(n); updatePropsPanel(); pushHistory();
     setStatus(`Imagen cargada: ${file.name}`);
@@ -4460,7 +4483,7 @@ function uploadNodeImage(id, input) {
 }
 
 function clearNodeImage(id) {
-  const n = nodes.find(x => x.id === id); if (!n || !n.image) return;
+  const n = getNode(id); if (!n || !n.image) return;
   n.image = null;
   renderNode(n); updatePropsPanel(); pushHistory();
   setStatus('Imagen eliminada; se usa el icono');
@@ -4468,22 +4491,22 @@ function clearNodeImage(id) {
 
 function setNodeLabelOption(id, option, checked) {
   if (!['nameInside','hideName'].includes(option)) return;
-  const n = nodes.find(x => x.id === id); if (!n) return;
+  const n = getNode(id); if (!n) return;
   n[option] = !!checked;
   renderNode(n); updatePropsPanel(); pushHistory();
 }
 
 function updateLinkDescription(id, description) {
-  const l = links.find(x => x.id === id); if (!l || l.description === description) return;
+  const l = getLink(id); if (!l || l.description === description) return;
   l.description = description;
   renderLinks(); updatePropsPanel(); pushHistory();
   setStatus('Descripción del enlace actualizada');
 }
 
 function redrawLink(id) {
-  const link = links.find(item => item.id === id); if (!link) return;
-  const from = nodes.find(node => node.id === link.from);
-  const to = nodes.find(node => node.id === link.to);
+  const link = getLink(id); if (!link) return;
+  const from = getNode(link.from);
+  const to = getNode(link.to);
   if (!from || !to) return;
   const beforeRedraw = getSnapshot();
   const dx = to.x - from.x, dy = to.y - from.y;
@@ -4502,9 +4525,9 @@ function redrawLink(id) {
 }
 
 function cloneLink(id) {
-  const source = links.find(item => item.id === id); if (!source) return;
-  const from = nodes.find(node => node.id === source.from);
-  const to = nodes.find(node => node.id === source.to);
+  const source = getLink(id); if (!source) return;
+  const from = getNode(source.from);
+  const to = getNode(source.to);
   if (!from || !to) return;
   const fromPort = source.fromPort || 'center';
   const toPort = source.toPort || 'center';
@@ -4544,7 +4567,7 @@ function recalculateLinkUtilization(link) {
 }
 
 function updateLinkTraffic(id, field, rawValue) {
-  const l = links.find(x => x.id === id); if (!l) return;
+  const l = getLink(id); if (!l) return;
   let value;
   if (field === 'capacityUnit') {
     if (!LINK_CAPACITY_UNITS.includes(rawValue)) return;
@@ -4562,7 +4585,7 @@ function updateLinkTraffic(id, field, rawValue) {
 }
 
 function updateLinkUsageLabel(id, field, rawValue) {
-  const l = links.find(x => x.id === id); if (!l) return;
+  const l = getLink(id); if (!l) return;
   let value;
   if (field === 'usageLabelPosition') {
     if (!['center','above','below'].includes(rawValue)) return;
@@ -4579,7 +4602,7 @@ function updateLinkUsageLabel(id, field, rawValue) {
 }
 
 function updateLinkCapacityLabel(id, field, rawValue) {
-  const l = links.find(x => x.id === id); if (!l) return;
+  const l = getLink(id); if (!l) return;
   let value;
   if (field === 'capacityLabelSide') {
     if (!['left','right'].includes(rawValue)) return;
@@ -4595,7 +4618,7 @@ function updateLinkCapacityLabel(id, field, rawValue) {
 }
 
 function updateLinkCapacityLabelPlacement(id, placement) {
-  const l = links.find(x => x.id === id); if (!l) return;
+  const l = getLink(id); if (!l) return;
   if (!['above','below','left','right'].includes(placement)) return;
   if (l.capacityLabelSide === placement) return;
   l.capacityLabelSide = placement;
@@ -4604,14 +4627,14 @@ function updateLinkCapacityLabelPlacement(id, placement) {
 }
 
 function randomizeEditorLink(id) {
-  const l = links.find(x => x.id===id); if (!l) return;
+  const l = getLink(id); if (!l) return;
   l.editorInPct = Math.floor(Math.random()*101);
   l.editorOutPct = Math.floor(Math.random()*101);
   renderLinks(); updatePropsPanel(); pushHistory(); setStatus('Valores ficticios del editor actualizados');
 }
 
 function updateLinkWidth(id, value) {
-  const l = links.find(x => x.id === id); if (!l) return;
+  const l = getLink(id); if (!l) return;
   const width = Math.max(1, Math.min(24, Math.round(Number(value) || 1)));
   if (width === l.width) { updatePropsPanel(); return; }
   const beforeStyle = getSnapshot();
@@ -4626,7 +4649,7 @@ function updateLinkWidth(id, value) {
 
 function updateLinkTermination(id, value) {
   if (!MID_TERMINATIONS.some(([type]) => type === value)) return;
-  const l = links.find(x => x.id === id); if (!l || l.midTermination === value) return;
+  const l = getLink(id); if (!l || l.midTermination === value) return;
   const beforeStyle = getSnapshot();
   l.midTermination = value;
   l.styleOverride = true;
@@ -4638,7 +4661,7 @@ function updateLinkTermination(id, value) {
 }
 
 function previewLinkDivider(id, value) {
-  const l = links.find(x => x.id === id); if (!l) return;
+  const l = getLink(id); if (!l) return;
   l.dividerPosition = Math.max(5, Math.min(95, Math.round(Number(value) || 50)));
   l.dividerPositionOverride = true;
   renderLinks();
@@ -4647,7 +4670,7 @@ function previewLinkDivider(id, value) {
 }
 
 function commitLinkDivider(id, value, startValue) {
-  const l = links.find(x => x.id === id); if (!l) return;
+  const l = getLink(id); if (!l) return;
   const start = Math.max(5, Math.min(95, Math.round(Number(startValue) || 50)));
   previewLinkDivider(id, value);
   if (l.dividerPosition !== start) pushHistory();
@@ -4656,7 +4679,7 @@ function commitLinkDivider(id, value, startValue) {
 }
 
 function setLinkScaleOverride(id, enabled) {
-  const l = links.find(x => x.id === id); if (!l || l.scaleOverride === enabled) return;
+  const l = getLink(id); if (!l || l.scaleOverride === enabled) return;
   l.scaleOverride = enabled;
   l.scale = enabled ? currentScale.map(item => ({...item})) : null;
   renderLinks(); updatePropsPanel(); pushHistory();
@@ -4664,7 +4687,7 @@ function setLinkScaleOverride(id, enabled) {
 }
 
 function updateLinkThresholdPct(id, index, rawValue) {
-  const l = links.find(x => x.id === id); if (!l?.scaleOverride || !Array.isArray(l.scale)) return;
+  const l = getLink(id); if (!l?.scaleOverride || !Array.isArray(l.scale)) return;
   const item = l.scale[index]; if (!item) return;
   const min = index > 0 ? l.scale[index-1].pct + 1 : 0;
   const max = index < l.scale.length-1 ? l.scale[index+1].pct - 1 : 100;
@@ -4675,14 +4698,14 @@ function updateLinkThresholdPct(id, index, rawValue) {
 }
 
 function updateLinkThresholdColor(id, index, color) {
-  const l = links.find(x => x.id === id); if (!l?.scaleOverride || !Array.isArray(l.scale)) return;
+  const l = getLink(id); if (!l?.scaleOverride || !Array.isArray(l.scale)) return;
   if (!/^#[0-9a-f]{6}$/i.test(color) || !l.scale[index] || l.scale[index].color === color) return;
   l.scale[index].color = color.toLowerCase();
   renderLinks(); updatePropsPanel(); pushHistory(); setStatus('Color del umbral actualizado');
 }
 
 function addLinkThreshold(id) {
-  const l = links.find(x => x.id === id); if (!l?.scaleOverride || !Array.isArray(l.scale)) return;
+  const l = getLink(id); if (!l?.scaleOverride || !Array.isArray(l.scale)) return;
   let gapIndex = -1, largestGap = 0;
   for (let i=0; i<l.scale.length-1; i++) {
     const gap = l.scale[i+1].pct - l.scale[i].pct;
@@ -4696,13 +4719,13 @@ function addLinkThreshold(id) {
 }
 
 function removeLinkThreshold(id, index) {
-  const l = links.find(x => x.id === id); if (!l?.scaleOverride || !Array.isArray(l.scale) || l.scale.length <= 2) return;
+  const l = getLink(id); if (!l?.scaleOverride || !Array.isArray(l.scale) || l.scale.length <= 2) return;
   l.scale.splice(index,1);
   renderLinks(); updatePropsPanel(); pushHistory(); setStatus('Umbral individual eliminado');
 }
 
 function copyGeneralScaleToLink(id) {
-  const l = links.find(x => x.id === id); if (!l) return;
+  const l = getLink(id); if (!l) return;
   l.scaleOverride = true;
   l.scale = currentScale.map(item => ({...item}));
   renderLinks(); updatePropsPanel(); pushHistory(); setStatus('Umbrales generales copiados al enlace');
@@ -4868,7 +4891,7 @@ function updateGeneralCapacityLabelPlacement(placement) {
 }
 
 function useGeneralNodeConfig(id) {
-  const n = nodes.find(x => x.id === id); if (!n) return;
+  const n = getNode(id); if (!n) return;
   const beforeReset = getSnapshot();
   n.w = generalConfig.nodeWidth; n.h = generalConfig.nodeHeight;
   n.linkPadding = generalConfig.linkPadding;
@@ -4881,7 +4904,7 @@ function useGeneralNodeConfig(id) {
 }
 
 function useGeneralLinkConfig(id) {
-  const l = links.find(x => x.id === id); if (!l) return;
+  const l = getLink(id); if (!l) return;
   const beforeReset = getSnapshot();
   l.width = generalConfig.linkWidth;
   l.midTermination = generalConfig.midTermination;
@@ -5807,7 +5830,7 @@ function _highlightCurrentSearch() {
   if (_searchIdx < 0 || _searchIdx >= _searchResults.length) return;
   const id = _searchResults[_searchIdx];
   document.getElementById(id)?.classList.add('search-current');
-  const n = nodes.find(x => x.id === id);
+  const n = getNode(id);
   if (n) {
     const wrap = document.getElementById('canvas-wrap');
     panX = wrap.clientWidth  / 2 - (n.x + (n.w || 120) / 2) * zoom;
