@@ -209,7 +209,9 @@ function runDataAction(el, key, event) {
   const fn = window[el.dataset[key]];
   if (typeof fn !== 'function') return;
   let args = [];
-  const raw = el.dataset.args;
+  // Per-event args (data-<event>-args) let one element carry several handlers
+  // with different arguments; otherwise fall back to the shared data-args.
+  const raw = el.dataset[key + 'Args'] ?? el.dataset.args;
   if (raw) { try { args = JSON.parse(raw).map(t => resolveActionArg(t, el, event)); } catch { args = []; } }
   return fn.apply(null, args);
 }
@@ -242,6 +244,26 @@ function syncDividerPositionLabel(el) {
 function handlePromptKey(event) {
   if (event.key === 'Enter') resolvePrompt();
   if (event.key === 'Escape') resolvePrompt(null);
+}
+// Wrappers for generated handlers that chained calls or ran inline drag logic.
+function dragAllow(event) { event.preventDefault(); }
+function arrangeSectionDragOver(event, el) { event.preventDefault(); el.style.background = 'color-mix(in srgb, var(--accent) 8%, transparent)'; }
+function arrangeSectionDragLeave(el) { el.style.background = ''; }
+function arrangeSectionDrop(event, side, el) { _arrangeDropOnSection(event, side); el.style.background = ''; }
+function openServerMapAndClose(id) { openServerMap(id); closeMapModal(); }
+// Convert a legacy "fn('a','%v')" call template (used by seg toggles) into
+// delegation data-* attributes, mapping '%v'/this.value to the $value token.
+function callTemplateToData(callTemplate, eventName = 'change') {
+  const m = /^(\w+)\((.*)\)$/.exec(callTemplate.trim());
+  if (!m) return '';
+  const args = m[2].trim() === '' ? [] : m[2].split(',').map(t => {
+    t = t.trim();
+    if (t === "'%v'" || t === '%v' || t === 'this.value') return '$value';
+    if (t === 'this.checked') return '$checked';
+    if (t.startsWith("'") && t.endsWith("'")) return t.slice(1, -1);
+    const n = Number(t); return Number.isNaN(n) ? t : n;
+  });
+  return `data-${eventName}="${m[1]}"` + (args.length ? ` data-args='${JSON.stringify(args)}'` : '');
 }
 
 // ════════════════════════════════════════════════════
@@ -530,18 +552,18 @@ function renderScaleUI() {
   list.innerHTML = currentScale.map((s, i) => `
     <div class="scale-threshold-row" id="sth-${i}">
       <div class="sth-color" title="Cambiar color" style="background:${s.color}">
-        <input type="color" value="${s.color}" onchange="updateThresholdColor(${i}, this.value)">
+        <input type="color" value="${s.color}" data-change="updateThresholdColor" data-args='[${i},"$value"]'>
         <div class="sth-swatch" style="background:${s.color}"></div>
       </div>
       <div class="sth-pct-wrap">
         <input class="sth-pct" type="number" min="0" max="100" value="${s.pct}"
-               onchange="updateThresholdPct(${i}, this.value)"
-               onblur="updateThresholdPct(${i}, this.value)" />
+               data-change="updateThresholdPct" data-args='[${i},"$value"]'
+               data-blur="updateThresholdPct" data-args='[${i},"$value"]' />
         <span class="sth-pct-unit">%</span>
       </div>
       <div style="flex:1;height:10px;border-radius:3px;background:${s.color};border:1px solid color-mix(in srgb,var(--border) 45%,transparent)"></div>
       ${currentScale.length > 2
-        ? `<button class="sth-del" onclick="removeThreshold(${i})" title="Eliminar">✕</button>`
+        ? `<button class="sth-del" data-click="removeThreshold" data-args='[${i}]' title="Eliminar">✕</button>`
         : `<div style="width:22px"></div>`}
     </div>`).join('');
 }
@@ -3004,8 +3026,8 @@ function cactiBindingHtml(link) {
     ${status}
     ${binding ? `<div class="cacti-binding-summary"><strong>${escapeHtml(binding.deviceName || `Host ${binding.hostId}`)}</strong>${binding.graphName ? `<span>Gráfica: ${escapeHtml(binding.graphName)}</span>` : ''}<span>${escapeHtml(binding.sourceName || `Fuente ${binding.localDataId}`)}</span><small>IN: ${escapeHtml(binding.inDs || '—')} · OUT: ${escapeHtml(binding.outDs || '—')}</small></div>` : ''}
     <div class="cacti-binding-actions">
-      <button class="tb-btn primary" type="button" onclick="openCactiBindingModal('${link.id}')">${binding ? 'Cambiar fuente' : 'Vincular fuente'}</button>
-      ${binding ? `<button class="tb-btn" type="button" onclick="testCactiBinding('${link.id}')">Probar</button><button class="tb-btn" type="button" onclick="clearCactiBinding('${link.id}')">Quitar</button>` : ''}
+      <button class="tb-btn primary" type="button" data-click="openCactiBindingModal" data-args='["${link.id}"]'>${binding ? 'Cambiar fuente' : 'Vincular fuente'}</button>
+      ${binding ? `<button class="tb-btn" type="button" data-click="testCactiBinding" data-args='["${link.id}"]'>Probar</button><button class="tb-btn" type="button" data-click="clearCactiBinding" data-args='["${link.id}"]'>Quitar</button>` : ''}
     </div>
   </div>`;
 }
@@ -3176,7 +3198,7 @@ async function loadCactiDevices(linkId) {
     }
     const link = getLink(linkId);
     picker.innerHTML = `<div class="cacti-modal-grid">
-      <label><span>Equipo</span><select class="prop-val" id="cacti-device-${linkId}" onchange="loadCactiGraphs('${linkId}',this.value)">
+      <label><span>Equipo</span><select class="prop-val" id="cacti-device-${linkId}" data-change="loadCactiGraphs" data-args='["${linkId}","$value"]'>
         <option value="">Selecciona un equipo…</option>${cactiCatalog.devices.map(device => `<option value="${device.id}" ${Number(link?.dataSource?.hostId)===device.id?'selected':''}>${escapeHtml(device.name)}${device.hostname ? ` · ${escapeHtml(device.hostname)}` : ''}</option>`).join('')}
       </select></label>
     </div><div id="cacti-graph-wrap-${linkId}">${cactiDisabledFlowHtml(linkId)}</div>`;
@@ -3208,7 +3230,7 @@ async function loadCactiGraphs(linkId, rawHostId) {
     })));
     cactiCatalog.sources.set(hostId, sources);
     wrap.innerHTML = `<div id="cacti-source-wrap-${linkId}"><div class="cacti-modal-grid">
-      <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" ${sources.length ? '' : 'disabled'} onchange="renderCactiDsPicker('${linkId}',${hostId},this.value,this.selectedOptions[0]?.dataset?.graphId)">
+      <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" ${sources.length ? '' : 'disabled'} data-change="renderCactiDsPicker" data-args='["${linkId}",${hostId},"$value",this.selectedOptions[0]?.dataset?.graphId]'>
           <option value="">${sources.length ? 'Selecciona una fuente…' : 'No hay fuentes disponibles'}</option>${sources.map(source => `<option value="${source.localDataId}" data-graph-id="${source.graphId || ''}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
         </select></label>
       </div><div id="cacti-ds-wrap-${linkId}">
@@ -3236,7 +3258,7 @@ function loadCactiGraphSources(linkId, hostId, rawGraphId) {
   cactiCatalog.sources.set(Number(hostId), graph.dataSources || []);
   const link = getLink(linkId);
   wrap.innerHTML = `<div class="cacti-modal-grid">
-    <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" onchange="renderCactiDsPicker('${linkId}',${hostId},this.value,${graphId})">
+    <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" data-change="renderCactiDsPicker" data-args='["${linkId}",${hostId},"$value",${graphId}]'>
         <option value="">Selecciona una fuente…</option>${graph.dataSources.map(source => `<option value="${source.localDataId}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
       </select></label>
     </div><div id="cacti-ds-wrap-${linkId}"></div>`;
@@ -3260,7 +3282,7 @@ async function loadCactiSources(linkId, rawHostId) {
     }
     const sources = cactiCatalog.sources.get(hostId), link = getLink(linkId);
     wrap.innerHTML = `<label class="prop-label" style="margin-top:8px">Interfaz / fuente</label>
-      <select class="prop-val" id="cacti-source-${linkId}" onchange="renderCactiDsPicker('${linkId}',${hostId},this.value)">
+      <select class="prop-val" id="cacti-source-${linkId}" data-change="renderCactiDsPicker" data-args='["${linkId}",${hostId},"$value"]'>
         <option value="">Selecciona una fuente…</option>${sources.map(source => `<option value="${source.localDataId}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
       </select><div id="cacti-ds-wrap-${linkId}"></div>`;
     if (link?.dataSource?.localDataId) renderCactiDsPicker(linkId, hostId, link.dataSource.localDataId);
@@ -3284,7 +3306,7 @@ function renderCactiDsPicker(linkId, hostId, rawLocalDataId, graphId = null) {
   const inDs = link?.dataSource?.localDataId === localDataId ? link.dataSource.inDs : guess('in');
   const outDs = link?.dataSource?.localDataId === localDataId ? link.dataSource.outDs : guess('out');
   const options = selected => `<option value="">Ninguna</option>${names.map(name => `<option value="${escapeHtml(name)}" ${name===selected?'selected':''}>${escapeHtml(name)}</option>`).join('')}`;
-  wrap.innerHTML = `<div class="cacti-ds-grid"><label>Entrada<select class="prop-val" id="cacti-in-${linkId}" onchange="previewCactiBinding('${linkId}',${hostId},${localDataId})">${options(inDs)}</select></label><label>Salida<select class="prop-val" id="cacti-out-${linkId}" onchange="previewCactiBinding('${linkId}',${hostId},${localDataId})">${options(outDs)}</select></label></div>
+  wrap.innerHTML = `<div class="cacti-ds-grid"><label>Entrada<select class="prop-val" id="cacti-in-${linkId}" data-change="previewCactiBinding" data-args='["${linkId}",${hostId},${localDataId}]'>${options(inDs)}</select></label><label>Salida<select class="prop-val" id="cacti-out-${linkId}" data-change="previewCactiBinding" data-args='["${linkId}",${hostId},${localDataId}]'>${options(outDs)}</select></label></div>
     ${cactiPreviewHtml('Calculando vista previa…')}`;
   previewCactiBinding(linkId, hostId, localDataId);
 }
@@ -3397,7 +3419,7 @@ function segToggleHtml(name, value, options, call, opts = {}) {
   return `<div class="seg-toggle" role="group"${opts.label ? ` aria-label="${opts.label}"` : ''}${dis ? ' aria-disabled="true"' : ''}>`
     + options.map(([val, glyph, title]) =>
         `<label class="seg-opt"${title ? ` title="${title}"` : ''}>`
-        + `<input type="radio" name="${name}" value="${val}" ${String(val) === String(value) ? 'checked' : ''}${dis ? ' disabled' : ''} onchange="${call.replace(/%v/g, val)}" />`
+        + `<input type="radio" name="${name}" value="${val}" ${String(val) === String(value) ? 'checked' : ''}${dis ? ' disabled' : ''} ${callTemplateToData(call)} />`
         + `<span class="seg-glyph" aria-hidden="true">${glyph}</span></label>`
       ).join('')
     + `</div>`;
@@ -3429,26 +3451,26 @@ function linkThresholdEditorHtml(link) {
     ${scale.map((item,index) => `
       <div class="scale-threshold-row">
         <div class="sth-color" style="background:${item.color}">
-          <input type="color" value="${item.color}" onchange="updateLinkThresholdColor('${link.id}',${index},this.value)" />
+          <input type="color" value="${item.color}" data-change="updateLinkThresholdColor" data-args='["${link.id}",${index},"$value"]' />
           <div class="sth-swatch" style="background:${item.color}"></div>
         </div>
         <div class="sth-pct-wrap">
           <input class="sth-pct" type="number" min="0" max="100" value="${item.pct}"
-                 onchange="updateLinkThresholdPct('${link.id}',${index},this.value)" />
+                 data-change="updateLinkThresholdPct" data-args='["${link.id}",${index},"$value"]' />
           <span class="sth-pct-unit">%</span>
         </div>
         <div style="flex:1;height:10px;border-radius:3px;background:${item.color}"></div>
-        ${scale.length > 2 ? `<button class="sth-del" onclick="removeLinkThreshold('${link.id}',${index})" title="Eliminar">✕</button>` : '<div style="width:22px"></div>'}
+        ${scale.length > 2 ? `<button class="sth-del" data-click="removeLinkThreshold" data-args='["${link.id}",${index}]' title="Eliminar">✕</button>` : '<div style="width:22px"></div>'}
       </div>`).join('')}
     <div style="display:flex;gap:5px;margin-top:7px">
-      <button class="tb-btn" style="flex:1;font-size:10px" onclick="addLinkThreshold('${link.id}')">+ Umbral</button>
-      <button class="tb-btn" style="flex:1;font-size:10px" onclick="copyGeneralScaleToLink('${link.id}')">Copiar general</button>
+      <button class="tb-btn" style="flex:1;font-size:10px" data-click="addLinkThreshold" data-args='["${link.id}"]'>+ Umbral</button>
+      <button class="tb-btn" style="flex:1;font-size:10px" data-click="copyGeneralScaleToLink" data-args='["${link.id}"]'>Copiar general</button>
     </div>`;
 }
 function iconGridHtml(node) {
   return `<div class="icon-grid">${NODE_ICONS.map(icon => `
     <button class="icon-choice ${!node.image && node.icon===icon ? 'selected' : ''}"
-            title="${icon}" onclick="setNodeVisual('${node.id}','${icon}')">${icon}</button>`).join('')}</div>`;
+            title="${icon}" data-click="setNodeVisual" data-args='["${node.id}","${icon}"]'>${icon}</button>`).join('')}</div>`;
 }
 
 const PROPERTY_TAB_CONFIG = {
@@ -3845,16 +3867,16 @@ function multiSelectPanelHtml(count) {
       <strong class="ins-title">${count} elementos seleccionados</strong>
       <p class="ins-copy">Arrástralos juntos o deja que el editor detecte si forman una fila o una columna.</p>
       <div class="ins-batch-controls">
-        <label><span>Ancho</span><input type="number" min="32" max="2000" value="${multiSelectionDimension('w')}" onchange="resizeSelectedNodes('w',this.value)"><small>px</small></label>
-        <label><span>Alto</span><input type="number" min="32" max="2000" value="${multiSelectionDimension('h')}" onchange="resizeSelectedNodes('h',this.value)"><small>px</small></label>
-        <label class="ins-spacing-control"><span>Separación ${spacingDirection}</span><input type="number" min="0" max="2000" value="${multiSelectionSpacing(alignment)}" onchange="setMultiSelectionSpacing(this.value)"><small>px</small></label>
+        <label><span>Ancho</span><input type="number" min="32" max="2000" value="${multiSelectionDimension('w')}" data-change="resizeSelectedNodes" data-args='["w","$value"]'><small>px</small></label>
+        <label><span>Alto</span><input type="number" min="32" max="2000" value="${multiSelectionDimension('h')}" data-change="resizeSelectedNodes" data-args='["h","$value"]'><small>px</small></label>
+        <label class="ins-spacing-control"><span>Separación ${spacingDirection}</span><input type="number" min="0" max="2000" value="${multiSelectionSpacing(alignment)}" data-change="setMultiSelectionSpacing" data-args='["$value"]'><small>px</small></label>
       </div>
       <div class="ins-actions">
-        <button class="tb-btn ins-align-btn" onclick="alignSelectionAutomatically()" ${alignment ? '' : 'disabled'}
+        <button class="tb-btn ins-align-btn" data-click="alignSelectionAutomatically" ${alignment ? '' : 'disabled'}
                 title="Detecta la orientación dominante y alinea los centros">${alignmentLabel}</button>
-        <button class="tb-btn" onclick="startCustomAlignment()" ${alignment ? '' : 'disabled'}
+        <button class="tb-btn" data-click="startCustomAlignment" ${alignment ? '' : 'disabled'}
                 title="Después selecciona el nodo que servirá como referencia">Alineación custom</button>
-        <button class="tb-btn" onclick="deleteSelected()">Eliminar selección</button>
+        <button class="tb-btn" data-click="deleteSelected">Eliminar selección</button>
       </div>
     </div>
     <footer class="ins-footer">
@@ -3887,52 +3909,52 @@ function updatePropsPanel() {
       <div class="prop-row">
         <div class="prop-label">${n.type === 'text' ? 'Texto' : 'Nombre'}</div>
         <input class="prop-val editable" type="text" value="${escapeHtml(n.name)}"
-               onchange="renameNode('${n.id}',this.value.trim())" />
+               data-change="renameNode" data-args='["${n.id}",this.value.trim()]' />
       </div>
       <div class="prop-row">
         <div class="prop-label">Tipografía</div>
-        <select class="prop-val" onchange="updateNodeAppearance('${n.id}','fontFamily',this.value)">
+        <select class="prop-val" data-change="updateNodeAppearance" data-args='["${n.id}","fontFamily","$value"]'>
           ${nodeFontOptions(n.fontFamily || 'system-ui')}
         </select>
         <div class="format-toolbar">
           <div class="prop-pair">
             <input class="prop-val coord" type="number" min="8" max="120" value="${getNodeFontSize(n)}"
-                   title="Tamaño de fuente" onchange="updateNodeAppearance('${n.id}','fontSize',this.value)" />
+                   title="Tamaño de fuente" data-change="updateNodeAppearance" data-args='["${n.id}","fontSize","$value"]' />
             <span style="font-size:11px;color:var(--text2)">px</span>
           </div>
           <div class="text-format-group" role="group" aria-label="Estilo de texto">
             <label class="format-toggle" data-format="bold" title="Negrita"><input type="checkbox" ${n.fontBold?'checked':''}
-                   onchange="updateNodeAppearance('${n.id}','fontBold',this.checked)" /><span class="format-glyph" aria-hidden="true">B</span></label>
+                   data-change="updateNodeAppearance" data-args='["${n.id}","fontBold","$checked"]' /><span class="format-glyph" aria-hidden="true">B</span></label>
             <label class="format-toggle" data-format="italic" title="Cursiva"><input type="checkbox" ${n.fontItalic?'checked':''}
-                   onchange="updateNodeAppearance('${n.id}','fontItalic',this.checked)" /><span class="format-glyph" aria-hidden="true">I</span></label>
+                   data-change="updateNodeAppearance" data-args='["${n.id}","fontItalic","$checked"]' /><span class="format-glyph" aria-hidden="true">I</span></label>
           </div>
         </div>
         <div class="prop-label" style="margin-top:7px">Color del texto</div>
         <input class="prop-val" type="color" value="${textColor}" style="height:31px;padding:3px"
-               onchange="updateNodeAppearance('${n.id}','textColor',this.value)" />
+               data-change="updateNodeAppearance" data-args='["${n.id}","textColor","$value"]' />
       </div>
       <div class="prop-row">
         <div class="prop-label">Apariencia del nodo</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
           <label style="font-size:10px;color:var(--text2)">Fondo
             <input class="prop-val" type="color" value="${nodeBg}" style="height:31px;padding:3px" ${nodeBgTransparent?'disabled':''}
-                   onchange="updateNodeAppearance('${n.id}','nodeBackground',this.value)" />
+                   data-change="updateNodeAppearance" data-args='["${n.id}","nodeBackground","$value"]' />
           </label>
           <label style="font-size:10px;color:var(--text2)">Borde
             <input class="prop-val" type="color" value="${nodeBorder}" style="height:31px;padding:3px" ${nodeBorderHidden?'disabled':''}
-                   onchange="updateNodeAppearance('${n.id}','nodeBorderColor',this.value)" />
+                   data-change="updateNodeAppearance" data-args='["${n.id}","nodeBorderColor","$value"]' />
           </label>
         </div>
         <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${nodeBgTransparent?'checked':''}
-               onchange="updateNodeAppearance('${n.id}','nodeBackgroundTransparent',this.checked)" /> Fondo transparente</label>
+               data-change="updateNodeAppearance" data-args='["${n.id}","nodeBackgroundTransparent","$checked"]' /> Fondo transparente</label>
         <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${nodeBorderHidden?'checked':''}
-               onchange="updateNodeAppearance('${n.id}','nodeBorderHidden',this.checked)" /> Ocultar borde del nodo</label>
+               data-change="updateNodeAppearance" data-args='["${n.id}","nodeBorderHidden","$checked"]' /> Ocultar borde del nodo</label>
         <div class="stack-field${nodeBorderHidden?' is-disabled':''}">
           <span class="stack-field-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 17h18"/></svg></span>
           <span class="stack-field-copy">Grosor del borde</span>
           <div class="input-unit stack-field-control">
             <input class="prop-val coord" type="number" min="0" max="12" step="0.5" ${nodeBorderHidden?'disabled':''}
-                   value="${n.nodeBorderWidth ?? 1.5}" onchange="updateNodeAppearance('${n.id}','nodeBorderWidth',this.value)" />
+                   value="${n.nodeBorderWidth ?? 1.5}" data-change="updateNodeAppearance" data-args='["${n.id}","nodeBorderWidth","$value"]' />
             <span class="input-unit-suffix">px</span>
           </div>
         </div>
@@ -3942,23 +3964,23 @@ function updatePropsPanel() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
           <label style="font-size:10px;color:var(--text2)">Fondo
             <input class="prop-val" type="color" value="${textBg}" style="height:31px;padding:3px" ${textBgTransparent?'disabled':''}
-                   onchange="updateNodeAppearance('${n.id}','textBackground',this.value)" />
+                   data-change="updateNodeAppearance" data-args='["${n.id}","textBackground","$value"]' />
           </label>
           <label style="font-size:10px;color:var(--text2)">Borde
             <input class="prop-val" type="color" value="${textBorder}" style="height:31px;padding:3px" ${textBorderHidden?'disabled':''}
-                   onchange="updateNodeAppearance('${n.id}','textBorderColor',this.value)" />
+                   data-change="updateNodeAppearance" data-args='["${n.id}","textBorderColor","$value"]' />
           </label>
         </div>
         <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${textBgTransparent?'checked':''}
-               onchange="updateNodeAppearance('${n.id}','textBackgroundTransparent',this.checked)" /> Fondo transparente</label>
+               data-change="updateNodeAppearance" data-args='["${n.id}","textBackgroundTransparent","$checked"]' /> Fondo transparente</label>
         <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${textBorderHidden?'checked':''}
-               onchange="updateNodeAppearance('${n.id}','textBorderHidden',this.checked)" /> Ocultar borde del texto</label>
+               data-change="updateNodeAppearance" data-args='["${n.id}","textBorderHidden","$checked"]' /> Ocultar borde del texto</label>
         <div class="stack-field${textBorderHidden?' is-disabled':''}">
           <span class="stack-field-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 17h18"/></svg></span>
           <span class="stack-field-copy">Grosor del borde</span>
           <div class="input-unit stack-field-control">
             <input class="prop-val coord" type="number" min="0" max="12" step="0.5" ${textBorderHidden?'disabled':''}
-                   value="${n.textBorderWidth ?? (n.type === 'text' ? 0 : 1)}" onchange="updateNodeAppearance('${n.id}','textBorderWidth',this.value)" />
+                   value="${n.textBorderWidth ?? (n.type === 'text' ? 0 : 1)}" data-change="updateNodeAppearance" data-args='["${n.id}","textBorderWidth","$value"]' />
             <span class="input-unit-suffix">px</span>
           </div>
         </div>
@@ -3967,14 +3989,14 @@ function updatePropsPanel() {
         <div class="prop-label">Tamaño</div>
         <div class="prop-pair">
           <input class="prop-val coord" type="number" min="32" max="2000" value="${n.w}"
-                 title="Ancho" onchange="resizeNodeFromProps('${n.id}','w',this.value)" />
+                 title="Ancho" data-change="resizeNodeFromProps" data-args='["${n.id}","w","$value"]' />
           <span style="color:var(--text3)">×</span>
           <input class="prop-val coord" type="number" min="32" max="2000" value="${n.h}"
-                 title="Alto" onchange="resizeNodeFromProps('${n.id}','h',this.value)" />
+                 title="Alto" data-change="resizeNodeFromProps" data-args='["${n.id}","h","$value"]' />
         </div>
       </div>
       ${n.appearanceOverride ? `
-        <button class="tb-btn" style="width:100%;font-size:11px;margin-bottom:9px" onclick="useGeneralNodeAppearance('${n.id}')">
+        <button class="tb-btn" style="width:100%;font-size:11px;margin-bottom:9px" data-click="useGeneralNodeAppearance" data-args='["${n.id}"]'>
           ↺ Usar apariencia general
         </button>` : ''}
       <div class="prop-row">
@@ -3982,18 +4004,18 @@ function updatePropsPanel() {
         <div class="prop-pair">
           <input class="prop-val coord" type="number" min="0" max="100"
                  value="${n.linkPadding ?? DEFAULT_LINK_PADDING}"
-                 onchange="updateNodeLinkPadding('${n.id}',this.value)" />
+                 data-change="updateNodeLinkPadding" data-args='["${n.id}","$value"]' />
           <span style="font-size:11px;color:var(--text2)">px</span>
         </div>
       </div>
       ${(n.type !== 'text' && (n.sizeOverride || n.linkPaddingOverride)) ? `
-        <button class="tb-btn" style="width:100%;font-size:11px;margin-bottom:9px" onclick="useGeneralNodeConfig('${n.id}')">
+        <button class="tb-btn" style="width:100%;font-size:11px;margin-bottom:9px" data-click="useGeneralNodeConfig" data-args='["${n.id}"]'>
           ↺ Usar configuración general
         </button>` : ''}
       ${n.type === 'chart' ? `
         <div class="prop-row">
           <div class="prop-label">Gráfica</div>
-          <button class="tb-btn primary" style="width:100%;font-size:12px" onclick="openChartWizard('${n.id}')">📊 Editar gráfica</button>
+          <button class="tb-btn primary" style="width:100%;font-size:12px" data-click="openChartWizard" data-args='["${n.id}"]'>📊 Editar gráfica</button>
         </div>` : n.type === 'text' ? `
         <div class="prop-row">
           <div class="prop-label">Contenido</div>
@@ -4003,35 +4025,35 @@ function updatePropsPanel() {
           <div class="prop-label">Rotación</div>
           <div class="prop-pair">
             <input class="prop-val coord" type="number" min="0" max="359" value="${Number(n.textRotation)||0}"
-                   onchange="updateTextRotation('${n.id}',this.value)" />
+                   data-change="updateTextRotation" data-args='["${n.id}","$value"]' />
             <span style="font-size:11px;color:var(--text2)">°</span>
           </div>
           <div class="prop-label" style="margin-top:7px">Orientación</div>
           <div style="display:flex;gap:5px;margin-top:5px">
-            <button class="tb-btn ${((Number(n.textRotation)||0) % 180) === 0 ? 'active' : ''}" style="flex:1;font-size:11px" onclick="updateTextRotation('${n.id}',0)">Horizontal</button>
-            <button class="tb-btn ${((Number(n.textRotation)||0) % 180) === 90 ? 'active' : ''}" style="flex:1;font-size:11px" onclick="updateTextRotation('${n.id}',90)">Vertical</button>
+            <button class="tb-btn ${((Number(n.textRotation)||0) % 180) === 0 ? 'active' : ''}" style="flex:1;font-size:11px" data-click="updateTextRotation" data-args='["${n.id}",0]'>Horizontal</button>
+            <button class="tb-btn ${((Number(n.textRotation)||0) % 180) === 90 ? 'active' : ''}" style="flex:1;font-size:11px" data-click="updateTextRotation" data-args='["${n.id}",90]'>Vertical</button>
           </div>
           <div style="display:flex;gap:4px;margin-top:5px">
-            ${[0,90,180,270].map(angle => `<button class="tb-btn" style="flex:1;font-size:11px" onclick="updateTextRotation('${n.id}',${angle})">${angle}°</button>`).join('')}
+            ${[0,90,180,270].map(angle => `<button class="tb-btn" style="flex:1;font-size:11px" data-click="updateTextRotation" data-args='["${n.id}",${angle}]'>${angle}°</button>`).join('')}
           </div>
         </div>` : `
         <div class="prop-row">
           <div class="prop-label">Icono / imagen</div>
           ${iconGridHtml(n)}
           <input class="prop-val editable" type="text" value="${escapeHtml(visualValue)}"
-                 placeholder="Emoji o URL de imagen" onchange="setNodeVisual('${n.id}',this.value.trim())" />
-          <input class="prop-file" type="file" accept="image/*" onchange="uploadNodeImage('${n.id}',this)" />
-          ${n.image ? `<button class="tb-btn" style="width:100%;font-size:11px;margin-top:5px" onclick="clearNodeImage('${n.id}')">Usar icono</button>` : ''}
+                 placeholder="Emoji o URL de imagen" data-change="setNodeVisual" data-args='["${n.id}",this.value.trim()]' />
+          <input class="prop-file" type="file" accept="image/*" data-change="uploadNodeImage" data-args='["${n.id}","$self"]' />
+          ${n.image ? `<button class="tb-btn" style="width:100%;font-size:11px;margin-top:5px" data-click="clearNodeImage" data-args='["${n.id}"]'>Usar icono</button>` : ''}
         </div>`}
       ${n.type === 'text' ? '' : `<div class="prop-row">
         <label class="prop-check">
           <input type="checkbox" ${n.nameInside ? 'checked' : ''}
-                 onchange="setNodeLabelOption('${n.id}','nameInside',this.checked)" />
+                 data-change="setNodeLabelOption" data-args='["${n.id}","nameInside","$checked"]' />
           Nombre dentro del cuadro
         </label>
         <label class="prop-check">
           <input type="checkbox" ${n.hideName ? 'checked' : ''}
-                 onchange="setNodeLabelOption('${n.id}','hideName',this.checked)" />
+                 data-change="setNodeLabelOption" data-args='["${n.id}","hideName","$checked"]' />
           Ocultar nombre
         </label>
       </div>`}
@@ -4048,42 +4070,42 @@ function updatePropsPanel() {
       <div class="prop-row">
         <div class="prop-label">Acciones del enlace</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <button class="tb-btn" onclick="redrawLink('${l.id}')" title="Regenera únicamente la geometría de la ruta">Redibujar</button>
-          <button class="tb-btn" onclick="cloneLink('${l.id}')" title="Copia el enlace y conserva su configuración">Clonar enlace</button>
+          <button class="tb-btn" data-click="redrawLink" data-args='["${l.id}"]' title="Regenera únicamente la geometría de la ruta">Redibujar</button>
+          <button class="tb-btn" data-click="cloneLink" data-args='["${l.id}"]' title="Copia el enlace y conserva su configuración">Clonar enlace</button>
         </div>
       </div>
       <div class="prop-row">
         <div class="prop-label">Descripción</div>
         <textarea class="prop-val editable" placeholder="Descripción del enlace"
-                  onchange="updateLinkDescription('${l.id}',this.value)">${escapeHtml(l.description || '')}</textarea>
+                  data-change="updateLinkDescription" data-args='["${l.id}","$value"]'>${escapeHtml(l.description || '')}</textarea>
       </div>
       ${cactiBindingHtml(l)}
       <div class="prop-row">
         <div class="prop-label">Capacidad del enlace para umbrales</div>
         <input class="prop-val" type="number" min="0.01" step="0.01" value="${l.capacity ?? 100}"
-               onchange="updateLinkTraffic('${l.id}','capacity',this.value)" />
+               data-change="updateLinkTraffic" data-args='["${l.id}","capacity","$value"]' />
         ${segToggleHtml(`cap-unit-${l.id}`, LINK_CAPACITY_UNITS.includes(l.capacityUnit) ? l.capacityUnit : 'Mbps', SEG_OPTIONS.capacityUnit, `updateLinkTraffic('${l.id}','capacityUnit','%v')`, {label:'Unidad de capacidad'})}
       </div>
       <div class="prop-row">
         <div class="prop-label">Etiqueta de capacidad</div>
         <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${l.capacityLabelVisible!==false?'checked':''}
-               onchange="updateLinkCapacityLabel('${l.id}','capacityLabelVisible',this.checked)" /> Mostrar tag de capacidad</label>
+               data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelVisible","$checked"]' /> Mostrar tag de capacidad</label>
         <div class="prop-label" style="margin-top:7px">Posición del tag</div>
         ${segToggleHtml(`cap-place-${l.id}`, ['above','below','left'].includes(l.capacityLabelSide) ? l.capacityLabelSide : 'right', SEG_OPTIONS.placement, `updateLinkCapacityLabelPlacement('${l.id}','%v')`, {label:'Posición del tag', disabled:l.capacityLabelVisible===false})}
         <div class="prop-label" style="margin-top:7px">Tamaño del texto</div>
         <div class="prop-pair"><input class="prop-val coord" type="number" min="8" max="72"
              value="${l.capacityLabelFontSize ?? 11}" ${l.capacityLabelVisible===false?'disabled':''}
-             onchange="updateLinkCapacityLabel('${l.id}','capacityLabelFontSize',this.value)" /><span>px</span></div>
+             data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelFontSize","$value"]' /><span>px</span></div>
         <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${l.capacityLabelRotate?'checked':''} ${l.capacityLabelVisible===false?'disabled':''}
-               onchange="updateLinkCapacityLabel('${l.id}','capacityLabelRotate',this.checked)" /> Rotar siguiendo el enlace</label>
+               data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelRotate","$checked"]' /> Rotar siguiendo el enlace</label>
         <label class="prop-check" style="margin-top:5px"><input type="checkbox" ${l.capacityLabelFlip?'checked':''} ${!l.capacityLabelRotate||l.capacityLabelVisible===false?'disabled':''}
-               onchange="updateLinkCapacityLabel('${l.id}','capacityLabelFlip',this.checked)" /> Girar 180° sólo en vertical</label>
+               data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelFlip","$checked"]' /> Girar 180° sólo en vertical</label>
       </div>
       <div class="prop-row">
         <div class="prop-label">Grosor visual del enlace</div>
         <div class="prop-pair">
           <input class="prop-val coord" type="number" min="1" max="24" value="${l.width || 6}"
-                 onchange="updateLinkWidth('${l.id}',this.value)" />
+                 data-change="updateLinkWidth" data-args='["${l.id}","$value"]' />
           <span style="font-size:11px;color:var(--text2)">px</span>
         </div>
       </div>
@@ -4097,8 +4119,8 @@ function updatePropsPanel() {
         </div>
         <input id="divider-position-slider" class="prop-val" type="range" min="5" max="95" step="1"
                value="${l.dividerPosition ?? 50}" data-start="${l.dividerPosition ?? 50}"
-               oninput="previewLinkDivider('${l.id}',this.value)"
-               onchange="commitLinkDivider('${l.id}',this.value,this.dataset.start)" />
+               data-input="previewLinkDivider" data-args='["${l.id}","$value"]'
+               data-change="commitLinkDivider" data-args='["${l.id}","$value",this.dataset.start]' />
         <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3)"><span>Entrada</span><span>Salida</span></div>
       </div>
       <div class="prop-row">
@@ -4107,20 +4129,20 @@ function updatePropsPanel() {
         <div class="prop-label" style="margin-top:7px">Ubicación</div>
         ${segToggleHtml(`usage-pos-${l.id}`, ['above','below','center'].includes(l.usageLabelPosition)?l.usageLabelPosition:'above', SEG_OPTIONS.usagePosition, `updateLinkUsageLabel('${l.id}','usageLabelPosition','%v')`, {label:'Ubicación'})}
         <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${l.usageLabelRotate?'checked':''}
-               onchange="updateLinkUsageLabel('${l.id}','usageLabelRotate',this.checked)" /> Rotar siguiendo el enlace</label>
+               data-change="updateLinkUsageLabel" data-args='["${l.id}","usageLabelRotate","$checked"]' /> Rotar siguiendo el enlace</label>
         <label class="prop-check" style="margin-top:5px"><input type="checkbox" ${l.usageLabelFlip?'checked':''} ${!l.usageLabelRotate?'disabled':''}
-               onchange="updateLinkUsageLabel('${l.id}','usageLabelFlip',this.checked)" /> Girar 180° sólo en vertical</label>
+               data-change="updateLinkUsageLabel" data-args='["${l.id}","usageLabelFlip","$checked"]' /> Girar 180° sólo en vertical</label>
       </div>
       <div class="prop-row">
         <label class="prop-check">
           <input type="checkbox" ${l.scaleOverride ? 'checked' : ''}
-                 onchange="setLinkScaleOverride('${l.id}',this.checked)" />
+                 data-change="setLinkScaleOverride" data-args='["${l.id}","$checked"]' />
           Usar umbrales individuales
         </label>
         ${linkThresholdEditorHtml(l)}
       </div>
       ${(l.styleOverride || l.dividerPositionOverride || l.usageLabelOverride || l.capacityLabelOverride) ? `
-        <button class="tb-btn" style="width:100%;font-size:11px;margin-bottom:9px" onclick="useGeneralLinkConfig('${l.id}')">
+        <button class="tb-btn" style="width:100%;font-size:11px;margin-bottom:9px" data-click="useGeneralLinkConfig" data-args='["${l.id}"]'>
           ↺ Usar estilo general
         </button>` : ''}
       `;
@@ -4330,9 +4352,9 @@ function renderArrangeForm() {
   ['top','bottom','left','right'].forEach(side => {
     const grp = groups[side];
     html += `<div class="arrange-section"
-      ondragover="event.preventDefault();this.style.background='color-mix(in srgb, var(--accent) 8%, transparent)'"
-      ondragleave="this.style.background=''"
-      ondrop="_arrangeDropOnSection(event,'${side}');this.style.background=''">
+      data-dragover="arrangeSectionDragOver" data-dragover-args='["$event","$self"]'
+      data-dragleave="arrangeSectionDragLeave" data-dragleave-args='["$self"]'
+      data-drop="arrangeSectionDrop" data-drop-args='["$event","${side}","$self"]'>
       <div class="arrange-side-title">${sideLabel[side]}
         <span>(${sideHint[side]})</span>
       </div>`;
@@ -4342,21 +4364,21 @@ function renderArrangeForm() {
       const col = {top:'#0DBFA6',bottom:'#28C97A',left:'#F09A38',right:'#E86060'}[side];
       grp.forEach((item, i) => {
         html += `<div draggable="true"
-          ondragstart="_arrangeDragStart('${side}',${i})"
-          ondragover="event.preventDefault()"
-          ondrop="_arrangeDrop(event,'${side}',${i})"
+          data-dragstart="_arrangeDragStart" data-dragstart-args='["${side}",${i}]'
+          data-dragover="dragAllow" data-dragover-args='["$event"]'
+          data-drop="_arrangeDrop" data-drop-args='["$event","${side}",${i}]'
           class="arrange-row">
           <span class="arrange-grip">⠿</span>
           <span class="arrange-index" style="background:${col}" title="Posición fija ${item.slot} de ${PORT_SLOT_COUNT}">${item.slot}</span>
           <span class="arrange-item-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
-          <select class="arrange-side-select" title="Cambiar lado" onchange="_arrangeMoveToSide('${side}',${i},this.value)">
+          <select class="arrange-side-select" title="Cambiar lado" data-change="_arrangeMoveToSide" data-args='["${side}",${i},"$value"]'>
             <option value="top" ${side==='top'?'selected':''}>↑</option>
             <option value="bottom" ${side==='bottom'?'selected':''}>↓</option>
             <option value="left" ${side==='left'?'selected':''}>←</option>
             <option value="right" ${side==='right'?'selected':''}>→</option>
           </select>
-          <button class="tb-btn compact-icon" ${item.slot===1?'disabled':''} onclick="_arrangeMoveUp('${side}',${i})">↑</button>
-          <button class="tb-btn compact-icon" ${item.slot===PORT_SLOT_COUNT?'disabled':''} onclick="_arrangeMoveDown('${side}',${i})">↓</button>
+          <button class="tb-btn compact-icon" ${item.slot===1?'disabled':''} data-click="_arrangeMoveUp" data-args='["${side}",${i}]'>↑</button>
+          <button class="tb-btn compact-icon" ${item.slot===PORT_SLOT_COUNT?'disabled':''} data-click="_arrangeMoveDown" data-args='["${side}",${i}]'>↓</button>
         </div>`;
       });
     }
@@ -4364,8 +4386,8 @@ function renderArrangeForm() {
   });
 
   html += `<div class="arrange-actions">
-    <button class="tb-btn primary" style="flex:1;font-size:12px" onclick="applyArrange()">Guardar</button>
-    <button class="tb-btn" style="flex:1;font-size:12px" onclick="_cancelArrange()">Cancelar</button>
+    <button class="tb-btn primary" style="flex:1;font-size:12px" data-click="applyArrange">Guardar</button>
+    <button class="tb-btn" style="flex:1;font-size:12px" data-click="_cancelArrange">Cancelar</button>
   </div>`;
 
   if (arrangeEmbeddedInTab) {
@@ -4376,7 +4398,7 @@ function renderArrangeForm() {
     container.closest('.panel-section')?.classList.add('has-property-tabs');
     container.innerHTML = `<div class="props-arrange-shell">
     <div class="props-arrange-head">
-      <button type="button" class="props-arrange-back" onclick="_cancelArrange()" title="Volver a propiedades" aria-label="Volver a propiedades">←</button>
+      <button type="button" class="props-arrange-back" data-click="_cancelArrange" title="Volver a propiedades" aria-label="Volver a propiedades">←</button>
       <span class="props-entity-icon"><svg viewBox="0 0 24 24"><path d="M5 5v14M19 5v14M5 8h6l2 4h6M5 16h6l2-4"/><circle cx="5" cy="8" r="2"/><circle cx="5" cy="16" r="2"/><circle cx="19" cy="12" r="2"/></svg></span>
       <span class="props-entity-copy"><strong>Ordenar enlaces</strong><small>${escapeHtml(n.name)}</small></span>
     </div>
@@ -5204,7 +5226,7 @@ function renderHotkeysDraft() {
   list.innerHTML = HOTKEY_TOOLS.map(tool => `<div class="hotkey-row">
     <span class="hotkey-tool-icon"><svg viewBox="0 0 24 24">${tool.icon}</svg></span>
     <span class="hotkey-tool-copy"><strong>${tool.label}</strong><small>${tool.description}</small></span>
-    <button type="button" class="hotkey-capture" onkeydown="captureHotkey(event,'${tool.id}')" aria-label="Cambiar atajo de ${tool.label}" title="Haz clic y presiona una tecla"><kbd>${hotkeyDraft[tool.id].toUpperCase()}</kbd><small>Cambiar</small></button>
+    <button type="button" class="hotkey-capture" data-keydown="captureHotkey" data-args='["$event","${tool.id}"]' aria-label="Cambiar atajo de ${tool.label}" title="Haz clic y presiona una tecla"><kbd>${hotkeyDraft[tool.id].toUpperCase()}</kbd><small>Cambiar</small></button>
   </div>`).join('');
 }
 function openHotkeysModal() {
@@ -5662,7 +5684,7 @@ async function openMapModal() {
       return;
     }
     grid.innerHTML = maps.map(map => `
-      <div class="map-card" data-id="${map.id}" data-name="${escapeHtml(map.name.toLowerCase())}" onclick="openServerMap('${map.id}');closeMapModal()">
+      <div class="map-card" data-id="${map.id}" data-name="${escapeHtml(map.name.toLowerCase())}" data-click="openServerMapAndClose" data-args='["${map.id}"]'>
         <canvas class="map-card-canvas" id="mpcv-${map.id}" width="280" height="160"></canvas>
         <div class="map-card-body">
           <strong>${escapeHtml(map.name)}</strong>
