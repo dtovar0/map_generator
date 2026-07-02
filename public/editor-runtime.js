@@ -189,6 +189,62 @@ function getLink(id) {
 }
 
 // ════════════════════════════════════════════════════
+// EVENT DELEGATION
+// ════════════════════════════════════════════════════
+// Declarative handlers replace inline on*= attributes so the CSP can drop
+// 'unsafe-inline' from script-src. An element carries data-<event>="fnName"
+// (e.g. data-click, data-change) plus optional data-args='[...]' whose string
+// tokens are resolved at call time: $value, $valueNum, $checked, $self, $event.
+function resolveActionArg(token, el, event) {
+  switch (token) {
+    case '$value': return el.value;
+    case '$valueNum': return Number(el.value);
+    case '$checked': return el.checked;
+    case '$self': return el;
+    case '$event': return event;
+    default: return token;
+  }
+}
+function runDataAction(el, key, event) {
+  const fn = window[el.dataset[key]];
+  if (typeof fn !== 'function') return;
+  let args = [];
+  const raw = el.dataset.args;
+  if (raw) { try { args = JSON.parse(raw).map(t => resolveActionArg(t, el, event)); } catch { args = []; } }
+  return fn.apply(null, args);
+}
+// eventType: real DOM event; key: dataset property (camelCase) / attribute (kebab).
+const DELEGATED_EVENTS = [
+  ['click', 'click'], ['change', 'change'], ['input', 'input'],
+  ['keydown', 'keydown'], ['mousedown', 'mdown'], ['dblclick', 'dblclick'],
+  ['dragstart', 'dragstart'], ['dragover', 'dragover'], ['drop', 'drop'],
+  ['dragleave', 'dragleave'], ['focusout', 'blur'],
+];
+function setupActionDelegation() {
+  for (const [eventType, key] of DELEGATED_EVENTS) {
+    const attr = 'data-' + key.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+    document.addEventListener(eventType, event => {
+      const el = event.target.closest(`[${attr}]`);
+      if (!el) return;
+      runDataAction(el, key, event);
+    });
+  }
+}
+
+// Small wrappers for the few handlers that chained calls or ran inline logic.
+function toolSelectReset() { cancelPlacing(); setTool('select'); }
+function toolLinkReset() { cancelPlacing(); setTool('link'); }
+function openMapPickerReplace() { openMapPicker(); closeMapModal(); }
+function syncDividerPositionLabel(el) {
+  const out = document.getElementById('cfg-divider-position-value');
+  if (out) out.textContent = el.value + '%';
+}
+function handlePromptKey(event) {
+  if (event.key === 'Enter') resolvePrompt();
+  if (event.key === 'Escape') resolvePrompt(null);
+}
+
+// ════════════════════════════════════════════════════
 // UNDO / REDO
 // ════════════════════════════════════════════════════
 let history = [], historyIdx = -1;
@@ -6023,6 +6079,7 @@ document.getElementById('presentation-refresh').value = String(presentationRefre
 updatePresentationViewControls();
 updatePaletteHotkeyTitles();
 syncTagsToggleBtn();
+setupActionDelegation();
 // Seed history with the initial state so undo can't go below it
 history = [getSnapshot()]; historyIdx = 0; updateUndoBtns();
 if (localDraftRestored) {

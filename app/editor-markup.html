@@ -4,95 +4,95 @@
   <div class="sep"></div>
 
   <!-- Acciones directas -->
-  <button class="tb-btn toolbar-icon" onclick="newMap()" title="Nuevo mapa (Ctrl+N)" aria-label="Nuevo mapa"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M12 10v6"/></svg></span></button>
-  <button class="tb-btn toolbar-icon" onclick="saveMap()" title="Guardar (Ctrl+G)" aria-label="Guardar"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M5 4h12l2 2v14H5z"/><path d="M8 4v6h8V4M8 20v-6h8v6"/></svg></span></button>
-  <button class="tb-btn toolbar-icon" onclick="saveMapAs()" title="Guardar como nuevo mapa" aria-label="Guardar como nuevo mapa"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 5h11l2 2v5M7 5v5h7V5M5 19v-5h7"/><path d="M18 15v6M15 18h6"/></svg></span></button>
-  <button class="tb-btn toolbar-icon" onclick="exportMap()" title="Exportar JSON" aria-label="Exportar JSON"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M5 19h14"/></svg></span></button>
+  <button class="tb-btn toolbar-icon" data-click="newMap" title="Nuevo mapa (Ctrl+N)" aria-label="Nuevo mapa"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 13h6M12 10v6"/></svg></span></button>
+  <button class="tb-btn toolbar-icon" data-click="saveMap" title="Guardar (Ctrl+G)" aria-label="Guardar"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M5 4h12l2 2v14H5z"/><path d="M8 4v6h8V4M8 20v-6h8v6"/></svg></span></button>
+  <button class="tb-btn toolbar-icon" data-click="saveMapAs" title="Guardar como nuevo mapa" aria-label="Guardar como nuevo mapa"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 5h11l2 2v5M7 5v5h7V5M5 19v-5h7"/><path d="M18 15v6M15 18h6"/></svg></span></button>
+  <button class="tb-btn toolbar-icon" data-click="exportMap" title="Exportar JSON" aria-label="Exportar JSON"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M5 19h14"/></svg></span></button>
   <div class="sep"></div>
   <!-- Selector de mapas -->
-  <button class="tb-btn" id="menu-btn" onclick="openMapModal()"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="m3 6 5-2 8 3 5-2v14l-5 2-8-3-5 2z"/><path d="M8 4v14M16 7v14"/></svg></span><span class="btn-label">Mapas</span></button>
+  <button class="tb-btn" id="menu-btn" data-click="openMapModal"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="m3 6 5-2 8 3 5-2v14l-5 2-8-3-5 2z"/><path d="M8 4v14M16 7v14"/></svg></span><span class="btn-label">Mapas</span></button>
 
   <div class="sep"></div>
 
   <!-- Panel toggles -->
-  <button class="ct-btn active" id="tool-toggle-palette" onclick="togglePalettePanel()" title="Mostrar/ocultar panel de herramientas">◧</button>
-  <button class="ct-btn active" id="tool-toggle-props" onclick="togglePropsPanel()" aria-pressed="true" title="Mostrar/ocultar panel de propiedades">◨</button>
+  <button class="ct-btn active" id="tool-toggle-palette" data-click="togglePalettePanel" title="Mostrar/ocultar panel de herramientas">◧</button>
+  <button class="ct-btn active" id="tool-toggle-props" data-click="togglePropsPanel" aria-pressed="true" title="Mostrar/ocultar panel de propiedades">◨</button>
 
   <div class="ct-sep"></div>
 
   <!-- Tool buttons -->
-  <button class="ct-btn" id="tool-scale" onclick="toggleScalePanel()" title="Escala de Color" aria-label="Escala de color"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
-  <button class="ct-btn" id="tool-tags" onclick="toggleEditorTags()" aria-pressed="false" title="Ocultar etiquetas de enlaces" aria-label="Mostrar u ocultar etiquetas de enlaces"><svg viewBox="0 0 24 24"><path d="M20.6 13.4 11 3.8A2 2 0 0 0 9.6 3H4v5.6a2 2 0 0 0 .6 1.4l9.6 9.6a2 2 0 0 0 2.8 0l3.6-3.6a2 2 0 0 0 0-2.8z"/><circle cx="7.6" cy="7.6" r="1.3"/></svg></button>
-  <button class="ct-btn" id="tool-config" onclick="toggleConfigPanel()" title="Configuración general" aria-label="Configuración general"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7-.7-1.7.9-1.9-2.1-2.1-1.9.9-1.7-.7-.7-2h-3l-.7 2-1.7.7-1.9-.9-2.1 2.1.9 1.9-.7 1.7-2 .7v3l2 .7.7 1.7-.9 1.9 2.1 2.1 1.9-.9 1.7.7.7 2h3l.7-2 1.7-.7 1.9.9 2.1-2.1-.9-1.9.7-1.7z"/></svg></button>
-  <button class="ct-btn" id="tool-hotkeys" onclick="openHotkeysModal()" title="Configurar atajos" aria-label="Configurar atajos"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h.01M11 9h.01M15 9h.01M18 9h.01M7 13h.01M10 13h.01M17 13h.01M8 16h8"/></svg></button>
-  <button class="ct-btn" id="tool-theme" onclick="toggleTheme()" title="Cambiar tema" aria-label="Cambiar tema"><svg viewBox="0 0 24 24"><path d="M20 15.5A8 8 0 1 1 8.5 4 6.5 6.5 0 0 0 20 15.5z"/></svg></button>
-  <button class="ct-btn" id="tool-search" onclick="openSearch()" title="Buscar nodo (Ctrl+F)" aria-label="Buscar nodo"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></button>
-  <button class="ct-btn" id="tool-multi-place" onclick="toggleMultiPlacement()" aria-pressed="false"
+  <button class="ct-btn" id="tool-scale" data-click="toggleScalePanel" title="Escala de Color" aria-label="Escala de color"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
+  <button class="ct-btn" id="tool-tags" data-click="toggleEditorTags" aria-pressed="false" title="Ocultar etiquetas de enlaces" aria-label="Mostrar u ocultar etiquetas de enlaces"><svg viewBox="0 0 24 24"><path d="M20.6 13.4 11 3.8A2 2 0 0 0 9.6 3H4v5.6a2 2 0 0 0 .6 1.4l9.6 9.6a2 2 0 0 0 2.8 0l3.6-3.6a2 2 0 0 0 0-2.8z"/><circle cx="7.6" cy="7.6" r="1.3"/></svg></button>
+  <button class="ct-btn" id="tool-config" data-click="toggleConfigPanel" title="Configuración general" aria-label="Configuración general"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7-.7-1.7.9-1.9-2.1-2.1-1.9.9-1.7-.7-.7-2h-3l-.7 2-1.7.7-1.9-.9-2.1 2.1.9 1.9-.7 1.7-2 .7v3l2 .7.7 1.7-.9 1.9 2.1 2.1 1.9-.9 1.7.7.7 2h3l.7-2 1.7-.7 1.9.9 2.1-2.1-.9-1.9.7-1.7z"/></svg></button>
+  <button class="ct-btn" id="tool-hotkeys" data-click="openHotkeysModal" title="Configurar atajos" aria-label="Configurar atajos"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h.01M11 9h.01M15 9h.01M18 9h.01M7 13h.01M10 13h.01M17 13h.01M8 16h8"/></svg></button>
+  <button class="ct-btn" id="tool-theme" data-click="toggleTheme" title="Cambiar tema" aria-label="Cambiar tema"><svg viewBox="0 0 24 24"><path d="M20 15.5A8 8 0 1 1 8.5 4 6.5 6.5 0 0 0 20 15.5z"/></svg></button>
+  <button class="ct-btn" id="tool-search" data-click="openSearch" title="Buscar nodo (Ctrl+F)" aria-label="Buscar nodo"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></button>
+  <button class="ct-btn" id="tool-multi-place" data-click="toggleMultiPlacement" aria-pressed="false"
           title="Colocación única activa: la herramienta se libera después de insertar" aria-label="Alternar colocación continua"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2"/></svg></button>
 
   <div class="ct-sep"></div>
 
-  <button class="ct-btn disabled" id="btn-undo" onclick="undo()" title="Deshacer (Ctrl+Z)">↩</button>
-  <button class="ct-btn disabled" id="btn-redo" onclick="redo()" title="Rehacer (Ctrl+Y)">↪</button>
+  <button class="ct-btn disabled" id="btn-undo" data-click="undo" title="Deshacer (Ctrl+Z)">↩</button>
+  <button class="ct-btn disabled" id="btn-redo" data-click="redo" title="Rehacer (Ctrl+Y)">↪</button>
 
   <div class="ct-sep"></div>
 
   <!-- Zoom controls -->
-  <button class="ct-btn" onclick="zoomIn()" title="Zoom in">＋</button>
+  <button class="ct-btn" data-click="zoomIn" title="Zoom in">＋</button>
   <button class="ct-btn u-cursor-default" id="zoom-label">100%</button>
-  <button class="ct-btn" onclick="zoomOut()" title="Zoom out">－</button>
-  <button class="ct-btn" onclick="zoomFit()" title="Ajustar vista">⛶</button>
+  <button class="ct-btn" data-click="zoomOut" title="Zoom out">－</button>
+  <button class="ct-btn" data-click="zoomFit" title="Ajustar vista">⛶</button>
 
   <div class="spacer"></div>
   <label class="presentation-action" id="presentation-view-control" title="Seleccionar vista en vivo o histórica">
     <span>Vista</span>
     <div class="seg-toggle seg-compact" role="group" aria-label="Vista">
-      <label class="seg-opt" title="Live"><input type="radio" name="presentation-view-mode" value="live" checked onchange="setPresentationViewMode('live')" /><span class="seg-glyph" aria-hidden="true">▶</span></label>
-      <label class="seg-opt" title="Por día"><input type="radio" name="presentation-view-mode" value="day" onchange="setPresentationViewMode('day')" /><span class="seg-glyph" aria-hidden="true">📅</span></label>
+      <label class="seg-opt" title="Live"><input type="radio" name="presentation-view-mode" value="live" checked data-change="setPresentationViewMode" data-args='["live"]' /><span class="seg-glyph" aria-hidden="true">▶</span></label>
+      <label class="seg-opt" title="Por día"><input type="radio" name="presentation-view-mode" value="day" data-change="setPresentationViewMode" data-args='["day"]' /><span class="seg-glyph" aria-hidden="true">📅</span></label>
     </div>
   </label>
   <label class="presentation-action" id="presentation-date-control" title="Seleccionar fecha del mapa">
     <span>Fecha</span>
-    <input id="presentation-date" type="date" onchange="selectPresentationDate(this.value)" />
+    <input id="presentation-date" type="date" data-change="selectPresentationDate" data-args='["$value"]' />
   </label>
   <label class="presentation-action" id="presentation-refresh-control" title="Intervalo de actualización automática">
     <span>Auto refresco</span>
-    <select id="presentation-refresh" onchange="setPresentationRefresh(this.value)">
+    <select id="presentation-refresh" data-change="setPresentationRefresh" data-args='["$value"]'>
       <option value="5">5 m</option><option value="10">10 m</option><option value="15">15 m</option>
       <option value="30">30 m</option><option value="60">60 m</option>
     </select>
   </label>
-  <button class="tb-btn presentation-action" id="btn-save-map" onclick="saveMap()" title="Guardar mapa y fecha en el servidor">💾 Guardar</button>
-  <button class="tb-btn presentation-action" id="btn-open-map" onclick="openMapModal()" title="Abrir un mapa guardado en el servidor">📂 Abrir mapa</button>
-  <button class="tb-btn presentation-action presentation-export" onclick="exportMapImage()" title="Exportar vista como imagen PNG">🖼 Imagen</button>
-  <button class="tb-btn presentation-action presentation-export" onclick="exportMapPdf()" title="Exportar vista como documento PDF">📄 PDF</button>
-  <input id="map-file-input" type="file" accept="application/json,.json" hidden onchange="importMapFile(this)" />
-  <button class="tb-btn presentation-toggle" id="btn-presentation" onclick="togglePresentationMode()"
+  <button class="tb-btn presentation-action" id="btn-save-map" data-click="saveMap" title="Guardar mapa y fecha en el servidor">💾 Guardar</button>
+  <button class="tb-btn presentation-action" id="btn-open-map" data-click="openMapModal" title="Abrir un mapa guardado en el servidor">📂 Abrir mapa</button>
+  <button class="tb-btn presentation-action presentation-export" data-click="exportMapImage" title="Exportar vista como imagen PNG">🖼 Imagen</button>
+  <button class="tb-btn presentation-action presentation-export" data-click="exportMapPdf" title="Exportar vista como documento PDF">📄 PDF</button>
+  <input id="map-file-input" type="file" accept="application/json,.json" hidden data-change="importMapFile" data-args='["$self"]' />
+  <button class="tb-btn presentation-toggle" id="btn-presentation" data-click="togglePresentationMode"
           aria-pressed="false" title="Cambiar entre vista de editor y presentación (P)">▶ Presentación</button>
 </div>
 
 <div id="app">
   <!-- PALETTE -->
   <div id="palette">
-    <div class="pal-item active" id="pal-select" onclick="cancelPlacing();setTool('select')" title="Seleccionar (S)">
+    <div class="pal-item active" id="pal-select" data-click="toolSelectReset" title="Seleccionar (S)">
       <span class="pal-icon"><svg viewBox="0 0 24 24"><path d="m5 4 13 8-6 1-3 6z"/></svg></span>
       <span class="pal-name">Selec.</span>
     </div>
     <div class="pal-divider"></div>
-    <div class="pal-item" id="pal-node" data-type="switch" data-icon="🔲" data-label="Nodo" onclick="activatePlacing(this)" title="Colocar nodo (N)">
+    <div class="pal-item" id="pal-node" data-type="switch" data-icon="🔲" data-label="Nodo" data-click="activatePlacing" data-args='["$self"]' title="Colocar nodo (N)">
       <span class="pal-badge">+</span><span class="pal-icon"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6M9 13h4"/></svg></span><span class="pal-name">Nodo</span>
     </div>
-    <div class="pal-item" id="pal-link" onclick="cancelPlacing();setTool('link')" title="Conectar (L)">
+    <div class="pal-item" id="pal-link" data-click="toolLinkReset" title="Conectar (L)">
       <span class="pal-icon"><svg viewBox="0 0 24 24"><path d="M8.5 15.5 6 18a3.5 3.5 0 0 1-5-5l3-3a3.5 3.5 0 0 1 5 0"/><path d="m15.5 8.5 2.5-2.5a3.5 3.5 0 0 1 5 5l-3 3a3.5 3.5 0 0 1-5 0"/><path d="m8 16 8-8"/></svg></span>
       <span class="pal-name">Link</span>
     </div>
-    <div class="pal-item" id="pal-icon" data-type="server" data-icon="🖼️" data-label="Icono" onclick="activatePlacing(this)">
+    <div class="pal-item" id="pal-icon" data-type="server" data-icon="🖼️" data-label="Icono" data-click="activatePlacing" data-args='["$self"]'>
       <span class="pal-badge">+</span><span class="pal-icon"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="9" cy="10" r="1.5"/><path d="m6 17 4-4 3 3 2-2 3 3"/></svg></span><span class="pal-name">Icono</span>
     </div>
-    <div class="pal-item" id="pal-text" data-type="text" data-icon="" data-label="Texto" onclick="activatePlacing(this)">
+    <div class="pal-item" id="pal-text" data-type="text" data-icon="" data-label="Texto" data-click="activatePlacing" data-args='["$self"]'>
       <span class="pal-badge">+</span><span class="pal-icon"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M8 20h8"/></svg></span><span class="pal-name">Texto</span>
     </div>
-    <div class="pal-item" id="chart-pal" data-type="chart" data-icon="📊" data-label="Gráfica" onclick="startChartPlacementMode()">
+    <div class="pal-item" id="chart-pal" data-type="chart" data-icon="📊" data-label="Gráfica" data-click="startChartPlacementMode">
       <span class="pal-badge">+</span><span class="pal-icon"><svg viewBox="0 0 24 24"><path d="M5 19V10h4v9M10 19V5h4v14M15 19v-7h4v7M3 19h18"/></svg></span><span class="pal-name">Gráfica</span>
     </div>
   </div>
@@ -108,11 +108,11 @@
     <div id="search-bar" role="search" aria-label="Buscar nodo">
       <span class="search-icon">⌕</span>
       <input id="search-input" type="text" placeholder="Buscar nodo…" autocomplete="off"
-             oninput="doSearch(this.value)" onkeydown="handleSearchKey(event)" />
+             data-input="doSearch" data-args='["$value"]' data-keydown="handleSearchKey" data-args='["$event"]' />
       <span id="search-count" class="search-count"></span>
-      <button class="search-nav" onclick="navigateSearch(-1)" title="Anterior (↑)">↑</button>
-      <button class="search-nav" onclick="navigateSearch(1)" title="Siguiente (↓)">↓</button>
-      <button class="search-close" onclick="closeSearch()" title="Cerrar (Esc)">×</button>
+      <button class="search-nav" data-click="navigateSearch" data-args='[-1]' title="Anterior (↑)">↑</button>
+      <button class="search-nav" data-click="navigateSearch" data-args='[1]' title="Siguiente (↓)">↓</button>
+      <button class="search-close" data-click="closeSearch" title="Cerrar (Esc)">×</button>
     </div>
 
     <div id="place-preview">
@@ -166,7 +166,7 @@
   <aside id="presentation-info" aria-live="polite">
     <div class="presentation-info-head">
       <strong id="presentation-info-title">Información</strong>
-      <button type="button" onclick="hidePresentationInfo()" aria-label="Limpiar selección">×</button>
+      <button type="button" data-click="hidePresentationInfo" aria-label="Limpiar selección">×</button>
     </div>
     <div id="presentation-info-content">
       <p class="presentation-info-empty">Selecciona un nodo o enlace para consultar su información.</p>
@@ -211,7 +211,7 @@
 
       <div class="palette-sel-row">
         <label>Paleta predefinida</label>
-        <select id="palette-sel" onchange="applyPreset(this.value)">
+        <select id="palette-sel" data-change="applyPreset" data-args='["$value"]'>
           <option value="cacti">Cacti Clásico</option>
           <option value="traffic">Semáforo</option>
           <option value="heat">Mapa de Calor</option>
@@ -224,7 +224,7 @@
 
       <div id="scale-threshold-list"></div>
 
-      <button class="add-threshold-btn" onclick="addThreshold()">+ Agregar umbral</button>
+      <button class="add-threshold-btn" data-click="addThreshold">+ Agregar umbral</button>
     </div>
 
     <div id="config-editor">
@@ -237,110 +237,110 @@
         <label class="canvas-preference-item">
           <span class="canvas-preference-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 10h16M10 4v16"/></svg></span>
           <span class="canvas-preference-copy"><strong>Mostrar cuadrícula</strong><small>Guía visual para alinear elementos</small></span>
-          <input id="cfg-grid-enabled" class="config-switch" type="checkbox" onchange="setGridEnabled(this.checked)" />
+          <input id="cfg-grid-enabled" class="config-switch" type="checkbox" data-change="setGridEnabled" data-args='["$checked"]' />
         </label>
         <label class="canvas-preference-item">
           <span class="canvas-preference-icon"><svg viewBox="0 0 24 24"><path d="M7 4v7a5 5 0 0 0 10 0V4M7 7h4M13 7h4"/><path d="M5 20h14"/></svg></span>
           <span class="canvas-preference-copy"><strong>Ajuste magnético</strong><small>Alinea posiciones a la cuadrícula</small></span>
-          <input id="cfg-snap-enabled" class="config-switch" type="checkbox" onchange="setSnapEnabled(this.checked)" />
+          <input id="cfg-snap-enabled" class="config-switch" type="checkbox" data-change="setSnapEnabled" data-args='["$checked"]' />
         </label>
         <label class="canvas-preference-item">
           <span class="canvas-preference-icon"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg></span>
           <span class="canvas-preference-copy"><strong>Ordenamiento automático</strong><small>Acomoda los nodos en cuadrícula y distribuye los enlaces</small></span>
-          <input id="cfg-auto-order" class="config-switch" type="checkbox" onchange="setAutoOrderEnabled(this.checked)" />
+          <input id="cfg-auto-order" class="config-switch" type="checkbox" data-change="setAutoOrderEnabled" data-args='["$checked"]' />
         </label>
       </div>
       <div class="prop-row">
         <div class="prop-label">Tamaño predeterminado del nodo</div>
         <div class="prop-pair">
-          <input id="cfg-node-width" class="prop-val coord" type="number" min="32" max="2000" onchange="updateGeneralConfig('nodeWidth',this.value)" />
+          <input id="cfg-node-width" class="prop-val coord" type="number" min="32" max="2000" data-change="updateGeneralConfig" data-args='["nodeWidth","$value"]' />
           <span class="u-text3">×</span>
-          <input id="cfg-node-height" class="prop-val coord" type="number" min="32" max="2000" onchange="updateGeneralConfig('nodeHeight',this.value)" />
+          <input id="cfg-node-height" class="prop-val coord" type="number" min="32" max="2000" data-change="updateGeneralConfig" data-args='["nodeHeight","$value"]' />
         </div>
       </div>
       <div class="prop-row">
         <div class="prop-label">Separación nodo–enlace</div>
         <div class="prop-pair">
-          <input id="cfg-link-padding" class="prop-val coord" type="number" min="0" max="100" onchange="updateGeneralConfig('linkPadding',this.value)" />
+          <input id="cfg-link-padding" class="prop-val coord" type="number" min="0" max="100" data-change="updateGeneralConfig" data-args='["linkPadding","$value"]' />
           <span class="u-hint">px</span>
         </div>
       </div>
       <div class="prop-row u-mt-16">
         <div class="prop-label">Apariencia predeterminada · nodos</div>
-        <select id="cfg-regular-font-family" class="prop-val" onchange="updateGeneralConfig('regularFontFamily',this.value)">
+        <select id="cfg-regular-font-family" class="prop-val" data-change="updateGeneralConfig" data-args='["regularFontFamily","$value"]'>
           <option value="system-ui">Sistema</option><option value="Arial">Arial</option>
           <option value="Georgia">Georgia</option><option value="Consolas">Consolas</option>
           <option value="Times New Roman">Times New Roman</option>
         </select>
         <div class="format-toolbar">
           <div class="prop-pair">
-            <input id="cfg-regular-font-size" class="prop-val coord" type="number" min="8" max="120" onchange="updateGeneralConfig('regularFontSize',this.value)" />
+            <input id="cfg-regular-font-size" class="prop-val coord" type="number" min="8" max="120" data-change="updateGeneralConfig" data-args='["regularFontSize","$value"]' />
             <span class="u-hint">px</span>
           </div>
           <div class="text-format-group" role="group" aria-label="Estilo de texto">
-            <label class="format-toggle" data-format="bold" title="Negrita"><input id="cfg-regular-font-bold" type="checkbox" onchange="updateGeneralConfig('regularFontBold',this.checked)" /><span class="format-glyph" aria-hidden="true">B</span></label>
-            <label class="format-toggle" data-format="italic" title="Cursiva"><input id="cfg-regular-font-italic" type="checkbox" onchange="updateGeneralConfig('regularFontItalic',this.checked)" /><span class="format-glyph" aria-hidden="true">I</span></label>
+            <label class="format-toggle" data-format="bold" title="Negrita"><input id="cfg-regular-font-bold" type="checkbox" data-change="updateGeneralConfig" data-args='["regularFontBold","$checked"]' /><span class="format-glyph" aria-hidden="true">B</span></label>
+            <label class="format-toggle" data-format="italic" title="Cursiva"><input id="cfg-regular-font-italic" type="checkbox" data-change="updateGeneralConfig" data-args='["regularFontItalic","$checked"]' /><span class="format-glyph" aria-hidden="true">I</span></label>
           </div>
         </div>
         <div class="prop-label u-mt-7">Color del texto</div>
-        <input id="cfg-regular-text-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('regularTextColor',this.value)" />
+        <input id="cfg-regular-text-color" class="prop-val u-field-sm" type="color" data-change="updateGeneralConfig" data-args='["regularTextColor","$value"]' />
         <div class="prop-label u-mt-9">Contenedor del nodo</div>
         <div class="u-grid-2fr-58">
-          <label class="u-hint-sm">Fondo<input id="cfg-regular-node-background" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('regularNodeBackground',this.value)" /></label>
-          <label class="u-hint-sm">Borde<input id="cfg-regular-node-border-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('regularNodeBorderColor',this.value)" /></label>
-          <label class="u-hint-sm">px<input id="cfg-regular-node-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('regularNodeBorderWidth',this.value)" /></label>
+          <label class="u-hint-sm">Fondo<input id="cfg-regular-node-background" class="prop-val u-field-sm" type="color" data-change="updateGeneralConfig" data-args='["regularNodeBackground","$value"]' /></label>
+          <label class="u-hint-sm">Borde<input id="cfg-regular-node-border-color" class="prop-val u-field-sm" type="color" data-change="updateGeneralConfig" data-args='["regularNodeBorderColor","$value"]' /></label>
+          <label class="u-hint-sm">px<input id="cfg-regular-node-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" data-change="updateGeneralConfig" data-args='["regularNodeBorderWidth","$value"]' /></label>
         </div>
-        <label class="prop-check u-mt-7"><input id="cfg-regular-node-background-transparent" type="checkbox" onchange="updateGeneralConfig('regularNodeBackgroundTransparent',this.checked)" /> Fondo transparente</label>
-        <label class="prop-check u-mt-5"><input id="cfg-regular-node-border-hidden" type="checkbox" onchange="updateGeneralConfig('regularNodeBorderHidden',this.checked)" /> Ocultar borde</label>
+        <label class="prop-check u-mt-7"><input id="cfg-regular-node-background-transparent" type="checkbox" data-change="updateGeneralConfig" data-args='["regularNodeBackgroundTransparent","$checked"]' /> Fondo transparente</label>
+        <label class="prop-check u-mt-5"><input id="cfg-regular-node-border-hidden" type="checkbox" data-change="updateGeneralConfig" data-args='["regularNodeBorderHidden","$checked"]' /> Ocultar borde</label>
         <div class="prop-label u-mt-9">Contenedor del nombre</div>
         <div class="u-grid-2fr-58">
-          <label class="u-hint-sm">Fondo<input id="cfg-regular-text-background" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('regularTextBackground',this.value)" /></label>
-          <label class="u-hint-sm">Borde<input id="cfg-regular-text-border-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('regularTextBorderColor',this.value)" /></label>
-          <label class="u-hint-sm">px<input id="cfg-regular-text-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('regularTextBorderWidth',this.value)" /></label>
+          <label class="u-hint-sm">Fondo<input id="cfg-regular-text-background" class="prop-val u-field-sm" type="color" data-change="updateGeneralConfig" data-args='["regularTextBackground","$value"]' /></label>
+          <label class="u-hint-sm">Borde<input id="cfg-regular-text-border-color" class="prop-val u-field-sm" type="color" data-change="updateGeneralConfig" data-args='["regularTextBorderColor","$value"]' /></label>
+          <label class="u-hint-sm">px<input id="cfg-regular-text-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" data-change="updateGeneralConfig" data-args='["regularTextBorderWidth","$value"]' /></label>
         </div>
-        <label class="prop-check u-mt-7"><input id="cfg-regular-text-background-transparent" type="checkbox" onchange="updateGeneralConfig('regularTextBackgroundTransparent',this.checked)" /> Fondo transparente</label>
-        <label class="prop-check u-mt-5"><input id="cfg-regular-text-border-hidden" type="checkbox" onchange="updateGeneralConfig('regularTextBorderHidden',this.checked)" /> Ocultar borde</label>
+        <label class="prop-check u-mt-7"><input id="cfg-regular-text-background-transparent" type="checkbox" data-change="updateGeneralConfig" data-args='["regularTextBackgroundTransparent","$checked"]' /> Fondo transparente</label>
+        <label class="prop-check u-mt-5"><input id="cfg-regular-text-border-hidden" type="checkbox" data-change="updateGeneralConfig" data-args='["regularTextBorderHidden","$checked"]' /> Ocultar borde</label>
       </div>
       <div class="prop-row">
         <div class="prop-label">Apariencia predeterminada · nodos de texto</div>
-        <select id="cfg-text-node-font-family" class="prop-val" onchange="updateGeneralConfig('textNodeFontFamily',this.value)">
+        <select id="cfg-text-node-font-family" class="prop-val" data-change="updateGeneralConfig" data-args='["textNodeFontFamily","$value"]'>
           <option value="system-ui">Sistema</option><option value="Arial">Arial</option>
           <option value="Georgia">Georgia</option><option value="Consolas">Consolas</option>
           <option value="Times New Roman">Times New Roman</option>
         </select>
         <div class="format-toolbar">
           <div class="prop-pair">
-            <input id="cfg-text-node-font-size" class="prop-val coord" type="number" min="8" max="120" onchange="updateGeneralConfig('textNodeFontSize',this.value)" />
+            <input id="cfg-text-node-font-size" class="prop-val coord" type="number" min="8" max="120" data-change="updateGeneralConfig" data-args='["textNodeFontSize","$value"]' />
             <span class="u-hint">px</span>
           </div>
           <div class="text-format-group" role="group" aria-label="Estilo de texto">
-            <label class="format-toggle" data-format="bold" title="Negrita"><input id="cfg-text-node-font-bold" type="checkbox" onchange="updateGeneralConfig('textNodeFontBold',this.checked)" /><span class="format-glyph" aria-hidden="true">B</span></label>
-            <label class="format-toggle" data-format="italic" title="Cursiva"><input id="cfg-text-node-font-italic" type="checkbox" onchange="updateGeneralConfig('textNodeFontItalic',this.checked)" /><span class="format-glyph" aria-hidden="true">I</span></label>
+            <label class="format-toggle" data-format="bold" title="Negrita"><input id="cfg-text-node-font-bold" type="checkbox" data-change="updateGeneralConfig" data-args='["textNodeFontBold","$checked"]' /><span class="format-glyph" aria-hidden="true">B</span></label>
+            <label class="format-toggle" data-format="italic" title="Cursiva"><input id="cfg-text-node-font-italic" type="checkbox" data-change="updateGeneralConfig" data-args='["textNodeFontItalic","$checked"]' /><span class="format-glyph" aria-hidden="true">I</span></label>
           </div>
         </div>
         <div class="prop-label u-mt-7">Color del texto</div>
-        <input id="cfg-text-node-text-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('textNodeTextColor',this.value)" />
+        <input id="cfg-text-node-text-color" class="prop-val u-field-sm" type="color" data-change="updateGeneralConfig" data-args='["textNodeTextColor","$value"]' />
         <div class="prop-label u-mt-9">Contenedor del nodo</div>
         <div class="u-grid-2fr-58">
-          <label class="u-hint-sm">Fondo<input id="cfg-text-node-background" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('textNodeBackground',this.value)" /></label>
-          <label class="u-hint-sm">Borde<input id="cfg-text-node-border-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('textNodeBorderColor',this.value)" /></label>
-          <label class="u-hint-sm">px<input id="cfg-text-node-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('textNodeBorderWidth',this.value)" /></label>
+          <label class="u-hint-sm">Fondo<input id="cfg-text-node-background" class="prop-val u-field-sm" type="color" data-change="updateGeneralConfig" data-args='["textNodeBackground","$value"]' /></label>
+          <label class="u-hint-sm">Borde<input id="cfg-text-node-border-color" class="prop-val u-field-sm" type="color" data-change="updateGeneralConfig" data-args='["textNodeBorderColor","$value"]' /></label>
+          <label class="u-hint-sm">px<input id="cfg-text-node-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" data-change="updateGeneralConfig" data-args='["textNodeBorderWidth","$value"]' /></label>
         </div>
-        <label class="prop-check u-mt-7"><input id="cfg-text-node-background-transparent" type="checkbox" onchange="updateGeneralConfig('textNodeBackgroundTransparent',this.checked)" /> Fondo transparente</label>
-        <label class="prop-check u-mt-5"><input id="cfg-text-node-border-hidden" type="checkbox" onchange="updateGeneralConfig('textNodeBorderHidden',this.checked)" /> Ocultar borde</label>
+        <label class="prop-check u-mt-7"><input id="cfg-text-node-background-transparent" type="checkbox" data-change="updateGeneralConfig" data-args='["textNodeBackgroundTransparent","$checked"]' /> Fondo transparente</label>
+        <label class="prop-check u-mt-5"><input id="cfg-text-node-border-hidden" type="checkbox" data-change="updateGeneralConfig" data-args='["textNodeBorderHidden","$checked"]' /> Ocultar borde</label>
         <div class="prop-label u-mt-9">Contenedor del texto</div>
         <div class="u-grid-2fr-58">
-          <label class="u-hint-sm">Fondo<input id="cfg-text-node-text-background" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('textNodeTextBackground',this.value)" /></label>
-          <label class="u-hint-sm">Borde<input id="cfg-text-node-text-border-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('textNodeTextBorderColor',this.value)" /></label>
-          <label class="u-hint-sm">px<input id="cfg-text-node-text-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('textNodeTextBorderWidth',this.value)" /></label>
+          <label class="u-hint-sm">Fondo<input id="cfg-text-node-text-background" class="prop-val u-field-sm" type="color" data-change="updateGeneralConfig" data-args='["textNodeTextBackground","$value"]' /></label>
+          <label class="u-hint-sm">Borde<input id="cfg-text-node-text-border-color" class="prop-val u-field-sm" type="color" data-change="updateGeneralConfig" data-args='["textNodeTextBorderColor","$value"]' /></label>
+          <label class="u-hint-sm">px<input id="cfg-text-node-text-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" data-change="updateGeneralConfig" data-args='["textNodeTextBorderWidth","$value"]' /></label>
         </div>
-        <label class="prop-check u-mt-7"><input id="cfg-text-node-text-background-transparent" type="checkbox" onchange="updateGeneralConfig('textNodeTextBackgroundTransparent',this.checked)" /> Fondo transparente</label>
-        <label class="prop-check u-mt-5"><input id="cfg-text-node-text-border-hidden" type="checkbox" onchange="updateGeneralConfig('textNodeTextBorderHidden',this.checked)" /> Ocultar borde</label>
+        <label class="prop-check u-mt-7"><input id="cfg-text-node-text-background-transparent" type="checkbox" data-change="updateGeneralConfig" data-args='["textNodeTextBackgroundTransparent","$checked"]' /> Fondo transparente</label>
+        <label class="prop-check u-mt-5"><input id="cfg-text-node-text-border-hidden" type="checkbox" data-change="updateGeneralConfig" data-args='["textNodeTextBorderHidden","$checked"]' /> Ocultar borde</label>
       </div>
       <div class="prop-row u-mt-16">
         <div class="prop-label">Grosor predeterminado del link</div>
         <div class="prop-pair">
-          <input id="cfg-link-width" class="prop-val coord" type="number" min="1" max="24" onchange="updateGeneralConfig('linkWidth',this.value)" />
+          <input id="cfg-link-width" class="prop-val coord" type="number" min="1" max="24" data-change="updateGeneralConfig" data-args='["linkWidth","$value"]' />
           <span class="u-hint">px</span>
         </div>
       </div>
@@ -353,8 +353,8 @@
           <span>Posición predeterminada del divisor</span><span id="cfg-divider-position-value">50%</span>
         </div>
         <input id="cfg-divider-position" class="prop-val" type="range" min="5" max="95" step="1"
-               oninput="document.getElementById('cfg-divider-position-value').textContent=this.value+'%'"
-               onchange="updateGeneralConfig('dividerPosition',this.value)" />
+               data-input="syncDividerPositionLabel" data-args='["$self"]'
+               data-change="updateGeneralConfig" data-args='["dividerPosition","$value"]' />
         <div class="u-flex-between-sm"><span>Entrada</span><span>Salida</span></div>
       </div>
       <div class="prop-row">
@@ -363,23 +363,23 @@
         <div class="prop-label u-mt-7">Ubicación</div>
         <div id="cfg-usage-label-position-host"></div>
         <label class="prop-check u-mt-7"><input id="cfg-usage-label-rotate" type="checkbox"
-               onchange="updateGeneralConfig('usageLabelRotate',this.checked)" /> Rotar siguiendo el enlace</label>
+               data-change="updateGeneralConfig" data-args='["usageLabelRotate","$checked"]' /> Rotar siguiendo el enlace</label>
         <label class="prop-check u-mt-5"><input id="cfg-usage-label-flip" type="checkbox" disabled
-               onchange="updateGeneralConfig('usageLabelFlip',this.checked)" /> Girar 180° sólo en vertical</label>
+               data-change="updateGeneralConfig" data-args='["usageLabelFlip","$checked"]' /> Girar 180° sólo en vertical</label>
       </div>
       <div class="prop-row">
         <div class="prop-label">Tag de capacidad predeterminado</div>
         <label class="prop-check"><input id="cfg-capacity-label-visible" type="checkbox"
-               onchange="updateGeneralConfig('capacityLabelVisible',this.checked)" /> Mostrar tag de capacidad</label>
+               data-change="updateGeneralConfig" data-args='["capacityLabelVisible","$checked"]' /> Mostrar tag de capacidad</label>
         <div class="prop-label u-mt-7">Posición del tag</div>
         <div id="cfg-capacity-label-placement-host"></div>
         <div class="prop-label u-mt-7">Tamaño del texto</div>
         <div class="prop-pair"><input id="cfg-capacity-label-font-size" class="prop-val coord" type="number" min="8" max="72"
-             onchange="updateGeneralConfig('capacityLabelFontSize',this.value)" /><span>px</span></div>
+             data-change="updateGeneralConfig" data-args='["capacityLabelFontSize","$value"]' /><span>px</span></div>
         <label class="prop-check u-mt-7"><input id="cfg-capacity-label-rotate" type="checkbox"
-               onchange="updateGeneralConfig('capacityLabelRotate',this.checked)" /> Rotar siguiendo el enlace</label>
+               data-change="updateGeneralConfig" data-args='["capacityLabelRotate","$checked"]' /> Rotar siguiendo el enlace</label>
         <label class="prop-check u-mt-5"><input id="cfg-capacity-label-flip" type="checkbox" disabled
-               onchange="updateGeneralConfig('capacityLabelFlip',this.checked)" /> Girar 180° sólo en vertical</label>
+               data-change="updateGeneralConfig" data-args='["capacityLabelFlip","$checked"]' /> Girar 180° sólo en vertical</label>
       </div>
     </div>
   </div>
@@ -403,7 +403,7 @@
     <div class="modal-header">
       <span class="modal-icon">📊</span>
       <span class="modal-title" id="chart-wizard-title">Crear gráfica</span>
-      <button class="modal-close" onclick="closeChartWizard()" title="Cerrar (Esc)">✕</button>
+      <button class="modal-close" data-click="closeChartWizard" title="Cerrar (Esc)">✕</button>
     </div>
     <div class="modal-body">
       <p class="modal-subtitle">Configura la visualización y después colócala en el canvas.</p>
@@ -440,10 +440,10 @@
     </div>
     <div class="modal-footer">
       <div class="modal-footer-left">
-        <button class="tb-btn" onclick="closeChartWizard()">Cancelar</button>
+        <button class="tb-btn" data-click="closeChartWizard">Cancelar</button>
       </div>
       <div class="modal-footer-right">
-        <button class="tb-btn primary" id="chart-wizard-save" onclick="saveChartWizard()">Crear y colocar</button>
+        <button class="tb-btn primary" id="chart-wizard-save" data-click="saveChartWizard">Crear y colocar</button>
       </div>
     </div>
   </div>
@@ -454,7 +454,7 @@
     <div class="modal-header">
       <span class="modal-icon">🌵</span>
       <span class="modal-title" id="cacti-binding-modal-title">Vincular fuente de Cacti</span>
-      <button class="modal-close" onclick="closeCactiBindingModal()" title="Cerrar (Esc)">✕</button>
+      <button class="modal-close" data-click="closeCactiBindingModal" title="Cerrar (Esc)">✕</button>
     </div>
     <div class="modal-body cacti-modal-body">
       <p class="modal-subtitle">Selecciona el equipo, la gráfica y la fuente que alimentará este enlace. Por ahora, si Cacti no responde, se carga un catálogo demo.</p>
@@ -463,11 +463,11 @@
     </div>
     <div class="modal-footer">
       <div class="modal-footer-left">
-        <button class="tb-btn" onclick="resetCactiDemoCatalog()">Usar demo</button>
+        <button class="tb-btn" data-click="resetCactiDemoCatalog">Usar demo</button>
       </div>
       <div class="modal-footer-right">
-        <button class="tb-btn" onclick="closeCactiBindingModal()">Cancelar</button>
-        <button class="tb-btn primary" onclick="saveCactiBindingFromModal()">Guardar vínculo</button>
+        <button class="tb-btn" data-click="closeCactiBindingModal">Cancelar</button>
+        <button class="tb-btn primary" data-click="saveCactiBindingFromModal">Guardar vínculo</button>
       </div>
     </div>
   </div>
@@ -478,21 +478,21 @@
     <div class="modal-header">
       <span class="modal-icon">🗺️</span>
       <span class="modal-title" id="map-modal-title">Mapas guardados</span>
-      <button class="modal-close" onclick="closeMapModal()" title="Cerrar (Esc)">✕</button>
+      <button class="modal-close" data-click="closeMapModal" title="Cerrar (Esc)">✕</button>
     </div>
     <div class="map-modal-body">
       <div class="map-modal-search">
         <span class="map-modal-search-icon">⌕</span>
-        <input id="map-modal-search" type="text" placeholder="Buscar mapa…" oninput="filterMapModal(this.value)" autocomplete="off" />
+        <input id="map-modal-search" type="text" placeholder="Buscar mapa…" data-input="filterMapModal" data-args='["$value"]' autocomplete="off" />
       </div>
       <div id="map-modal-grid"></div>
     </div>
     <div class="modal-footer">
       <div class="modal-footer-left">
-        <button class="tb-btn" onclick="openMapPicker();closeMapModal()">📂 Importar JSON</button>
+        <button class="tb-btn" data-click="openMapPickerReplace">📂 Importar JSON</button>
       </div>
       <div class="modal-footer-right">
-        <button class="tb-btn" onclick="closeMapModal()">Cerrar</button>
+        <button class="tb-btn" data-click="closeMapModal">Cerrar</button>
       </div>
     </div>
   </div>
@@ -504,14 +504,14 @@
     <div class="modal-header">
       <span class="modal-icon">⚠️</span>
       <span class="modal-title" id="alert-modal-title">Aviso</span>
-      <button class="modal-close" onclick="closeAlert()" title="Cerrar (Esc)">✕</button>
+      <button class="modal-close" data-click="closeAlert" title="Cerrar (Esc)">✕</button>
     </div>
     <div class="modal-body">
       <p class="u-body" id="alert-modal-msg"></p>
     </div>
     <div class="modal-footer">
       <div></div>
-      <div class="modal-footer-right"><button class="tb-btn primary" onclick="closeAlert()">Entendido</button></div>
+      <div class="modal-footer-right"><button class="tb-btn primary" data-click="closeAlert">Entendido</button></div>
     </div>
   </div>
 </div>
@@ -522,17 +522,17 @@
     <div class="modal-header">
       <span class="modal-icon">⚠️</span>
       <span class="modal-title" id="confirm-modal-title">¿Confirmar?</span>
-      <button class="modal-close" onclick="resolveConfirm(false)" title="Cancelar (Esc)">✕</button>
+      <button class="modal-close" data-click="resolveConfirm" data-args='[false]' title="Cancelar (Esc)">✕</button>
     </div>
     <div class="modal-body">
       <p class="u-body" id="confirm-modal-msg"></p>
     </div>
     <div class="modal-footer">
       <div class="modal-footer-left">
-        <button class="tb-btn" onclick="resolveConfirm(false)">Cancelar</button>
+        <button class="tb-btn" data-click="resolveConfirm" data-args='[false]'>Cancelar</button>
       </div>
       <div class="modal-footer-right">
-        <button class="tb-btn primary" id="confirm-modal-ok" onclick="resolveConfirm(true)">Aceptar</button>
+        <button class="tb-btn primary" id="confirm-modal-ok" data-click="resolveConfirm" data-args='[true]'>Aceptar</button>
       </div>
     </div>
   </div>
@@ -544,18 +544,18 @@
     <div class="modal-header">
       <span class="modal-icon">✏️</span>
       <span class="modal-title" id="prompt-modal-title">Nombre</span>
-      <button class="modal-close" onclick="resolvePrompt(null)" title="Cancelar (Esc)">✕</button>
+      <button class="modal-close" data-click="resolvePrompt" data-args='[null]' title="Cancelar (Esc)">✕</button>
     </div>
     <div class="modal-body">
       <input id="prompt-modal-input" type="text" class="prop-val editable u-w-full"
-             onkeydown="if(event.key==='Enter')resolvePrompt();if(event.key==='Escape')resolvePrompt(null)" />
+             data-keydown="handlePromptKey" data-args='["$event"]' />
     </div>
     <div class="modal-footer">
       <div class="modal-footer-left">
-        <button class="tb-btn" onclick="resolvePrompt(null)">Cancelar</button>
+        <button class="tb-btn" data-click="resolvePrompt" data-args='[null]'>Cancelar</button>
       </div>
       <div class="modal-footer-right">
-        <button class="tb-btn primary" onclick="resolvePrompt()">Aceptar</button>
+        <button class="tb-btn primary" data-click="resolvePrompt">Aceptar</button>
       </div>
     </div>
   </div>
@@ -567,15 +567,15 @@
     <div class="modal-header">
       <span class="modal-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h.01M11 9h.01M15 9h.01M18 9h.01M7 13h.01M10 13h.01M17 13h.01M8 16h8"/></svg></span>
       <span class="modal-title" id="hotkeys-modal-title">Atajos de herramientas</span>
-      <button class="modal-close" onclick="closeHotkeysModal()" title="Cerrar (Esc)">✕</button>
+      <button class="modal-close" data-click="closeHotkeysModal" title="Cerrar (Esc)">✕</button>
     </div>
     <div class="modal-body hotkeys-modal-body">
       <div class="hotkeys-intro"><strong>Tu flujo, a tu manera</strong><span>Selecciona un atajo y presiona una letra o número. Los duplicados se intercambian automáticamente.</span></div>
       <div id="hotkeys-list"></div>
     </div>
     <div class="modal-footer">
-      <div><button class="tb-btn" onclick="resetHotkeysDraft()">Restablecer</button></div>
-      <div><button class="tb-btn" onclick="closeHotkeysModal()">Cancelar</button><button class="tb-btn primary" onclick="saveHotkeys()">Guardar atajos</button></div>
+      <div><button class="tb-btn" data-click="resetHotkeysDraft">Restablecer</button></div>
+      <div><button class="tb-btn" data-click="closeHotkeysModal">Cancelar</button><button class="tb-btn primary" data-click="saveHotkeys">Guardar atajos</button></div>
     </div>
   </div>
 </div>
