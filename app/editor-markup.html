@@ -39,7 +39,7 @@
 
   <!-- Zoom controls -->
   <button class="ct-btn" onclick="zoomIn()" title="Zoom in">＋</button>
-  <button class="ct-btn" id="zoom-label" style="cursor:default">100%</button>
+  <button class="ct-btn u-cursor-default" id="zoom-label">100%</button>
   <button class="ct-btn" onclick="zoomOut()" title="Zoom out">－</button>
   <button class="ct-btn" onclick="zoomFit()" title="Ajustar vista">⛶</button>
 
@@ -102,7 +102,7 @@
     <div id="canvas-bg"></div>
     <svg id="links-svg" xmlns="http://www.w3.org/2000/svg"></svg>
     <div id="canvas"></div>
-    <svg id="overlay-svg" xmlns="http://www.w3.org/2000/svg" style="position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:20"></svg>
+    <svg id="overlay-svg" xmlns="http://www.w3.org/2000/svg"></svg>
 
     <!-- Search bar -->
     <div id="search-bar" role="search" aria-label="Buscar nodo">
@@ -205,7 +205,7 @@
 
     <div id="scale-editor">
       <div class="panel-title">Umbrales generales de enlaces</div>
-      <p style="font-size:11px;color:var(--text2);line-height:1.4;margin-bottom:12px">
+      <p class="u-note-12">
         Se aplican a todos los enlaces que no tengan umbrales individuales.
       </p>
 
@@ -229,7 +229,7 @@
 
     <div id="config-editor">
       <div class="panel-title">Configuración general</div>
-      <p style="font-size:11px;color:var(--text2);line-height:1.4;margin-bottom:14px">
+      <p class="u-note-14">
         Cada cambio se aplica de forma forzada a todos los elementos existentes y también a los nuevos.
       </p>
       <div class="prop-row canvas-preferences">
@@ -254,7 +254,7 @@
         <div class="prop-label">Tamaño predeterminado del nodo</div>
         <div class="prop-pair">
           <input id="cfg-node-width" class="prop-val coord" type="number" min="32" max="2000" onchange="updateGeneralConfig('nodeWidth',this.value)" />
-          <span style="color:var(--text3)">×</span>
+          <span class="u-text3">×</span>
           <input id="cfg-node-height" class="prop-val coord" type="number" min="32" max="2000" onchange="updateGeneralConfig('nodeHeight',this.value)" />
         </div>
       </div>
@@ -262,10 +262,10 @@
         <div class="prop-label">Separación nodo–enlace</div>
         <div class="prop-pair">
           <input id="cfg-link-padding" class="prop-val coord" type="number" min="0" max="100" onchange="updateGeneralConfig('linkPadding',this.value)" />
-          <span style="font-size:11px;color:var(--text2)">px</span>
+          <span class="u-hint">px</span>
         </div>
       </div>
-      <div class="prop-row" style="margin-top:16px">
+      <div class="prop-row u-mt-16">
         <div class="prop-label">Apariencia predeterminada · nodos</div>
         <select id="cfg-regular-font-family" class="prop-val" onchange="updateGeneralConfig('regularFontFamily',this.value)">
           <option value="system-ui">Sistema</option><option value="Arial">Arial</option>
@@ -275,31 +275,31 @@
         <div class="format-toolbar">
           <div class="prop-pair">
             <input id="cfg-regular-font-size" class="prop-val coord" type="number" min="8" max="120" onchange="updateGeneralConfig('regularFontSize',this.value)" />
-            <span style="font-size:11px;color:var(--text2)">px</span>
+            <span class="u-hint">px</span>
           </div>
           <div class="text-format-group" role="group" aria-label="Estilo de texto">
             <label class="format-toggle" data-format="bold" title="Negrita"><input id="cfg-regular-font-bold" type="checkbox" onchange="updateGeneralConfig('regularFontBold',this.checked)" /><span class="format-glyph" aria-hidden="true">B</span></label>
             <label class="format-toggle" data-format="italic" title="Cursiva"><input id="cfg-regular-font-italic" type="checkbox" onchange="updateGeneralConfig('regularFontItalic',this.checked)" /><span class="format-glyph" aria-hidden="true">I</span></label>
           </div>
         </div>
-        <div class="prop-label" style="margin-top:7px">Color del texto</div>
-        <input id="cfg-regular-text-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('regularTextColor',this.value)" />
-        <div class="prop-label" style="margin-top:9px">Contenedor del nodo</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 58px;gap:6px">
-          <label style="font-size:10px;color:var(--text2)">Fondo<input id="cfg-regular-node-background" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('regularNodeBackground',this.value)" /></label>
-          <label style="font-size:10px;color:var(--text2)">Borde<input id="cfg-regular-node-border-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('regularNodeBorderColor',this.value)" /></label>
-          <label style="font-size:10px;color:var(--text2)">px<input id="cfg-regular-node-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('regularNodeBorderWidth',this.value)" /></label>
+        <div class="prop-label u-mt-7">Color del texto</div>
+        <input id="cfg-regular-text-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('regularTextColor',this.value)" />
+        <div class="prop-label u-mt-9">Contenedor del nodo</div>
+        <div class="u-grid-2fr-58">
+          <label class="u-hint-sm">Fondo<input id="cfg-regular-node-background" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('regularNodeBackground',this.value)" /></label>
+          <label class="u-hint-sm">Borde<input id="cfg-regular-node-border-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('regularNodeBorderColor',this.value)" /></label>
+          <label class="u-hint-sm">px<input id="cfg-regular-node-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('regularNodeBorderWidth',this.value)" /></label>
         </div>
-        <label class="prop-check" style="margin-top:7px"><input id="cfg-regular-node-background-transparent" type="checkbox" onchange="updateGeneralConfig('regularNodeBackgroundTransparent',this.checked)" /> Fondo transparente</label>
-        <label class="prop-check" style="margin-top:5px"><input id="cfg-regular-node-border-hidden" type="checkbox" onchange="updateGeneralConfig('regularNodeBorderHidden',this.checked)" /> Ocultar borde</label>
-        <div class="prop-label" style="margin-top:9px">Contenedor del nombre</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 58px;gap:6px">
-          <label style="font-size:10px;color:var(--text2)">Fondo<input id="cfg-regular-text-background" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('regularTextBackground',this.value)" /></label>
-          <label style="font-size:10px;color:var(--text2)">Borde<input id="cfg-regular-text-border-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('regularTextBorderColor',this.value)" /></label>
-          <label style="font-size:10px;color:var(--text2)">px<input id="cfg-regular-text-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('regularTextBorderWidth',this.value)" /></label>
+        <label class="prop-check u-mt-7"><input id="cfg-regular-node-background-transparent" type="checkbox" onchange="updateGeneralConfig('regularNodeBackgroundTransparent',this.checked)" /> Fondo transparente</label>
+        <label class="prop-check u-mt-5"><input id="cfg-regular-node-border-hidden" type="checkbox" onchange="updateGeneralConfig('regularNodeBorderHidden',this.checked)" /> Ocultar borde</label>
+        <div class="prop-label u-mt-9">Contenedor del nombre</div>
+        <div class="u-grid-2fr-58">
+          <label class="u-hint-sm">Fondo<input id="cfg-regular-text-background" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('regularTextBackground',this.value)" /></label>
+          <label class="u-hint-sm">Borde<input id="cfg-regular-text-border-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('regularTextBorderColor',this.value)" /></label>
+          <label class="u-hint-sm">px<input id="cfg-regular-text-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('regularTextBorderWidth',this.value)" /></label>
         </div>
-        <label class="prop-check" style="margin-top:7px"><input id="cfg-regular-text-background-transparent" type="checkbox" onchange="updateGeneralConfig('regularTextBackgroundTransparent',this.checked)" /> Fondo transparente</label>
-        <label class="prop-check" style="margin-top:5px"><input id="cfg-regular-text-border-hidden" type="checkbox" onchange="updateGeneralConfig('regularTextBorderHidden',this.checked)" /> Ocultar borde</label>
+        <label class="prop-check u-mt-7"><input id="cfg-regular-text-background-transparent" type="checkbox" onchange="updateGeneralConfig('regularTextBackgroundTransparent',this.checked)" /> Fondo transparente</label>
+        <label class="prop-check u-mt-5"><input id="cfg-regular-text-border-hidden" type="checkbox" onchange="updateGeneralConfig('regularTextBorderHidden',this.checked)" /> Ocultar borde</label>
       </div>
       <div class="prop-row">
         <div class="prop-label">Apariencia predeterminada · nodos de texto</div>
@@ -311,37 +311,37 @@
         <div class="format-toolbar">
           <div class="prop-pair">
             <input id="cfg-text-node-font-size" class="prop-val coord" type="number" min="8" max="120" onchange="updateGeneralConfig('textNodeFontSize',this.value)" />
-            <span style="font-size:11px;color:var(--text2)">px</span>
+            <span class="u-hint">px</span>
           </div>
           <div class="text-format-group" role="group" aria-label="Estilo de texto">
             <label class="format-toggle" data-format="bold" title="Negrita"><input id="cfg-text-node-font-bold" type="checkbox" onchange="updateGeneralConfig('textNodeFontBold',this.checked)" /><span class="format-glyph" aria-hidden="true">B</span></label>
             <label class="format-toggle" data-format="italic" title="Cursiva"><input id="cfg-text-node-font-italic" type="checkbox" onchange="updateGeneralConfig('textNodeFontItalic',this.checked)" /><span class="format-glyph" aria-hidden="true">I</span></label>
           </div>
         </div>
-        <div class="prop-label" style="margin-top:7px">Color del texto</div>
-        <input id="cfg-text-node-text-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('textNodeTextColor',this.value)" />
-        <div class="prop-label" style="margin-top:9px">Contenedor del nodo</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 58px;gap:6px">
-          <label style="font-size:10px;color:var(--text2)">Fondo<input id="cfg-text-node-background" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('textNodeBackground',this.value)" /></label>
-          <label style="font-size:10px;color:var(--text2)">Borde<input id="cfg-text-node-border-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('textNodeBorderColor',this.value)" /></label>
-          <label style="font-size:10px;color:var(--text2)">px<input id="cfg-text-node-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('textNodeBorderWidth',this.value)" /></label>
+        <div class="prop-label u-mt-7">Color del texto</div>
+        <input id="cfg-text-node-text-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('textNodeTextColor',this.value)" />
+        <div class="prop-label u-mt-9">Contenedor del nodo</div>
+        <div class="u-grid-2fr-58">
+          <label class="u-hint-sm">Fondo<input id="cfg-text-node-background" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('textNodeBackground',this.value)" /></label>
+          <label class="u-hint-sm">Borde<input id="cfg-text-node-border-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('textNodeBorderColor',this.value)" /></label>
+          <label class="u-hint-sm">px<input id="cfg-text-node-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('textNodeBorderWidth',this.value)" /></label>
         </div>
-        <label class="prop-check" style="margin-top:7px"><input id="cfg-text-node-background-transparent" type="checkbox" onchange="updateGeneralConfig('textNodeBackgroundTransparent',this.checked)" /> Fondo transparente</label>
-        <label class="prop-check" style="margin-top:5px"><input id="cfg-text-node-border-hidden" type="checkbox" onchange="updateGeneralConfig('textNodeBorderHidden',this.checked)" /> Ocultar borde</label>
-        <div class="prop-label" style="margin-top:9px">Contenedor del texto</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 58px;gap:6px">
-          <label style="font-size:10px;color:var(--text2)">Fondo<input id="cfg-text-node-text-background" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('textNodeTextBackground',this.value)" /></label>
-          <label style="font-size:10px;color:var(--text2)">Borde<input id="cfg-text-node-text-border-color" class="prop-val" type="color" style="height:31px;padding:3px" onchange="updateGeneralConfig('textNodeTextBorderColor',this.value)" /></label>
-          <label style="font-size:10px;color:var(--text2)">px<input id="cfg-text-node-text-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('textNodeTextBorderWidth',this.value)" /></label>
+        <label class="prop-check u-mt-7"><input id="cfg-text-node-background-transparent" type="checkbox" onchange="updateGeneralConfig('textNodeBackgroundTransparent',this.checked)" /> Fondo transparente</label>
+        <label class="prop-check u-mt-5"><input id="cfg-text-node-border-hidden" type="checkbox" onchange="updateGeneralConfig('textNodeBorderHidden',this.checked)" /> Ocultar borde</label>
+        <div class="prop-label u-mt-9">Contenedor del texto</div>
+        <div class="u-grid-2fr-58">
+          <label class="u-hint-sm">Fondo<input id="cfg-text-node-text-background" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('textNodeTextBackground',this.value)" /></label>
+          <label class="u-hint-sm">Borde<input id="cfg-text-node-text-border-color" class="prop-val u-field-sm" type="color" onchange="updateGeneralConfig('textNodeTextBorderColor',this.value)" /></label>
+          <label class="u-hint-sm">px<input id="cfg-text-node-text-border-width" class="prop-val coord" type="number" min="0" max="12" step="0.5" onchange="updateGeneralConfig('textNodeTextBorderWidth',this.value)" /></label>
         </div>
-        <label class="prop-check" style="margin-top:7px"><input id="cfg-text-node-text-background-transparent" type="checkbox" onchange="updateGeneralConfig('textNodeTextBackgroundTransparent',this.checked)" /> Fondo transparente</label>
-        <label class="prop-check" style="margin-top:5px"><input id="cfg-text-node-text-border-hidden" type="checkbox" onchange="updateGeneralConfig('textNodeTextBorderHidden',this.checked)" /> Ocultar borde</label>
+        <label class="prop-check u-mt-7"><input id="cfg-text-node-text-background-transparent" type="checkbox" onchange="updateGeneralConfig('textNodeTextBackgroundTransparent',this.checked)" /> Fondo transparente</label>
+        <label class="prop-check u-mt-5"><input id="cfg-text-node-text-border-hidden" type="checkbox" onchange="updateGeneralConfig('textNodeTextBorderHidden',this.checked)" /> Ocultar borde</label>
       </div>
-      <div class="prop-row" style="margin-top:16px">
+      <div class="prop-row u-mt-16">
         <div class="prop-label">Grosor predeterminado del link</div>
         <div class="prop-pair">
           <input id="cfg-link-width" class="prop-val coord" type="number" min="1" max="24" onchange="updateGeneralConfig('linkWidth',this.value)" />
-          <span style="font-size:11px;color:var(--text2)">px</span>
+          <span class="u-hint">px</span>
         </div>
       </div>
       <div class="prop-row">
@@ -349,36 +349,36 @@
         <div id="cfg-mid-termination-host"></div>
       </div>
       <div class="prop-row">
-        <div class="prop-label" style="display:flex;justify-content:space-between">
+        <div class="prop-label u-flex-between">
           <span>Posición predeterminada del divisor</span><span id="cfg-divider-position-value">50%</span>
         </div>
         <input id="cfg-divider-position" class="prop-val" type="range" min="5" max="95" step="1"
                oninput="document.getElementById('cfg-divider-position-value').textContent=this.value+'%'"
                onchange="updateGeneralConfig('dividerPosition',this.value)" />
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3)"><span>Entrada</span><span>Salida</span></div>
+        <div class="u-flex-between-sm"><span>Entrada</span><span>Salida</span></div>
       </div>
       <div class="prop-row">
         <div class="prop-label">Texto de utilización predeterminado</div>
         <div id="cfg-usage-label-format-host"></div>
-        <div class="prop-label" style="margin-top:7px">Ubicación</div>
+        <div class="prop-label u-mt-7">Ubicación</div>
         <div id="cfg-usage-label-position-host"></div>
-        <label class="prop-check" style="margin-top:7px"><input id="cfg-usage-label-rotate" type="checkbox"
+        <label class="prop-check u-mt-7"><input id="cfg-usage-label-rotate" type="checkbox"
                onchange="updateGeneralConfig('usageLabelRotate',this.checked)" /> Rotar siguiendo el enlace</label>
-        <label class="prop-check" style="margin-top:5px"><input id="cfg-usage-label-flip" type="checkbox" disabled
+        <label class="prop-check u-mt-5"><input id="cfg-usage-label-flip" type="checkbox" disabled
                onchange="updateGeneralConfig('usageLabelFlip',this.checked)" /> Girar 180° sólo en vertical</label>
       </div>
       <div class="prop-row">
         <div class="prop-label">Tag de capacidad predeterminado</div>
         <label class="prop-check"><input id="cfg-capacity-label-visible" type="checkbox"
                onchange="updateGeneralConfig('capacityLabelVisible',this.checked)" /> Mostrar tag de capacidad</label>
-        <div class="prop-label" style="margin-top:7px">Posición del tag</div>
+        <div class="prop-label u-mt-7">Posición del tag</div>
         <div id="cfg-capacity-label-placement-host"></div>
-        <div class="prop-label" style="margin-top:7px">Tamaño del texto</div>
+        <div class="prop-label u-mt-7">Tamaño del texto</div>
         <div class="prop-pair"><input id="cfg-capacity-label-font-size" class="prop-val coord" type="number" min="8" max="72"
              onchange="updateGeneralConfig('capacityLabelFontSize',this.value)" /><span>px</span></div>
-        <label class="prop-check" style="margin-top:7px"><input id="cfg-capacity-label-rotate" type="checkbox"
+        <label class="prop-check u-mt-7"><input id="cfg-capacity-label-rotate" type="checkbox"
                onchange="updateGeneralConfig('capacityLabelRotate',this.checked)" /> Rotar siguiendo el enlace</label>
-        <label class="prop-check" style="margin-top:5px"><input id="cfg-capacity-label-flip" type="checkbox" disabled
+        <label class="prop-check u-mt-5"><input id="cfg-capacity-label-flip" type="checkbox" disabled
                onchange="updateGeneralConfig('capacityLabelFlip',this.checked)" /> Girar 180° sólo en vertical</label>
       </div>
     </div>
@@ -422,18 +422,18 @@
         </div>
         <div class="prop-row">
           <div class="prop-label">Color</div>
-          <input class="prop-val" id="chart-color" type="color" value="#0dbfa6" style="height:31px;padding:3px" />
+          <input class="prop-val u-field-sm" id="chart-color" type="color" value="#0dbfa6" />
         </div>
       </div>
       <div class="prop-row">
         <div class="prop-label">Valores separados por coma</div>
         <input class="prop-val editable" id="chart-values" type="text" value="25, 50, 35, 80, 60" />
       </div>
-      <div class="prop-row" style="margin-bottom:0">
+      <div class="prop-row u-mb-0">
         <div class="prop-label">Tamaño</div>
         <div class="prop-pair">
           <input class="prop-val coord" id="chart-width" type="number" min="120" max="1000" value="240" />
-          <span style="color:var(--text3)">×</span>
+          <span class="u-text3">×</span>
           <input class="prop-val coord" id="chart-height" type="number" min="100" max="800" value="160" />
         </div>
       </div>
@@ -500,14 +500,14 @@
 
 <!-- Alert modal -->
 <div class="modal-backdrop" id="alert-modal" role="alertdialog" aria-modal="true">
-  <div class="modal-card" style="width:min(400px,100%)">
+  <div class="modal-card u-w-400">
     <div class="modal-header">
       <span class="modal-icon">⚠️</span>
       <span class="modal-title" id="alert-modal-title">Aviso</span>
       <button class="modal-close" onclick="closeAlert()" title="Cerrar (Esc)">✕</button>
     </div>
     <div class="modal-body">
-      <p id="alert-modal-msg" style="color:var(--text2);font-size:13px;line-height:1.6"></p>
+      <p class="u-body" id="alert-modal-msg"></p>
     </div>
     <div class="modal-footer">
       <div></div>
@@ -518,14 +518,14 @@
 
 <!-- Confirm modal -->
 <div class="modal-backdrop" id="confirm-modal" role="alertdialog" aria-modal="true">
-  <div class="modal-card" style="width:min(400px,100%)">
+  <div class="modal-card u-w-400">
     <div class="modal-header">
       <span class="modal-icon">⚠️</span>
       <span class="modal-title" id="confirm-modal-title">¿Confirmar?</span>
       <button class="modal-close" onclick="resolveConfirm(false)" title="Cancelar (Esc)">✕</button>
     </div>
     <div class="modal-body">
-      <p id="confirm-modal-msg" style="color:var(--text2);font-size:13px;line-height:1.6"></p>
+      <p class="u-body" id="confirm-modal-msg"></p>
     </div>
     <div class="modal-footer">
       <div class="modal-footer-left">
@@ -540,15 +540,14 @@
 
 <!-- Prompt modal -->
 <div class="modal-backdrop" id="prompt-modal" role="dialog" aria-modal="true">
-  <div class="modal-card" style="width:min(420px,100%)">
+  <div class="modal-card u-w-420">
     <div class="modal-header">
       <span class="modal-icon">✏️</span>
       <span class="modal-title" id="prompt-modal-title">Nombre</span>
       <button class="modal-close" onclick="resolvePrompt(null)" title="Cancelar (Esc)">✕</button>
     </div>
     <div class="modal-body">
-      <input id="prompt-modal-input" type="text" class="prop-val editable"
-             style="width:100%;box-sizing:border-box"
+      <input id="prompt-modal-input" type="text" class="prop-val editable u-w-full"
              onkeydown="if(event.key==='Enter')resolvePrompt();if(event.key==='Escape')resolvePrompt(null)" />
     </div>
     <div class="modal-footer">

@@ -381,6 +381,7 @@
   #canvas { position: absolute; inset: 0; pointer-events: none; }
   .node { pointer-events: auto; }
   #links-svg { position: absolute; inset: 0; overflow: visible; }
+  #overlay-svg { position: absolute; inset: 0; overflow: visible; pointer-events: none; z-index: 20; }
 
   /* Place preview */
   #place-preview {
@@ -1243,3 +1244,24 @@
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   }
+
+  /* ── Utilidades reutilizables (extraídas de estilos inline del markup) ── */
+  .u-hint-sm { font-size: 10px; color: var(--text2); }
+  .u-hint { font-size: 11px; color: var(--text2); }
+  .u-body { color: var(--text2); font-size: 13px; line-height: 1.6; }
+  .u-text3 { color: var(--text3); }
+  .u-note-12 { font-size: 11px; color: var(--text2); line-height: 1.4; margin-bottom: 12px; }
+  .u-note-14 { font-size: 11px; color: var(--text2); line-height: 1.4; margin-bottom: 14px; }
+  .u-mt-5 { margin-top: 5px; }
+  .u-mt-7 { margin-top: 7px; }
+  .u-mt-9 { margin-top: 9px; }
+  .u-mt-16 { margin-top: 16px; }
+  .u-mb-0 { margin-bottom: 0; }
+  .u-field-sm { height: 31px; padding: 3px; }
+  .u-grid-2fr-58 { display: grid; grid-template-columns: 1fr 1fr 58px; gap: 6px; }
+  .u-flex-between { display: flex; justify-content: space-between; }
+  .u-flex-between-sm { display: flex; justify-content: space-between; font-size: 9px; color: var(--text3); }
+  .u-w-400 { width: min(400px, 100%); }
+  .u-w-420 { width: min(420px, 100%); }
+  .u-w-full { width: 100%; box-sizing: border-box; }
+  .u-cursor-default { cursor: default; }
