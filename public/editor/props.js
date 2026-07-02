@@ -1140,7 +1140,7 @@ function updateNodeAppearance(id, field, rawValue) {
     distributePortLinks(id);
   }
   renderNode(n); renderLinks(); updatePropsPanel();
-  const touching = links.filter(l => l.from===id || l.to===id).map(l => l.id);
+  const touching = linkIdsTouching(id);
   if (n.type === 'text' && affectsTextSize && revertIfLinksOverlap(beforeStyle, touching)) return;
   pushHistory();
   setStatus('Apariencia del nodo actualizada');
@@ -1153,7 +1153,7 @@ function useGeneralNodeAppearance(id) {
   n.appearanceOverride = false;
   if (n.type === 'text') autoFitTextNode(n);
   distributePortLinks(id); renderNode(n); renderLinks(); updatePropsPanel();
-  const touching = links.filter(l => l.from === id || l.to === id).map(l => l.id);
+  const touching = linkIdsTouching(id);
   if (!revertIfLinksOverlap(beforeReset, touching)) {
     pushHistory(); setStatus('Nodo vinculado a la apariencia general');
   }
@@ -1166,7 +1166,7 @@ function updateTextRotation(id, value) {
   const beforeRotation = getSnapshot();
   n.textRotation = rotation; autoFitTextNode(n); distributePortLinks(id);
   renderNode(n); renderLinks(); updatePropsPanel();
-  const touching = links.filter(l => l.from===id || l.to===id).map(l => l.id);
+  const touching = linkIdsTouching(id);
   if (!revertIfLinksOverlap(beforeRotation,touching)) {
     pushHistory(); setStatus(`Texto rotado a ${rotation}°`);
   }
@@ -1197,7 +1197,7 @@ function updateNodeLinkPadding(id, value) {
   const padding = Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
   if (padding === (n.linkPadding ?? DEFAULT_LINK_PADDING)) { updatePropsPanel(); return; }
   const beforePadding = getSnapshot();
-  const touchingLinks = links.filter(l => l.from === id || l.to === id).map(l => l.id);
+  const touchingLinks = linkIdsTouching(id);
   n.linkPadding = padding;
   n.linkPaddingOverride = true;
   renderLinks(); updatePropsPanel();
@@ -1650,7 +1650,7 @@ function useGeneralNodeConfig(id) {
   n.linkPadding = generalConfig.linkPadding;
   n.sizeOverride = false; n.linkPaddingOverride = false;
   distributePortLinks(id); renderNode(n); renderLinks(); updatePropsPanel();
-  const touching = links.filter(l => l.from === id || l.to === id).map(l => l.id);
+  const touching = linkIdsTouching(id);
   if (!revertIfLinksOverlap(beforeReset, touching)) {
     pushHistory(); setStatus('Nodo vinculado a la configuración general');
   }

@@ -188,6 +188,13 @@ function getLink(id) {
   return _linkIndex.get(id);
 }
 
+// Links incident on a node (both endpoints), and just their ids — used all over
+// for node move/resize/delete and inspector counts.
+function linksTouching(nodeId) { return links.filter(l => l.from === nodeId || l.to === nodeId); }
+function linkIdsTouching(nodeId) { return linksTouching(nodeId).map(l => l.id); }
+// Reset the active/dragging usage-label state (selection changes, snapshots).
+function clearActiveUsageLabel() { activeUsageLabel = null; draggingUsageLabel = null; }
+
 // ════════════════════════════════════════════════════
 // EVENT DELEGATION
 // ════════════════════════════════════════════════════

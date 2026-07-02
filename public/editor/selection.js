@@ -2,7 +2,7 @@
 // SELECTION
 // ════════════════════════════════════════════════════
 function setNodeSelection(ids) {
-  activeUsageLabel = null; draggingUsageLabel = null;
+  clearActiveUsageLabel();
   selectedNodeIds = new Set(ids);
   selectedLinkIds = new Set();
   selectedId = ids.length ? ids[ids.length - 1] : null;
@@ -34,7 +34,7 @@ function effectiveDragNodeIds() {
   return ids;
 }
 function setMultiSelection(nodeIds, linkIds) {
-  activeUsageLabel = null; draggingUsageLabel = null;
+  clearActiveUsageLabel();
   selectedNodeIds = new Set(nodeIds);
   selectedLinkIds = new Set(linkIds);
   selectedId = nodeIds.length ? nodeIds[nodeIds.length - 1] : null;
@@ -71,7 +71,7 @@ function toggleLinkSelection(id) {
   applyResolvedSelection([...selectedNodeIds], [...linkIds]);
 }
 function selectLink(id) {
-  activeUsageLabel = null; draggingUsageLabel = null;
+  clearActiveUsageLabel();
   selectedLinkId = id; selectedId = null; selectedNodeIds = new Set(); selectedLinkIds = new Set();
   nodes.forEach(n => document.getElementById(n.id)?.classList.remove('selected', 'link-endpoint'));
   const l = getLink(id);
@@ -85,7 +85,7 @@ function selectLink(id) {
 }
 function clearSelection() {
   cancelCustomAlignment();
-  activeUsageLabel = null; draggingUsageLabel = null;
+  clearActiveUsageLabel();
   selectedId = null; selectedLinkId = null; selectedNodeIds = new Set(); selectedLinkIds = new Set();
   setConnHandlesMode(false); clearConnectionHandles();
   exitArrangeView();
@@ -168,7 +168,7 @@ function showPresentationNodeInfo(id) {
     ['Entrada', `${n.inPct ?? 0}%`],
     ['Salida', `${n.outPct ?? 0}%`],
     ['Tamaño', `${Math.round(n.w)} × ${Math.round(n.h)} px`],
-    ['Conexiones', String(links.filter(l => l.from===id || l.to===id).length)],
+    ['Conexiones', String(linksTouching(id).length)],
     ['Fuente', `${n.fontFamily || 'Sistema'} · ${getNodeFontSize(n)}px${n.fontBold ? ' · negrita' : ''}${n.fontItalic ? ' · cursiva' : ''}`]
   ];
   if (n.type === 'text') rows.push(['Orientación', `${Number(n.textRotation) || 0}°`]);

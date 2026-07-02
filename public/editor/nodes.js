@@ -106,7 +106,7 @@ function saveChartWizard() {
     const before = getSnapshot();
     n.graphConfig = graphConfig; n.name = title; n.w = width; n.h = height; n.sizeOverride = true;
     distributePortLinks(n.id); renderNode(n); renderLinks(); updatePropsPanel();
-    const touching = links.filter(l => l.from===n.id || l.to===n.id).map(l => l.id);
+    const touching = linkIdsTouching(n.id);
     if (!revertIfLinksOverlap(before, touching)) { pushHistory(); setStatus('Gráfica actualizada'); }
     closeChartWizard();
   } else {
@@ -447,7 +447,7 @@ function finishInlineTextEdit(commit) {
     autoFitTextNode(node); renderNode(node); distributePortLinks(id); renderLinks(); updatePropsPanel();
     const old = snapshot.getNode(id);
     const changed = !old || old.name!==node.name || old.w!==node.w || old.h!==node.h;
-    const touching = links.filter(l => l.from===id || l.to===id).map(l => l.id);
+    const touching = linkIdsTouching(id);
     const reverted = changed && revertIfLinksOverlap(snapshot,touching);
     if (changed && !reverted) pushHistory();
     savedStateForCancel = null;

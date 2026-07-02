@@ -96,7 +96,7 @@ function revertCancel() {
   textRotatedFlag = false;
   draggingWaypoint = null; draggingConnHandle = null; nodeDraggedFlag = false;
   draggingDivider = null;
-  activeUsageLabel = null; draggingUsageLabel = null;
+  clearActiveUsageLabel();
 }
 
 function applySnapshot(snap) {
