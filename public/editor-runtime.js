@@ -7,6 +7,19 @@ function lsGet(key) { try { return localStorage.getItem(key); } catch { return n
 function lsSet(key, value) { try { localStorage.setItem(key, value); } catch (e) { console.warn('localStorage no disponible:', e); } }
 function lsRemove(key) { try { localStorage.removeItem(key); } catch { /* sin persistencia */ } }
 
+// Fetch que se aborta tras `ms` para que una petición colgada no bloquee el
+// polling: sin esto, un refresh que nunca resuelve deja el guard en vuelo
+// activo y el auto-refresco se detiene de forma silenciosa.
+async function fetchWithTimeout(url, options = {}, ms = 15000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════
@@ -3010,7 +3023,7 @@ async function previewCactiBinding(linkId, hostId, localDataId) {
   }
   setCactiPreview({message:'Consultando última muestra recolectada…', inDs, outDs});
   try {
-    const response = await fetch('/api/cacti/metrics', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+    const response = await fetchWithTimeout('/api/cacti/metrics', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
       bindings:[{linkId:`preview-${linkId}`, localDataId:Number(localDataId), inDs, outDs, multiplier:8}]
     })});
     const result = await response.json();
@@ -3210,7 +3223,7 @@ function bpsToLinkUnit(bps, unit) {
 async function refreshCactiMetrics(date = null, onlyLinkId = null) {
   const bound = links.filter(link => link.dataSource?.provider === 'cacti' && (!onlyLinkId || link.id === onlyLinkId));
   if (!bound.length) return {updated:0, errors:0};
-  const response = await fetch('/api/cacti/metrics', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+  const response = await fetchWithTimeout('/api/cacti/metrics', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
     ...(date ? {date} : {}), bindings:bound.map(link => ({linkId:link.id, localDataId:link.dataSource.localDataId,
       inDs:link.dataSource.inDs, outDs:link.dataSource.outDs, multiplier:link.dataSource.multiplier}))
   })});
