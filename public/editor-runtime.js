@@ -2369,6 +2369,7 @@ function renderLinks() {
         hl.setAttribute('d', d);
         hl.setAttribute('stroke', '#0DBFA640'); hl.setAttribute('stroke-width', String(W + 12));
         hl.setAttribute('fill', 'none'); hl.setAttribute('stroke-linecap', 'butt');
+        hl.setAttribute('pointer-events', 'none'); // decorative halo must not block the canvas
         g.appendChild(hl);
       });
     }
@@ -2482,7 +2483,11 @@ function renderLinks() {
         labelGroup.classList.add('usage-label');
         labelGroup.dataset.linkId = link.id; labelGroup.dataset.labelSide = sideName;
         labelGroup.setAttribute('transform', `translate(${x} ${y}) rotate(${textAngle})`);
-        labelGroup.setAttribute('pointer-events', presentationMode ? 'none' : 'all');
+        // Only capture the pointer when the link is selected (editor). Otherwise
+        // these labels float over otherwise-empty canvas and would block panning,
+        // marquee selection and click-to-deselect, and swap the cursor to a
+        // pointer over blank space. Presentation never makes them interactive.
+        labelGroup.setAttribute('pointer-events', (!presentationMode && isSel) ? 'all' : 'none');
         if (!presentationMode) labelGroup.style.cursor = isActiveLabel ? 'grab' : 'pointer';
         const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
         bg.setAttribute('x', -bw/2); bg.setAttribute('y', -bh/2);
