@@ -5131,7 +5131,25 @@ function activateToolHotkey(action) {
   const element = tool ? document.getElementById(tool.paletteId) : null;
   if (element && placingItem?.el !== element) activatePlacing(element);
 }
+// Currently open modal dialog, if any, so focus can be trapped inside it.
+function openModalElement() {
+  const dialogs = document.querySelectorAll('.modal-backdrop.open, #chart-wizard.open');
+  return dialogs.length ? dialogs[dialogs.length - 1] : null;
+}
+// Keep Tab focus within the open modal (accessibility): a dialog should not
+// let keyboard focus escape to the editor behind it.
+function trapFocus(e, modal) {
+  const focusable = [...modal.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )].filter(el => el.offsetParent !== null);
+  if (!focusable.length) { e.preventDefault(); return; }
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  const active = document.activeElement;
+  if (e.shiftKey && (active === first || !modal.contains(active))) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && (active === last || !modal.contains(active))) { e.preventDefault(); first.focus(); }
+}
 document.addEventListener('keydown', e => {
+  if (e.key === 'Tab') { const modal = openModalElement(); if (modal) { trapFocus(e, modal); return; } }
   if ((e.ctrlKey||e.metaKey) && e.key==='f') { e.preventDefault(); openSearch(); return; }
   if (document.getElementById('search-bar')?.classList.contains('open') && e.key==='Escape') {
     e.preventDefault(); closeSearch(); return;
