@@ -1,4 +1,13 @@
 // ════════════════════════════════════════════════════
+// SAFE STORAGE
+// ════════════════════════════════════════════════════
+// localStorage lanza en modo privado o cuando la cuota está llena; estos
+// envoltorios degradan silenciosamente en vez de romper el editor.
+function lsGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function lsSet(key, value) { try { localStorage.setItem(key, value); } catch (e) { console.warn('localStorage no disponible:', e); } }
+function lsRemove(key) { try { localStorage.removeItem(key); } catch { /* sin persistencia */ } }
+
+// ════════════════════════════════════════════════════
 // STATE
 // ════════════════════════════════════════════════════
 let nodes = [], links = [];
@@ -6,13 +15,13 @@ let selectedId = null, selectedLinkId = null;
 let selectedNodeIds = new Set();   // multi-selection; selectedId = primary (last picked)
 let selectedLinkIds = new Set();   // multi-selection of links (marquee / shift-click)
 let nodeCounter = 0, linkCounter = 0;
-let gridEnabled = localStorage.getItem('mapgen_grid_enabled') !== 'false';
-let snapEnabled = localStorage.getItem('mapgen_snap_enabled') !== 'false';
-let autoOrderEnabled = localStorage.getItem('mapgen_auto_order_enabled') === 'true';
+let gridEnabled = lsGet('mapgen_grid_enabled') !== 'false';
+let snapEnabled = lsGet('mapgen_snap_enabled') !== 'false';
+let autoOrderEnabled = lsGet('mapgen_auto_order_enabled') === 'true';
 let presentationMode = false;
-let presentationViewMode = localStorage.getItem('mapgen_presentation_view_mode') === 'day' ? 'day' : 'live';
+let presentationViewMode = lsGet('mapgen_presentation_view_mode') === 'day' ? 'day' : 'live';
 const PRESENTATION_REFRESH_OPTIONS = [5,10,15,30,60];
-let presentationRefreshMinutes = Number(localStorage.getItem('mapgen_presentation_refresh')) || 5;
+let presentationRefreshMinutes = Number(lsGet('mapgen_presentation_refresh')) || 5;
 if (!PRESENTATION_REFRESH_OPTIONS.includes(presentationRefreshMinutes)) presentationRefreshMinutes = 5;
 let presentationRefreshTimer = null;
 let presentationRefreshInFlight = false;
@@ -21,9 +30,9 @@ const localToday = () => {
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   return now.toISOString().slice(0, 10);
 };
-let selectedMapDate = localStorage.getItem('mapgen_current_server_date') || localToday();
-let currentServerMapId = localStorage.getItem('mapgen_current_server_id') || null;
-let currentServerMapName = localStorage.getItem('mapgen_current_server_name') || '';
+let selectedMapDate = lsGet('mapgen_current_server_date') || localToday();
+let currentServerMapId = lsGet('mapgen_current_server_id') || null;
+let currentServerMapName = lsGet('mapgen_current_server_name') || '';
 let currentTool = 'select';
 const DEFAULT_TOOL_HOTKEYS = { select:'s', node:'n', link:'l', icon:'i', text:'t', chart:'g' };
 const HOTKEY_RESERVED = new Set(['p']);
@@ -37,7 +46,7 @@ const HOTKEY_TOOLS = [
 ];
 function loadToolHotkeys() {
   try {
-    const saved = JSON.parse(localStorage.getItem('mapgen_tool_hotkeys') || '{}');
+    const saved = JSON.parse(lsGet('mapgen_tool_hotkeys') || '{}');
     const result = {...DEFAULT_TOOL_HOTKEYS};
     const used = new Set();
     for (const tool of HOTKEY_TOOLS) {
@@ -146,7 +155,7 @@ let nodeDraggedFlag = false;    // true if node was actually dragged since last 
 let history = [], historyIdx = -1;
 const MAX_HISTORY = 60;
 const LOCAL_DRAFT_KEY = 'mapgen_local_draft_v1';
-let localDraftEnabled = localStorage.getItem(LOCAL_DRAFT_KEY) !== null;
+let localDraftEnabled = lsGet(LOCAL_DRAFT_KEY) !== null;
 let localDraftTimer = null;
 let localDraftStorageWarningShown = false;
 
@@ -165,12 +174,12 @@ function saveLocalDraft(enable = false) {
   if (!localDraftEnabled) return false;
   clearTimeout(localDraftTimer); localDraftTimer = null;
   try {
-    localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify({
+    lsSet(LOCAL_DRAFT_KEY, JSON.stringify({
       version: 1,
       savedAt: new Date().toISOString(),
       snapshot: getSnapshot(),
       viewport: { zoom, panX, panY },
-      context: { currentServerMapId, currentServerMapName, selectedMapDate, theme: localStorage.getItem('mapgen_theme') || 'dark' }
+      context: { currentServerMapId, currentServerMapName, selectedMapDate, theme: lsGet('mapgen_theme') || 'dark' }
     }));
     return true;
   } catch (error) {
@@ -190,10 +199,10 @@ function scheduleLocalDraftSave() {
 function clearLocalDraft() {
   clearTimeout(localDraftTimer); localDraftTimer = null;
   localDraftEnabled = false;
-  localStorage.removeItem(LOCAL_DRAFT_KEY);
+  lsRemove(LOCAL_DRAFT_KEY);
 }
 function restoreLocalDraft() {
-  const raw = localStorage.getItem(LOCAL_DRAFT_KEY);
+  const raw = lsGet(LOCAL_DRAFT_KEY);
   if (!raw) return false;
   try {
     const draft = JSON.parse(raw);
@@ -2759,7 +2768,7 @@ function setPresentationRefresh(rawMinutes) {
   const minutes = Number(rawMinutes);
   if (!PRESENTATION_REFRESH_OPTIONS.includes(minutes)) return;
   presentationRefreshMinutes = minutes;
-  localStorage.setItem('mapgen_presentation_refresh', String(minutes));
+  lsSet('mapgen_presentation_refresh', String(minutes));
   schedulePresentationRefresh();
   setStatus(`Auto refresco cada ${minutes} minutos`);
 }
@@ -2777,7 +2786,7 @@ async function setPresentationViewMode(mode) {
     updatePresentationViewControls(); return;
   }
   presentationViewMode = mode;
-  localStorage.setItem('mapgen_presentation_view_mode', mode);
+  lsSet('mapgen_presentation_view_mode', mode);
   updatePresentationViewControls();
   schedulePresentationRefresh();
   if (!presentationMode || !currentServerMapId) {
@@ -3395,12 +3404,12 @@ function mountPropertyTabs(container, profile, title, subtitle, entityId = null)
   const stage = document.createElement('div'); stage.className = 'props-tab-stage';
   const storageKey = `mapgen_props_tab_${profile}`;
   const availableKeys = tabs.map(([key]) => key);
-  let activeKey = localStorage.getItem(storageKey);
+  let activeKey = lsGet(storageKey);
   if (!availableKeys.includes(activeKey)) activeKey = tabs[0][0];
   // Never auto-open "arrange" on a fresh selection; keep it only while the arrange view is active.
   if (activeKey === 'arrange' && !document.body.classList.contains('arranging')) activeKey = tabs[0][0];
   const activate = key => {
-    activeKey = key; localStorage.setItem(storageKey, key);
+    activeKey = key; lsSet(storageKey, key);
     nav.querySelectorAll('.props-tab').forEach(button => {
       const active = button.dataset.tab === key;
       button.classList.toggle('active', active); button.setAttribute('aria-selected', String(active));
@@ -3438,10 +3447,10 @@ function mountConfigTabs() {
   head.innerHTML = `<span class="props-entity-icon"><svg viewBox="0 0 24 24">${tabs[0][2]}</svg></span><span class="props-entity-copy"><strong>Configuración general</strong><small>Valores predeterminados</small></span><span class="props-live-dot" title="Configuración activa"></span>`;
   const nav = document.createElement('div'); nav.className = 'props-tab-nav config-tab-nav'; nav.setAttribute('role','tablist');
   const stage = document.createElement('div'); stage.className = 'props-tab-stage';
-  let activeKey = localStorage.getItem('mapgen_config_tab');
+  let activeKey = lsGet('mapgen_config_tab');
   if (!tabs.some(([key]) => key === activeKey)) activeKey = 'general';
   const activate = key => {
-    activeKey = key; localStorage.setItem('mapgen_config_tab', key);
+    activeKey = key; lsSet('mapgen_config_tab', key);
     nav.querySelectorAll('.props-tab').forEach(button => {
       const active = button.dataset.tab === key;
       button.classList.toggle('active', active); button.setAttribute('aria-selected', String(active));
@@ -4286,7 +4295,7 @@ function _cancelArrange() {
   const nodeId = _arrangeState?.nodeId || null;
   const node = nodeId ? nodes.find(item => item.id === nodeId) : null;
   revertCancel(); // revert to snapshot taken in showArrangeForm
-  if (arrangeEmbeddedInTab && node) localStorage.setItem(`mapgen_props_tab_${node.type === 'text' ? 'text' : node.type === 'chart' ? 'chart' : 'regular'}`, node.type === 'text' ? 'transform' : 'layout');
+  if (arrangeEmbeddedInTab && node) lsSet(`mapgen_props_tab_${node.type === 'text' ? 'text' : node.type === 'chart' ? 'chart' : 'regular'}`, node.type === 'text' ? 'transform' : 'layout');
   arrangeEmbeddedInTab = false;
   _arrangeState = null; renderArrangeOverlays();
   if (nodeId && nodes.some(item => item.id === nodeId)) selectNode(nodeId); else updatePropsPanel();
@@ -4297,7 +4306,7 @@ function applyArrange() {
   const node = nodes.find(item => item.id === _arrangeState.nodeId);
   _previewArrange(); // ensure final state is applied
   savedStateForCancel = null; // commit
-  if (arrangeEmbeddedInTab && node) localStorage.setItem(`mapgen_props_tab_${node.type === 'text' ? 'text' : node.type === 'chart' ? 'chart' : 'regular'}`, node.type === 'text' ? 'transform' : 'layout');
+  if (arrangeEmbeddedInTab && node) lsSet(`mapgen_props_tab_${node.type === 'text' ? 'text' : node.type === 'chart' ? 'chart' : 'regular'}`, node.type === 'text' ? 'transform' : 'layout');
   arrangeEmbeddedInTab = false;
   _arrangeState = null; renderArrangeOverlays(); pushHistory(); updatePropsPanel();
 }
@@ -4978,19 +4987,19 @@ function togglePropsPanel() {
 }
 function setGridEnabled(enabled) {
   gridEnabled = !!enabled;
-  localStorage.setItem('mapgen_grid_enabled', String(gridEnabled));
+  lsSet('mapgen_grid_enabled', String(gridEnabled));
   updateMenuState();
   setStatus(gridEnabled ? 'Cuadrícula visible' : 'Cuadrícula oculta');
 }
 function setSnapEnabled(enabled) {
   snapEnabled = !!enabled;
-  localStorage.setItem('mapgen_snap_enabled', String(snapEnabled));
+  lsSet('mapgen_snap_enabled', String(snapEnabled));
   updateMenuState();
   setStatus(snapEnabled ? 'Ajuste magnético activado' : 'Ajuste magnético desactivado');
 }
 function setAutoOrderEnabled(enabled) {
   autoOrderEnabled = !!enabled;
-  localStorage.setItem('mapgen_auto_order_enabled', String(autoOrderEnabled));
+  lsSet('mapgen_auto_order_enabled', String(autoOrderEnabled));
   updateMenuState();
   if (autoOrderEnabled && nodes.length) {
     autoLayout();
@@ -5073,7 +5082,7 @@ function resetHotkeysDraft() {
 function saveHotkeys() {
   if (!hotkeyDraft) return;
   toolHotkeys = {...hotkeyDraft};
-  localStorage.setItem('mapgen_tool_hotkeys', JSON.stringify(toolHotkeys));
+  lsSet('mapgen_tool_hotkeys', JSON.stringify(toolHotkeys));
   updatePaletteHotkeyTitles();
   closeHotkeysModal();
   showToast('Tus atajos de herramientas se guardaron.', 'success');
@@ -5348,13 +5357,13 @@ function rememberCurrentServerMap(id, name, date = selectedMapDate) {
   currentServerMapId = id || null;
   currentServerMapName = name || '';
   if (currentServerMapId) {
-    localStorage.setItem('mapgen_current_server_id', currentServerMapId);
-    localStorage.setItem('mapgen_current_server_name', currentServerMapName);
-    localStorage.setItem('mapgen_current_server_date', date);
+    lsSet('mapgen_current_server_id', currentServerMapId);
+    lsSet('mapgen_current_server_name', currentServerMapName);
+    lsSet('mapgen_current_server_date', date);
   } else {
-    localStorage.removeItem('mapgen_current_server_id');
-    localStorage.removeItem('mapgen_current_server_name');
-    localStorage.removeItem('mapgen_current_server_date');
+    lsRemove('mapgen_current_server_id');
+    lsRemove('mapgen_current_server_name');
+    lsRemove('mapgen_current_server_date');
   }
 }
 
@@ -5414,7 +5423,7 @@ async function selectPresentationDate(date, autoRefresh = false) {
   const focusedLinkId = autoRefresh ? document.querySelector('.link-group.presentation-focused')?.dataset.linkId : null;
   if (!liveRequest) {
     selectedMapDate = date;
-    localStorage.setItem('mapgen_current_server_date', selectedMapDate);
+    lsSet('mapgen_current_server_date', selectedMapDate);
   }
   if (!autoRefresh) hidePresentationInfo();
   if (!currentServerMapId) {
@@ -5437,7 +5446,7 @@ async function selectPresentationDate(date, autoRefresh = false) {
     });
     if (liveRequest && result.date) {
       selectedMapDate = result.date;
-      localStorage.setItem('mapgen_current_server_date', selectedMapDate);
+      lsSet('mapgen_current_server_date', selectedMapDate);
       document.getElementById('presentation-date').value = selectedMapDate;
     }
     history = [getSnapshot()]; historyIdx = 0; updateUndoBtns();
@@ -5862,7 +5871,7 @@ const THEMES = {
 };
 
 const LEGACY_THEME_MAP = {'dark-teal':'dark','dark-purple':'dark','dark-blue':'dark','dark-amber':'dark'};
-const _storedTheme = localStorage.getItem('mapgen_theme') || 'dark';
+const _storedTheme = lsGet('mapgen_theme') || 'dark';
 let activeTheme = THEMES[_storedTheme] ? _storedTheme : (LEGACY_THEME_MAP[_storedTheme] || 'dark');
 
 function applyTheme(name) {
@@ -5872,7 +5881,7 @@ function applyTheme(name) {
   const root = document.documentElement;
   root.dataset.theme = name;
   Object.entries(theme.vars).forEach(([k, v]) => root.style.setProperty(k, v));
-  localStorage.setItem('mapgen_theme', name);
+  lsSet('mapgen_theme', name);
   document.getElementById('tool-theme')?.classList.remove('active');
 }
 
