@@ -4239,7 +4239,7 @@ function renderArrangeForm() {
           class="arrange-row">
           <span class="arrange-grip">⠿</span>
           <span class="arrange-index" style="background:${col}" title="Posición fija ${item.slot} de ${PORT_SLOT_COUNT}">${item.slot}</span>
-          <span class="arrange-item-name" title="${item.name}">${item.name}</span>
+          <span class="arrange-item-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
           <select class="arrange-side-select" title="Cambiar lado" onchange="_arrangeMoveToSide('${side}',${i},this.value)">
             <option value="top" ${side==='top'?'selected':''}>↑</option>
             <option value="bottom" ${side==='bottom'?'selected':''}>↓</option>
