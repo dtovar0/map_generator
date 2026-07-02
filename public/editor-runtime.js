@@ -2236,7 +2236,74 @@ function createMidpointMarker(point, nextPoint, type, width, firstColor, secondC
   return shape;
 }
 
+// Event delegation for the per-link handlers that otherwise get rebound on
+// every link, every render (selection click, hover, connection dots, usage
+// labels). Attached once; individual elements carry data-link-id/data-* so the
+// handlers can resolve their link. The selected-link-only drag handles
+// (waypoints, divider, hit-area insert) stay as direct listeners since there is
+// at most one selected link.
+let linkDelegationReady = false;
+function ensureLinkDelegation() {
+  if (linkDelegationReady) return;
+  const svg = document.getElementById('links-svg');
+  const overlay = document.getElementById('overlay-svg');
+  if (!svg || !overlay) return;
+
+  svg.addEventListener('click', e => {
+    if (e.target.closest('.usage-label')) { e.stopPropagation(); e.preventDefault(); return; }
+    const g = e.target.closest('.link-group'); if (!g) return;
+    const link = getLink(g.dataset.linkId); if (!link) return;
+    const routeVerts = getLinkVertices(link);
+    const baseW = Math.max(1, Math.min(24, Number(link.width) || 6));
+    const tolerance = Math.max(5, baseW / 2 + 2);
+    if (pointToPolylineDistance(getCanvasPos(e), routeVerts) > tolerance) return;
+    e.stopPropagation(); e.preventDefault();
+    if (presentationMode) showPresentationLinkInfo(link.id);
+    else if (e.shiftKey || e.ctrlKey || e.metaKey) toggleLinkSelection(link.id);
+    else selectLink(link.id);
+  });
+  svg.addEventListener('dblclick', e => {
+    const label = e.target.closest('.usage-label'); if (!label) return;
+    const link = getLink(label.dataset.linkId); if (!link || presentationMode) return;
+    e.stopPropagation(); e.preventDefault();
+    const sideName = label.dataset.labelSide;
+    if (selectedLinkId !== link.id) selectLink(link.id);
+    activeUsageLabel = { linkId: link.id, side: sideName };
+    renderLinks();
+    setStatus(`Etiqueta de ${sideName === 'in' ? 'entrada' : 'salida'} activa · arrástrala dentro de su lado`);
+  });
+  svg.addEventListener('mousedown', e => {
+    const label = e.target.closest('.usage-label'); if (!label || e.button !== 0 || presentationMode) return;
+    const link = getLink(label.dataset.linkId); if (!link) return;
+    const sideName = label.dataset.labelSide;
+    if (!(activeUsageLabel?.linkId === link.id && activeUsageLabel.side === sideName)) return;
+    e.stopPropagation(); e.preventDefault();
+    geometryChangeSnapshot = getSnapshot();
+    const field = sideName === 'in' ? 'usageLabelInPosition' : 'usageLabelOutPosition';
+    draggingUsageLabel = { linkId: link.id, side: sideName, startPosition: link[field] ?? 50 };
+  });
+  svg.addEventListener('mouseover', e => {
+    const g = e.target.closest('.link-group'); if (g) g.classList.add('hover');
+  });
+  svg.addEventListener('mouseout', e => {
+    const g = e.target.closest('.link-group');
+    if (g && (!e.relatedTarget || !g.contains(e.relatedTarget))) g.classList.remove('hover');
+  });
+
+  overlay.addEventListener('mousedown', e => {
+    const dot = e.target.closest('.conn-dot'); if (!dot || !showConnHandles) return;
+    const link = getLink(dot.dataset.linkId); if (!link) return;
+    e.stopPropagation(); e.preventDefault();
+    const isFrom = dot.dataset.connFrom === '1';
+    geometryChangeSnapshot = getSnapshot();
+    draggingConnHandle = { linkId: link.id, isFrom, nodeId: isFrom ? link.from : link.to };
+  });
+
+  linkDelegationReady = true;
+}
+
 function renderLinks() {
+  ensureLinkDelegation();
   const svg = document.getElementById('links-svg');
   svg.querySelectorAll('.link-group').forEach(g => g.remove());
   document.getElementById('overlay-svg').querySelectorAll('.conn-dot').forEach(el => el.remove());
@@ -2266,18 +2333,8 @@ function renderLinks() {
       title.textContent = link.description;
       g.appendChild(title);
     }
-    g.addEventListener('click', e => {
-      const clickPoint = getCanvasPos(e);
-      const tolerance = Math.max(5, baseW / 2 + 2);
-      if (pointToPolylineDistance(clickPoint, routeVerts) > tolerance) return;
-      e.stopPropagation(); e.preventDefault();
-      if (presentationMode) showPresentationLinkInfo(link.id);
-      else if (e.shiftKey || e.ctrlKey || e.metaKey) toggleLinkSelection(link.id);
-      else selectLink(link.id);
-    });
-    g.addEventListener('mouseenter', () => g.classList.add('hover'));
-    g.addEventListener('mouseleave', () => g.classList.remove('hover'));
-
+    // Selection click and hover are handled by delegation on #links-svg
+    // (see ensureLinkDelegation) so we don't rebind them per link every render.
     const routeVerts = getLinkVertices(link);
     const renderedFromPoint = routeVerts[0] || fp;
     const renderedToPoint = routeVerts[routeVerts.length - 1] || tp;
@@ -2357,12 +2414,8 @@ function renderLinks() {
       c.setAttribute('fill', col); c.setAttribute('stroke', '#070C13'); c.setAttribute('stroke-width', '2');
       c.setAttribute('pointer-events', 'all'); c.style.cursor = 'move';
       c.classList.add('conn-dot');
-      c.addEventListener('mousedown', e => {
-        if (!showConnHandles) return;
-        e.stopPropagation(); e.preventDefault();
-        geometryChangeSnapshot = getSnapshot();
-        draggingConnHandle = { linkId: link.id, isFrom, nodeId: isFrom ? link.from : link.to };
-      });
+      // mousedown handled by delegation on #overlay-svg (ensureLinkDelegation).
+      c.dataset.linkId = link.id; c.dataset.connFrom = isFrom ? '1' : '0';
       return c;
     };
     overlaySvg.appendChild(mkConnDot(renderedFromPoint, inC, true));
@@ -2418,6 +2471,8 @@ function renderLinks() {
         const bw = txt.length * charW + pad * 2;
         const labelGroup = document.createElementNS('http://www.w3.org/2000/svg','g');
         const isActiveLabel = activeUsageLabel?.linkId === link.id && activeUsageLabel.side === sideName;
+        labelGroup.classList.add('usage-label');
+        labelGroup.dataset.linkId = link.id; labelGroup.dataset.labelSide = sideName;
         labelGroup.setAttribute('transform', `translate(${x} ${y}) rotate(${textAngle})`);
         labelGroup.setAttribute('pointer-events', presentationMode ? 'none' : 'all');
         if (!presentationMode) labelGroup.style.cursor = isActiveLabel ? 'grab' : 'pointer';
@@ -2436,23 +2491,8 @@ function renderLinks() {
         t.setAttribute('font-family', "Consolas,'SF Mono',monospace");
         t.setAttribute('font-weight', '700'); t.setAttribute('letter-spacing', '0.2');
         t.textContent = txt; labelGroup.appendChild(t);
-        if (!presentationMode) {
-          labelGroup.addEventListener('click', e => { e.stopPropagation(); e.preventDefault(); });
-          labelGroup.addEventListener('dblclick', e => {
-            e.stopPropagation(); e.preventDefault();
-            if (selectedLinkId !== link.id) selectLink(link.id);
-            activeUsageLabel = {linkId:link.id, side:sideName};
-            renderLinks();
-            setStatus(`Etiqueta de ${sideName === 'in' ? 'entrada' : 'salida'} activa · arrástrala dentro de su lado`);
-          });
-          labelGroup.addEventListener('mousedown', e => {
-            if (e.button !== 0 || !isActiveLabel) return;
-            e.stopPropagation(); e.preventDefault();
-            geometryChangeSnapshot = getSnapshot();
-            const field = sideName === 'in' ? 'usageLabelInPosition' : 'usageLabelOutPosition';
-            draggingUsageLabel = {linkId:link.id, side:sideName, startPosition:link[field] ?? 50};
-          });
-        }
+        // click / dblclick / mousedown for labels are delegated on #links-svg
+        // (ensureLinkDelegation), keyed by data-link-id / data-label-side.
         g.appendChild(labelGroup);
       });
     }

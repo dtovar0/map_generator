@@ -3,10 +3,12 @@
 // El editor depende de manejadores onclick en línea y de estilos en línea, por
 // eso script-src/style-src incluyen 'unsafe-inline'. Aun así fijamos el resto
 // de directivas para limitar orígenes, bloquear el embebido en marcos ajenos y
-// evitar contenido mixto.
+// evitar contenido mixto. En desarrollo Next usa eval() para HMR/webpack, así
+// que 'unsafe-eval' se añade solo fuera de producción.
+const isDev = process.env.NODE_ENV !== "production";
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
