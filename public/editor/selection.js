@@ -500,6 +500,75 @@ function resetCactiDemoCatalog() {
   }
 }
 
+function cactiDevicePickerHtml(linkId, devices, selectedId = null) {
+  const selected = devices.find(device => Number(device.id) === Number(selectedId));
+  const options = devices.map(device => `<option value="${device.id}" ${Number(selectedId)===Number(device.id)?'selected':''}>${escapeHtml(device.name)}</option>`).join('');
+  const items = devices.map(device => {
+    const search = `${device.name || ''} ${device.hostname || ''}`.toLocaleLowerCase();
+    return `<button type="button" class="cacti-source-option ${Number(selectedId)===Number(device.id)?'selected':''}" data-search="${escapeHtml(search)}" data-click="chooseCactiDevice" data-args='["${linkId}",${device.id}]'>
+      <span><strong>${escapeHtml(device.name)}</strong>${device.hostname ? `<small>${escapeHtml(device.hostname)}</small>` : ''}</span>
+      <em>Host ${device.id}</em>
+    </button>`;
+  }).join('');
+  return `<div class="cacti-source-select cacti-device-select" id="cacti-device-picker-${linkId}" data-blur="closeCactiDevicePicker" data-args='["${linkId}","$self"]'>
+    <select class="cacti-native-source" id="cacti-device-${linkId}" tabindex="-1" aria-hidden="true"><option value="">Selecciona un equipo…</option>${options}</select>
+    <button type="button" class="cacti-source-trigger" data-click="toggleCactiDevicePicker" data-args='["${linkId}","$self"]' aria-haspopup="listbox" aria-expanded="false">
+      <span>${selected ? `${escapeHtml(selected.name)}${selected.hostname ? `<small>${escapeHtml(selected.hostname)}</small>` : ''}` : 'Selecciona un equipo…'}</span><i aria-hidden="true"></i>
+    </button>
+    <div class="cacti-source-menu" hidden>
+      <div class="cacti-source-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="Buscar equipo o hostname…" autocomplete="off" data-input="filterCactiDevices" data-input-args='["${linkId}","$value"]' data-keydown="handleCactiDeviceSearchKey" data-keydown-args='["${linkId}","$event"]'></div>
+      <div class="cacti-source-options" role="listbox">${items}</div><div class="cacti-source-empty" hidden>Sin equipos coincidentes</div>
+    </div>
+  </div>`;
+}
+
+function toggleCactiDevicePicker(linkId, trigger) {
+  const picker = document.getElementById(`cacti-device-picker-${linkId}`); if (!picker) return;
+  const menu = picker.querySelector('.cacti-source-menu'), open = menu.hidden;
+  menu.hidden = !open; picker.classList.toggle('open', open); trigger.setAttribute('aria-expanded', String(open));
+  if (open) setTimeout(() => picker.querySelector('input[type="search"]')?.focus(), 0);
+}
+
+function closeCactiDevicePicker(linkId, picker) {
+  setTimeout(() => {
+    if (picker.contains(document.activeElement)) return;
+    picker.querySelector('.cacti-source-menu').hidden = true;
+    picker.classList.remove('open'); picker.querySelector('.cacti-source-trigger')?.setAttribute('aria-expanded', 'false');
+  }, 0);
+}
+
+function filterCactiDevices(linkId, query) {
+  const picker = document.getElementById(`cacti-device-picker-${linkId}`); if (!picker) return;
+  const normalized = query.trim().toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  let visible = 0;
+  picker.querySelectorAll('.cacti-source-option').forEach(option => {
+    const haystack = (option.dataset.search || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    option.hidden = !!normalized && !haystack.includes(normalized); if (!option.hidden) visible++;
+  });
+  picker.querySelector('.cacti-source-empty').hidden = visible > 0;
+}
+
+function handleCactiDeviceSearchKey(linkId, event) {
+  const picker = document.getElementById(`cacti-device-picker-${linkId}`); if (!picker) return;
+  if (event.key === 'Escape') {
+    picker.querySelector('.cacti-source-menu').hidden = true; picker.classList.remove('open'); picker.querySelector('.cacti-source-trigger')?.focus();
+  } else if (event.key === 'Enter') {
+    event.preventDefault(); picker.querySelector('.cacti-source-option:not([hidden])')?.click();
+  }
+}
+
+function chooseCactiDevice(linkId, hostId) {
+  const select = document.getElementById(`cacti-device-${linkId}`); if (!select) return;
+  select.value = String(hostId);
+  const picker = document.getElementById(`cacti-device-picker-${linkId}`);
+  const device = (cactiCatalog.devices || []).find(item => Number(item.id) === Number(hostId));
+  const trigger = picker?.querySelector('.cacti-source-trigger span');
+  if (trigger && device) trigger.innerHTML = `${escapeHtml(device.name)}${device.hostname ? `<small>${escapeHtml(device.hostname)}</small>` : ''}`;
+  picker?.querySelectorAll('.cacti-source-option').forEach(option => option.classList.toggle('selected', option.dataset.args?.endsWith(`,${hostId}]`)));
+  const menu = picker?.querySelector('.cacti-source-menu'); if (menu) menu.hidden = true;
+  picker?.classList.remove('open'); loadCactiGraphs(linkId, hostId);
+}
+
 function cactiSourcePickerHtml(linkId, hostId, sources, selectedId = null, fixedGraphId = null) {
   const selected = sources.find(source => Number(source.localDataId) === Number(selectedId));
   const buttonLabel = selected
@@ -714,9 +783,7 @@ async function loadCactiDevices(linkId) {
     }
     const link = getLink(linkId);
     picker.innerHTML = `<div class="cacti-modal-grid">
-      <label><span>Equipo</span><select class="prop-val" id="cacti-device-${linkId}" data-change="loadCactiGraphs" data-args='["${linkId}","$value"]'>
-        <option value="">Selecciona un equipo…</option>${cactiCatalog.devices.map(device => `<option value="${device.id}" ${Number(link?.dataSource?.hostId)===device.id?'selected':''}>${escapeHtml(device.name)}${device.hostname ? ` · ${escapeHtml(device.hostname)}` : ''}</option>`).join('')}
-      </select></label>
+      <label><span>Equipo</span>${cactiDevicePickerHtml(linkId, cactiCatalog.devices, link?.dataSource?.hostId)}</label>
     </div><div id="cacti-graph-wrap-${linkId}">${cactiDisabledFlowHtml(linkId)}</div>`;
     if (link?.dataSource?.hostId) loadCactiGraphs(linkId, link.dataSource.hostId);
   } catch (error) {

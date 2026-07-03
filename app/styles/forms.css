@@ -193,6 +193,7 @@
   .cacti-source-search input { width: 100%; min-height: 34px; padding: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 10px; box-shadow: none; }
   .cacti-source-options { max-height: 228px; overflow-y: auto; padding: 0 6px 6px; }
   .cacti-source-option { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 9px; padding: 9px; border: 0; border-radius: 8px; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+  .cacti-source-option[hidden], .cacti-source-empty[hidden] { display: none !important; }
   .cacti-source-option:hover, .cacti-source-option:focus-visible { outline: 0; background: color-mix(in srgb, var(--accent) 11%, var(--surface2)); }
   .cacti-source-option.selected { background: color-mix(in srgb, var(--accent) 15%, var(--surface2)); box-shadow: inset 2px 0 var(--accent); }
   .cacti-source-option span { min-width: 0; display: grid; gap: 3px; }
