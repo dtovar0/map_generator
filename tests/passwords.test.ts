@@ -22,3 +22,17 @@ test("malformed stored value fails safely", async () => {
   assert.equal(await verifyPassword("x", "scrypt$bad"), false);
   assert.equal(await verifyPassword("x", ""), false);
 });
+
+test("truncated hash fails even with correct password", async () => {
+  const stored = await hashPassword("s3creta!");
+  const parts = stored.split("$");
+  parts[5] = parts[5].slice(0, 2);
+  assert.equal(await verifyPassword("s3creta!", parts.join("$")), false);
+});
+
+test("altered scrypt parameters fail even with correct password", async () => {
+  const stored = await hashPassword("s3creta!");
+  const parts = stored.split("$");
+  parts[1] = "8192";
+  assert.equal(await verifyPassword("s3creta!", parts.join("$")), false);
+});

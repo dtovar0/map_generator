@@ -20,12 +20,12 @@ export async function verifyPassword(password: string, stored: string): Promise<
   const parts = stored.split("$");
   if (parts.length !== 6 || parts[0] !== "scrypt") return false;
   const [, n, r, p, saltEncoded, hashEncoded] = parts;
+  if (n !== String(N) || r !== String(R) || p !== String(P)) return false;
   const salt = Buffer.from(saltEncoded, "base64url");
   const expected = Buffer.from(hashEncoded, "base64url");
-  if (!salt.length || !expected.length) return false;
+  if (!salt.length || expected.length !== KEY_LENGTH) return false;
   try {
-    const actual = await scrypt(password, salt, expected.length,
-      { N: Number(n), r: Number(r), p: Number(p), maxmem: 128 * 1024 * 1024 });
+    const actual = await scrypt(password, salt, KEY_LENGTH, { N, r: R, p: P });
     return timingSafeEqual(actual, expected);
   } catch {
     return false;
