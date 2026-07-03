@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "../../../../lib/auth/guard";
 import { getStoredMetrics } from "../../../../lib/cacti/catalog";
 import { getCactiConfig } from "../../../../lib/cacti/config";
 import { getRrdMetrics } from "../../../../lib/cacti/rrd";
@@ -19,6 +20,8 @@ function validDate(value: unknown): value is string {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireUser(request, "viewer");
+  if (auth.response) return auth.response;
   const body = await request.json().catch(() => null) as { bindings?: BindingRequest[]; date?: string } | null;
   if (!body || !Array.isArray(body.bindings) || body.bindings.length > 500 || (body.date && !validDate(body.date))) {
     return NextResponse.json({ error: "Solicitud de métricas inválida" }, { status: 400 });

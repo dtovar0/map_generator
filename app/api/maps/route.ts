@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "../../../lib/auth/guard";
 import { listMaps, saveDay, validDate, validSnapshot, validId } from "../../../lib/maps/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await requireUser(request, "viewer");
+  if (auth.response) return auth.response;
   try {
     return NextResponse.json({ maps: await listMaps() });
   } catch (error) {
@@ -14,6 +17,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireUser(request, "editor");
+  if (auth.response) return auth.response;
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   if (!body || !validDate(body.date) || !validSnapshot(body.snapshot)) {
     return NextResponse.json({ error: "Datos de mapa inválidos" }, { status: 400 });
@@ -24,7 +29,7 @@ export async function POST(request: Request) {
       name: typeof body.name === "string" ? body.name : undefined,
       date: body.date,
       snapshot: body.snapshot as Record<string, unknown>,
-      userId: null,
+      userId: auth.user.id,
     });
     return NextResponse.json({ map });
   } catch (error) {

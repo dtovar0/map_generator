@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "../../../../lib/auth/guard";
 import { readRecord, validId } from "../../../../lib/maps/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request, context: { params: { id: string } }) {
+  const auth = await requireUser(request, "viewer");
+  if (auth.response) return auth.response;
   const id = context.params.id;
   if (!validId(id)) {
     return NextResponse.json({ error: "Identificador inválido" }, { status: 400 });

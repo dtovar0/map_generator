@@ -16,6 +16,24 @@ export function middleware(request: NextRequest) {
     ?.split(",")[0]
     .trim();
   const isHttps = (forwardedProto ?? request.nextUrl.protocol.replace(":", "")) === "https";
+
+  // Document gate: cheap presence check only. Sessions with an invalid/expired
+  // cookie still reach the page and are rejected there (and by the API guard);
+  // this only keeps fully anonymous navigation off protected documents.
+  const { pathname } = request.nextUrl;
+  const isPublicPage = pathname === "/login" || pathname === "/denied";
+  if (!isPublicPage) {
+    const hasSession = Boolean(request.cookies.get("mapgen_session")?.value);
+    const forwardOk = process.env.AUTH_FORWARD_ENABLED === "true" &&
+      Boolean(request.headers.get("remote-user"));
+    if (!hasSession && !forwardOk) {
+      const login = request.nextUrl.clone();
+      login.pathname = "/login";
+      login.search = pathname !== "/" ? `?next=${encodeURIComponent(pathname)}` : "";
+      return NextResponse.redirect(login);
+    }
+  }
+
   const nonce = btoa(crypto.randomUUID());
   const scriptSrc = isDev
     ? "'self' 'unsafe-inline' 'unsafe-eval'"

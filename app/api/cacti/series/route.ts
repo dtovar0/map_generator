@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "../../../../lib/auth/guard";
 import { getStoredSeries } from "../../../../lib/cacti/catalog";
 import { getCactiConfig } from "../../../../lib/cacti/config";
 import { getRrdSeries, type RrdConsolidation } from "../../../../lib/cacti/rrd";
@@ -18,6 +19,8 @@ interface SeriesRequest {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireUser(request, "viewer");
+  if (auth.response) return auth.response;
   const body = await request.json().catch(() => null) as {
     range?: string; consolidation?: RrdConsolidation; step?: number; series?: SeriesRequest[];
   } | null;
