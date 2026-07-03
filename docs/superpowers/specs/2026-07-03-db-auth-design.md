@@ -179,6 +179,18 @@ Permisos por rol (jerárquicos: admin ⊃ editor ⊃ viewer):
   alta de usuario local, cambio de rol, reset de contraseña, activar/desactivar.
 - **Rol viewer**: el editor carga en modo solo lectura — se ocultan las herramientas de
   edición y los guardados se bloquean también en el servidor (la API es la autoridad).
+- **Pantallas de error**: páginas con el estilo de la app (temas claro/oscuro, mensajes en
+  español, botón para volver al inicio o a `/login`), compartiendo un mismo componente de
+  layout de error:
+  - `app/not-found.tsx` — 404 para rutas inexistentes (documentos).
+  - `app/error.tsx` y `app/global-error.tsx` — errores de runtime/render (500); el detalle
+    técnico va solo al log del servidor, nunca a la pantalla.
+  - `/denied` — 403 cuando un usuario autenticado intenta entrar a algo que su rol no
+    permite en navegación de documentos (p. ej. un viewer al panel de admin).
+  - Los errores 400/401/403/5xx de la API siguen siendo JSON en español (`{error}`), como
+    hasta ahora; el editor los muestra en sus toasts. La página `/login` presenta los
+    errores de autenticación (credenciales inválidas, cuenta desactivada, fallo OIDC,
+    sesión expirada) de forma amigable vía `?error=<código>`.
 
 ## 6. Manejo de errores
 
