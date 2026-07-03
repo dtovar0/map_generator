@@ -170,18 +170,33 @@ Permisos por rol (jerárquicos: admin ⊃ editor ⊃ viewer):
 
 ## 5. UI
 
-- **Página `/login`**: página Next con el estilo de la app (temas claro/oscuro, CSP con
-  nonce). Muestra formulario local y/o botón "Entrar con Authelia" según los modos
-  habilitados (leídos de `/api/auth/me`). Errores en español.
+Todas las pantallas nuevas se diseñan al nivel de la identidad **Aurora Indigo** ya
+existente (`app/styles/base.css`): tokens del tema (`--surface`, `--accent-grad`,
+`--radius-lg`, `--shadow-lg`, `--ring`), paneles glass, degradado violeta→cian como
+acento, tipografía Inter, ambos temas (oscuro por defecto y claro) y microinteracciones
+sutiles (transiciones de foco/hover, entrada con fade/slide). Nada de formularios ni
+páginas de error genéricas de navegador.
+
+- **Página `/login`**: pieza central de la identidad — tarjeta glass centrada sobre el
+  fondo de la app con la retícula/resplandor del acento, logotipo/nombre del producto,
+  campos con estados de foco `--ring`, botón primario con `--accent-grad`, botón
+  "Entrar con Authelia" como acción secundaria, y errores inline en español con
+  `--danger`. Respeta la CSP con nonce (sin estilos/scripts inline sin nonce). Los modos
+  visibles se leen de `/api/auth/me`.
 - **Barra superior del editor**: nombre del usuario actual y botón de salir.
 - **Panel de administración de usuarios**: modal dentro del editor, visible solo para
-  admins (mismo patrón que los modales existentes en `public/editor/`): tabla de usuarios,
-  alta de usuario local, cambio de rol, reset de contraseña, activar/desactivar.
+  admins, con el mismo lenguaje visual de los modales glass existentes en
+  `public/editor/`: tabla de usuarios con badges de rol coloreados (admin con acento,
+  editor neutro, viewer atenuado) y estado activo/inactivo, alta de usuario local, cambio
+  de rol, reset de contraseña, activar/desactivar, con confirmación para acciones
+  destructivas.
 - **Rol viewer**: el editor carga en modo solo lectura — se ocultan las herramientas de
   edición y los guardados se bloquean también en el servidor (la API es la autoridad).
-- **Pantallas de error**: páginas con el estilo de la app (temas claro/oscuro, mensajes en
-  español, botón para volver al inicio o a `/login`), compartiendo un mismo componente de
-  layout de error:
+- **Pantallas de error**: mismo tratamiento premium, compartiendo un componente de layout
+  de error: código de estado en tipografía display grande con el degradado de acento
+  (`--accent-grad` como `background-clip: text`), título y mensaje en español, ilustración
+  sutil con la retícula de puntos del canvas de fondo, y botón para volver al inicio o a
+  `/login`. Ambos temas:
   - `app/not-found.tsx` — 404 para rutas inexistentes (documentos).
   - `app/error.tsx` y `app/global-error.tsx` — errores de runtime/render (500); el detalle
     técnico va solo al log del servidor, nunca a la pantalla.
