@@ -21,7 +21,15 @@ function setNodeSelection(ids) {
   if (n && selectedNodeIds.size === 1) showPosBadge(n.x, n.y); else hidePosBadge();
 }
 function selectNode(id) {
+  selectedCanvasInfo = null;
   setNodeSelection([id]);
+}
+function selectCanvasInfo(type) {
+  clearSelection();
+  selectedCanvasInfo = type;
+  document.getElementById(type === 'date' ? 'date-stamp' : 'scale-legend')?.classList.add('selected');
+  showPropsPanel();
+  updatePropsPanel();
 }
 function selectionCount() { return selectedNodeIds.size + selectedLinkIds.size; }
 // Nodes that must move together: selected nodes + both endpoints of every selected link
@@ -71,6 +79,7 @@ function toggleLinkSelection(id) {
   applyResolvedSelection([...selectedNodeIds], [...linkIds]);
 }
 function selectLink(id) {
+  selectedCanvasInfo = null;
   clearActiveUsageLabel();
   selectedLinkId = id; selectedId = null; selectedNodeIds = new Set(); selectedLinkIds = new Set();
   nodes.forEach(n => document.getElementById(n.id)?.classList.remove('selected', 'link-endpoint'));
@@ -86,10 +95,12 @@ function selectLink(id) {
 function clearSelection() {
   cancelCustomAlignment();
   clearActiveUsageLabel();
-  selectedId = null; selectedLinkId = null; selectedNodeIds = new Set(); selectedLinkIds = new Set();
+  selectedId = null; selectedLinkId = null; selectedCanvasInfo = null; selectedNodeIds = new Set(); selectedLinkIds = new Set();
+  cactiPickerOpenLinkId = null;
   setConnHandlesMode(false); clearConnectionHandles();
   exitArrangeView();
   nodes.forEach(n => document.getElementById(n.id)?.classList.remove('selected', 'link-endpoint'));
+  document.querySelectorAll('.canvas-badge.selected').forEach(el => el.classList.remove('selected'));
   document.body.classList.remove('has-link-selected');
   savedStateForCancel = null; // commit any pending link edits
   renderLinks(); updatePropsPanel(); hidePosBadge();
@@ -217,6 +228,71 @@ function hidePresentationInfo() {
   if (content) content.innerHTML = '<p class="presentation-info-empty">Selecciona un nodo o enlace para consultar su información.</p>';
   focusPresentationElement(null);
 }
+function closePresentationInfoPanel() {
+  hidePresentationInfo();
+  document.body.classList.add('hide-presentation-info');
+  syncPresentationInfoPanelButton();
+  requestAnimationFrame(() => { renderLinks(); chartInstances.forEach(chart => chart.resize()); });
+}
+
+function syncPresentationInfoPanelButton() {
+  const enabled = !document.body.classList.contains('hide-presentation-info');
+  const button = document.getElementById('btn-presentation-info');
+  button?.classList.toggle('active', enabled);
+  button?.setAttribute('aria-pressed', String(enabled));
+  if (button) button.title = enabled ? 'Ocultar panel de información' : 'Mostrar panel de información';
+}
+function togglePresentationInfoPanel() {
+  document.body.classList.toggle('hide-presentation-info');
+  syncPresentationInfoPanelButton();
+  requestAnimationFrame(() => { renderLinks(); chartInstances.forEach(chart => chart.resize()); });
+}
+function hidePresentationTopbar() {
+  if (!presentationMode) return;
+  document.body.classList.add('presentation-topbar-hidden');
+  requestAnimationFrame(() => { renderLinks(); chartInstances.forEach(chart => chart.resize()); });
+}
+let presentationTopbarTabDraggedAt = 0;
+function showPresentationTopbar() {
+  if (Date.now() - presentationTopbarTabDraggedAt < 250) return;
+  document.body.classList.remove('presentation-topbar-hidden');
+  requestAnimationFrame(() => { renderLinks(); chartInstances.forEach(chart => chart.resize()); });
+}
+function initPresentationTopbarRestoreDrag() {
+  const tab = document.getElementById('presentation-topbar-restore');
+  if (!tab) return;
+  const saved = Number(lsGet('mapgen_presentation_restore_x'));
+  if (Number.isFinite(saved) && saved > 0) {
+    tab.style.left = Math.max(27, Math.min(window.innerWidth - 27, saved)) + 'px';
+    tab.style.transform = 'translateX(-50%)';
+  }
+  tab.addEventListener('pointerdown', event => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startLeft = tab.getBoundingClientRect().left + tab.offsetWidth / 2;
+    let moved = false;
+    tab.setPointerCapture(event.pointerId); tab.classList.add('dragging');
+    const move = current => {
+      const delta = current.clientX - startX;
+      if (Math.abs(delta) > 3) moved = true;
+      const left = Math.max(tab.offsetWidth / 2, Math.min(window.innerWidth - tab.offsetWidth / 2, startLeft + delta));
+      tab.style.left = left + 'px';
+    };
+    const up = current => {
+      move(current); tab.classList.remove('dragging');
+      tab.removeEventListener('pointermove', move); tab.removeEventListener('pointerup', up); tab.removeEventListener('pointercancel', up);
+      if (moved) presentationTopbarTabDraggedAt = Date.now();
+      if (moved) lsSet('mapgen_presentation_restore_x', String(Math.round(parseFloat(tab.style.left))));
+    };
+    tab.addEventListener('pointermove', move); tab.addEventListener('pointerup', up); tab.addEventListener('pointercancel', up);
+  });
+  window.addEventListener('resize', () => {
+    const left = parseFloat(tab.style.left); if (!Number.isFinite(left)) return;
+    tab.style.left = Math.max(tab.offsetWidth / 2, Math.min(window.innerWidth - tab.offsetWidth / 2, left)) + 'px';
+  });
+}
+initPresentationTopbarRestoreDrag();
 
 function togglePresentationMode(force) {
   const next = typeof force === 'boolean' ? force : !presentationMode;
@@ -227,17 +303,23 @@ function togglePresentationMode(force) {
     if (editingTextNodeId) finishInlineTextEdit(true);
     cancelPlacing(); cancelLink(); clearSelection(); setTool('select');
     document.getElementById('props').classList.remove('show-scale', 'show-config');
-    document.getElementById('tool-scale').classList.remove('active');
+    document.getElementById('tool-scale')?.classList.remove('active');
     document.getElementById('tool-config').classList.remove('active');
   }
 
   presentationMode = next;
   document.body.classList.toggle('presentation-mode', next);
+  if (!next) document.body.classList.remove('presentation-topbar-hidden');
+  document.body.classList.remove('hide-presentation-info');
+  closePresentationExportMenu();
+  syncPresentationInfoPanelButton();
   if (!next) document.body.classList.remove('presentation-date-empty');
   const dateInput = document.getElementById('presentation-date');
   if (dateInput) dateInput.value = selectedMapDate;
   const button = document.getElementById('btn-presentation');
-  button.textContent = next ? '✎ Volver al editor' : '▶ Presentación';
+  button.innerHTML = next
+    ? '<span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17.2z"/><path d="M13.5 6.5 17 10"/></svg></span><span class="btn-label">Volver al editor</span>'
+    : '<span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z"/></svg></span><span class="btn-label">Presentación</span>';
   button.setAttribute('aria-pressed', String(next));
   document.getElementById('mode-label').textContent = next ? 'Modo: Presentación' : 'Modo: Seleccionar';
   updatePresentationViewControls();
@@ -270,10 +352,32 @@ function setPresentationRefresh(rawMinutes) {
 function updatePresentationViewControls() {
   const date = document.getElementById('presentation-date');
   const refresh = document.getElementById('presentation-refresh');
+  const dateControl = document.getElementById('presentation-date-control');
+  const refreshControl = document.getElementById('presentation-refresh-control');
   syncSegToggle('presentation-view-mode', presentationViewMode);
   if (date) date.disabled = presentationViewMode === 'live';
   if (refresh) refresh.disabled = presentationViewMode === 'day';
+  if (dateControl) dateControl.hidden = presentationViewMode !== 'day';
+  if (refreshControl) refreshControl.hidden = presentationViewMode !== 'live';
 }
+
+function togglePresentationExportMenu() {
+  const menu = document.getElementById('presentation-export-menu');
+  const button = document.getElementById('btn-presentation-export');
+  const opening = !menu?.classList.contains('open');
+  menu?.classList.toggle('open', opening);
+  button?.setAttribute('aria-expanded', String(opening));
+}
+function closePresentationExportMenu() {
+  document.getElementById('presentation-export-menu')?.classList.remove('open');
+  document.getElementById('btn-presentation-export')?.setAttribute('aria-expanded', 'false');
+}
+function exportPresentationImage() { closePresentationExportMenu(); exportMapImage(); }
+function exportPresentationPdf() { closePresentationExportMenu(); exportMapPdf(); }
+document.addEventListener('click', event => {
+  const dropdown = document.getElementById('presentation-export-dropdown');
+  if (dropdown && !dropdown.contains(event.target)) closePresentationExportMenu();
+});
 
 async function setPresentationViewMode(mode) {
   if (!['live','day'].includes(mode) || mode === presentationViewMode) {
@@ -335,60 +439,51 @@ const cactiDemoCatalog = {
   ])
 };
 const cactiCatalog = { devices:null, graphs:new Map(), sources:new Map(), demo:false };
+let cactiPickerOpenLinkId = null;
 
-function setCactiModalState(message, type = '') {
-  const state = document.getElementById('cacti-modal-state');
+function setCactiPanelState(message, type = '') {
+  const state = document.getElementById('cacti-binding-state');
   if (state) state.innerHTML = message ? `<span class="cacti-state ${type}">${message}</span>` : '';
 }
 
 function cactiBindingHtml(link) {
   const binding = link.dataSource?.provider === 'cacti' ? link.dataSource : null;
+  const pickerOpen = cactiPickerOpenLinkId === link.id;
   const status = link.telemetryError
     ? `<span class="cacti-state error">⚠ ${escapeHtml(link.telemetryError)}</span>`
     : binding
       ? `<span class="cacti-state connected">● Vinculado${link.telemetryTimestamp ? ` · ${new Date(link.telemetryTimestamp * 1000).toLocaleString()}` : ''}</span>`
       : '<span class="cacti-state">Sin fuente vinculada</span>';
+  if (pickerOpen) setTimeout(() => loadCactiDevices(link.id), 0);
   return `<div class="prop-row cacti-binding" id="cacti-binding-${link.id}">
     <div class="prop-label">Fuente de datos · Cacti</div>
     ${status}
     ${binding ? `<div class="cacti-binding-summary"><strong>${escapeHtml(binding.deviceName || `Host ${binding.hostId}`)}</strong>${binding.graphName ? `<span>Gráfica: ${escapeHtml(binding.graphName)}</span>` : ''}<span>${escapeHtml(binding.sourceName || `Fuente ${binding.localDataId}`)}</span><small>IN: ${escapeHtml(binding.inDs || '—')} · OUT: ${escapeHtml(binding.outDs || '—')}</small></div>` : ''}
     <div class="cacti-binding-actions">
-      <button class="tb-btn primary" type="button" data-click="openCactiBindingModal" data-args='["${link.id}"]'>${binding ? 'Cambiar fuente' : 'Vincular fuente'}</button>
+      <button class="tb-btn ${pickerOpen ? '' : 'primary'}" type="button" data-click="toggleCactiPicker" data-args='["${link.id}"]'>${pickerOpen ? 'Cerrar selector' : binding ? 'Cambiar fuente' : 'Vincular fuente'}</button>
       ${binding ? `<button class="tb-btn" type="button" data-click="testCactiBinding" data-args='["${link.id}"]'>Probar</button><button class="tb-btn" type="button" data-click="clearCactiBinding" data-args='["${link.id}"]'>Quitar</button>` : ''}
     </div>
+    ${pickerOpen ? `<div id="cacti-binding-state"></div>
+    <div id="cacti-picker-${link.id}" class="cacti-picker"></div>
+    <div class="cacti-binding-actions" style="margin-top:8px">
+      <button class="tb-btn primary" type="button" data-click="saveCactiBindingFromPanel" data-args='["${link.id}"]'>Guardar vínculo</button>
+      <button class="tb-btn" type="button" data-click="resetCactiDemoCatalog">Usar demo</button>
+    </div>` : ''}
   </div>`;
 }
 
-function openCactiBindingModal(linkId) {
-  const link = getLink(linkId);
-  if (!link) return;
-  const modal = document.getElementById('cacti-binding-modal');
-  const picker = document.getElementById('cacti-modal-picker');
-  if (!modal || !picker) {
-    loadCactiDevices(linkId);
-    return;
-  }
-  modal.dataset.linkId = linkId;
-  picker.innerHTML = '';
-  setCactiModalState('Preparando catálogo de Cacti…');
-  modal.classList.add('open');
-  loadCactiDevices(linkId, true);
+function toggleCactiPicker(linkId) {
+  cactiPickerOpenLinkId = cactiPickerOpenLinkId === linkId ? null : linkId;
+  updatePropsPanel();
 }
 
-function closeCactiBindingModal() {
-  document.getElementById('cacti-binding-modal')?.classList.remove('open');
-}
-
-function saveCactiBindingFromModal() {
-  const modal = document.getElementById('cacti-binding-modal');
-  const linkId = modal?.dataset.linkId;
-  if (!linkId) return;
+function saveCactiBindingFromPanel(linkId) {
   const hostId = Number(document.getElementById(`cacti-device-${linkId}`)?.value);
   const sourceSelect = document.getElementById(`cacti-source-${linkId}`);
   const localDataId = Number(sourceSelect?.value);
   const graphId = Number(sourceSelect?.selectedOptions?.[0]?.dataset?.graphId);
   if (!hostId || !localDataId) {
-    setCactiModalState('Selecciona equipo y fuente antes de guardar.', 'error');
+    setCactiPanelState('Selecciona equipo y fuente antes de guardar.', 'error');
     return;
   }
   applyCactiBinding(linkId, hostId, localDataId, graphId || null);
@@ -399,10 +494,9 @@ function resetCactiDemoCatalog() {
   cactiCatalog.graphs = new Map();
   cactiCatalog.sources = new Map();
   cactiCatalog.demo = true;
-  const linkId = document.getElementById('cacti-binding-modal')?.dataset.linkId;
-  if (linkId) {
-    setCactiModalState('Modo demo activo: usando catálogo de ejemplo.', 'connected');
-    loadCactiDevices(linkId);
+  if (cactiPickerOpenLinkId) {
+    setCactiPanelState('Modo demo activo: usando catálogo de ejemplo.', 'connected');
+    loadCactiDevices(cactiPickerOpenLinkId);
   }
 }
 
@@ -500,9 +594,7 @@ async function previewCactiBinding(linkId, hostId, localDataId) {
 }
 
 async function loadCactiDevices(linkId) {
-  const useModal = document.getElementById('cacti-binding-modal')?.classList.contains('open')
-    && document.getElementById('cacti-binding-modal')?.dataset.linkId === linkId;
-  const picker = useModal ? document.getElementById('cacti-modal-picker') : document.getElementById(`cacti-picker-${linkId}`);
+  const picker = document.getElementById(`cacti-picker-${linkId}`);
   if (!picker) return;
   picker.innerHTML = cactiDisabledCatalogHtml(linkId);
   try {
@@ -513,15 +605,15 @@ async function loadCactiDevices(linkId) {
         if (!response.ok) throw new Error(result.error || 'Cacti no disponible');
         cactiCatalog.devices = result.devices;
         cactiCatalog.demo = false;
-        setCactiModalState('');
+        setCactiPanelState('');
       } catch (error) {
         cactiCatalog.devices = cactiDemoCatalog.devices;
         cactiCatalog.demo = true;
-        setCactiModalState('Modo demo: Cacti todavía no está conectado, usando catálogo de ejemplo.', 'connected');
+        setCactiPanelState('Modo demo: Cacti todavía no está conectado, usando catálogo de ejemplo.', 'connected');
       }
     }
     if (cactiCatalog.demo) {
-      setCactiModalState('Modo demo: Cacti todavía no está conectado, usando catálogo de ejemplo.', 'connected');
+      setCactiPanelState('Modo demo: Cacti todavía no está conectado, usando catálogo de ejemplo.', 'connected');
     }
     const link = getLink(linkId);
     picker.innerHTML = `<div class="cacti-modal-grid">
@@ -557,7 +649,7 @@ async function loadCactiGraphs(linkId, rawHostId) {
     })));
     cactiCatalog.sources.set(hostId, sources);
     wrap.innerHTML = `<div id="cacti-source-wrap-${linkId}"><div class="cacti-modal-grid">
-      <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" ${sources.length ? '' : 'disabled'} data-change="renderCactiDsPicker" data-args='["${linkId}",${hostId},"$value",this.selectedOptions[0]?.dataset?.graphId]'>
+      <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" ${sources.length ? '' : 'disabled'} data-change="renderCactiDsPicker" data-args='["${linkId}",${hostId},"$value"]'>
           <option value="">${sources.length ? 'Selecciona una fuente…' : 'No hay fuentes disponibles'}</option>${sources.map(source => `<option value="${source.localDataId}" data-graph-id="${source.graphId || ''}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
         </select></label>
       </div><div id="cacti-ds-wrap-${linkId}">
@@ -651,8 +743,8 @@ async function applyCactiBinding(linkId, hostId, localDataId, graphId = null) {
   if (Number(source.capacityBps) > 0) {
     link.capacity = bpsToLinkUnit(Number(source.capacityBps), link.capacityUnit || 'Mbps');
   }
-  link.telemetryError = null; pushHistory(); updatePropsPanel();
-  closeCactiBindingModal();
+  link.telemetryError = null; cactiPickerOpenLinkId = null;
+  pushHistory(); updatePropsPanel();
   if (cactiCatalog.demo) {
     link.inUsage = 420 + Math.round(Math.random() * 180);
     link.outUsage = 260 + Math.round(Math.random() * 160);

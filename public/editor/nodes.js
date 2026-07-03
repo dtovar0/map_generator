@@ -45,30 +45,9 @@ function toggleMultiPlacement() {
   setStatus(multiPlacementEnabled ? 'Colocación múltiple habilitada' : 'Colocación única habilitada');
 }
 
-function openChartWizard(nodeId = null) {
-  chartWizardEditingId = nodeId || null;
-  const n = nodeId ? getNode(nodeId) : null;
-  const cfg = n?.graphConfig || {type:'bar',color:'#0dbfa6',values:[25,50,35,80,60],title:'Gráfica'};
-  document.getElementById('chart-title').value = cfg.title || n?.name || 'Gráfica';
-  syncSegToggle('chart-type', cfg.type || 'bar');
-  document.getElementById('chart-color').value = cfg.color || '#0dbfa6';
-  document.getElementById('chart-values').value = (cfg.values || []).join(', ');
-  document.getElementById('chart-width').value = n?.w || 240;
-  document.getElementById('chart-height').value = n?.h || 160;
-  document.getElementById('chart-wizard-title').textContent = n ? 'Editar gráfica' : 'Crear gráfica';
-  document.getElementById('chart-wizard-save').textContent = n ? 'Guardar cambios' : 'Crear y colocar';
-  document.getElementById('chart-wizard').classList.add('open');
-  setTimeout(() => document.getElementById('chart-title').focus(), 0);
-}
-
-function closeChartWizard() {
-  document.getElementById('chart-wizard').classList.remove('open');
-  chartWizardEditingId = null;
-}
-
 function startChartPlacementMode() {
   if (placingItem?.type === 'chart') { cancelPlacing(); return; }
-  const defaultConfig = {type:'bar', color:'#0dbfa6', values:[25,50,35,80,60], title:'Gráfica'};
+  const defaultConfig = {type:'bar', color:'#7c5cff', values:[25,50,35,80,60], title:'Gráfica'};
   beginChartPlacement('Gráfica', defaultConfig, 240, 160);
 }
 
@@ -87,32 +66,22 @@ function beginChartPlacement(title, graphConfig, width, height) {
   setStatus('Clic en el canvas para colocar la gráfica · Esc para cancelar');
 }
 
-function saveChartWizard() {
-  const title = document.getElementById('chart-title').value.trim() || 'Gráfica';
-  const values = document.getElementById('chart-values').value.split(',')
-    .map(v => Number(v.trim())).filter(Number.isFinite);
-  if (!values.length) {
-    setStatus('⚠ Agrega al menos un valor numérico');
-    document.getElementById('chart-values').focus(); return;
-  }
-  const graphConfig = {
-    title, values, type:segToggleValue('chart-type') || 'bar',
-    color:document.getElementById('chart-color').value
-  };
-  const width = Math.max(120, Math.min(1000, Number(document.getElementById('chart-width').value) || 240));
-  const height = Math.max(100, Math.min(800, Number(document.getElementById('chart-height').value) || 160));
-  if (chartWizardEditingId) {
-    const n = getNode(chartWizardEditingId); if (!n) return closeChartWizard();
-    const before = getSnapshot();
-    n.graphConfig = graphConfig; n.name = title; n.w = width; n.h = height; n.sizeOverride = true;
-    distributePortLinks(n.id); renderNode(n); renderLinks(); updatePropsPanel();
-    const touching = linkIdsTouching(n.id);
-    if (!revertIfLinksOverlap(before, touching)) { pushHistory(); setStatus('Gráfica actualizada'); }
-    closeChartWizard();
+function updateChartConfig(id, key, rawValue) {
+  const n = getNode(id); if (!n || n.type !== 'chart') return;
+  const cfg = {type:'bar', color:'#7c5cff', values:[25,50,35,80,60], title:n.name || 'Gráfica', ...(n.graphConfig || {})};
+  if (key === 'values') {
+    const values = String(rawValue).split(',').map(v => Number(v.trim())).filter(Number.isFinite);
+    if (!values.length) {
+      setStatus('⚠ Agrega al menos un valor numérico');
+      updatePropsPanel(); return;
+    }
+    cfg.values = values;
   } else {
-    closeChartWizard();
-    beginChartPlacement(title, graphConfig, width, height);
+    cfg[key] = rawValue;
   }
+  n.graphConfig = cfg;
+  renderNode(n); pushHistory(); updatePropsPanel();
+  setStatus('Gráfica actualizada');
 }
 
 // ════════════════════════════════════════════════════
@@ -195,7 +164,7 @@ function renderChartVisual(container, node) {
   }
   const canvas = document.createElement('canvas');
   canvas.className = 'chart-canvas'; container.appendChild(canvas);
-  const color = cfg.color || '#0dbfa6';
+  const color = cfg.color || '#7c5cff';
   const labels = data.map((_,i) => `Dato ${i+1}`);
   const type = cfg.type === 'donut' ? 'doughnut' : (cfg.type || 'bar');
   const donutColors = data.map((_,i) => `${color}${Math.max(55, 255-i*28).toString(16).padStart(2,'0')}`);
@@ -304,6 +273,13 @@ function renderNode(n) {
       if (nodeDraggedFlag) return; // was a select+drag, not a real double-click
       e.stopPropagation();
       if (n.type === 'text') { startInlineTextEdit(n.id); return; }
+      if (isSupportNode(n)) {
+        // Support elements take no links → no endpoint grid on double-click.
+        setTool('select');
+        selectNode(n.id);
+        if (n.type === 'chart') setStatus('Edita la gráfica desde el panel derecho');
+        return;
+      }
       // Double-click a node → edit its existing endpoints on the 10-position grid.
       setTool('select');
       selectNode(n.id);
@@ -320,13 +296,20 @@ function renderNode(n) {
   el.classList.toggle('name-inside', !!n.nameInside);
   el.classList.toggle('hide-name', !!n.hideName);
   el.classList.toggle('text-only', n.type === 'text');
+  el.classList.toggle('no-ports', isSupportNode(n));
   const box = document.getElementById('box-' + n.id);
   if (box) {
     box.style.width = n.w + 'px'; box.style.height = n.h + 'px';
-    box.style.backgroundColor = n.nodeBackgroundTransparent ? 'transparent' : (n.nodeBackground || '');
-    box.style.borderColor = n.nodeBorderColor || '';
-    box.style.borderWidth = n.nodeBorderWidth == null ? '' : `${n.nodeBorderWidth}px`;
-    box.style.borderStyle = n.nodeBorderHidden ? 'none' : 'solid';
+    if (n.type === 'text') {
+      // A text element IS its text container: the outer node box never paints.
+      box.style.backgroundColor = 'transparent';
+      box.style.borderStyle = 'none';
+    } else {
+      box.style.backgroundColor = n.nodeBackgroundTransparent ? 'transparent' : (n.nodeBackground || '');
+      box.style.borderColor = n.nodeBorderColor || '';
+      box.style.borderWidth = n.nodeBorderWidth == null ? '' : `${n.nodeBorderWidth}px`;
+      box.style.borderStyle = n.nodeBorderHidden ? 'none' : 'solid';
+    }
     const em = box.querySelector('.node-emoji');
     if (em) {
       const visualHeight = n.nameInside && !n.hideName ? Math.max(16, n.h - 22) : n.h;
@@ -509,7 +492,7 @@ document.getElementById('canvas-wrap').addEventListener('click', e => {
     selectNode(id);
     cancelPlacing();
     if (isChart) {
-      openChartWizard(id);
+      setStatus(`Gráfica colocada en (${snap(pos.x)}, ${snap(pos.y)}) · configúrala en el panel derecho`);
     } else {
       if (multiPlacementEnabled) activatePlacing(savedPlacingEl);
       setStatus(`${placedLabel} colocado en (${snap(pos.x)}, ${snap(pos.y)})${multiPlacementEnabled ? ' · coloca otro o presiona Esc' : ''}`);
@@ -519,7 +502,11 @@ document.getElementById('canvas-wrap').addEventListener('click', e => {
   if (!onNode) {
     if (linkStart) {
       const pos = getCanvasPos(e);
-      commitLinkWaypoint({ x:snap(pos.x), y:snap(pos.y) });
+      if (generalConfig.routeStyle === 'free') {
+        commitLinkWaypoint({ x: pos.x, y: pos.y });
+      } else {
+        commitLinkWaypoint({ x:snap(pos.x), y:snap(pos.y) });
+      }
       return;
     }
     clearSelection();
@@ -532,7 +519,7 @@ function renderPendingLinkWaypoints() {
   linkWaypoints.forEach(wp => {
     const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
     dot.setAttribute('cx', wp.x); dot.setAttribute('cy', wp.y); dot.setAttribute('r', '5');
-    dot.setAttribute('fill', '#0DBFA6'); dot.setAttribute('stroke', '#070C13');
+    dot.setAttribute('fill', '#7C5CFF'); dot.setAttribute('stroke', '#0A0912');
     dot.setAttribute('stroke-width', '2'); dot.setAttribute('pointer-events', 'none');
     dot.classList.add('link-wp-dot');
     svg.appendChild(dot);
@@ -542,12 +529,32 @@ function renderPendingLinkWaypoints() {
 function commitLinkWaypoint(point) {
   if (!linkStart) return;
   const from = getNode(linkStart.nodeId); if (!from) return;
-  const start = getLinkPortPos(from, linkStart.port || 'center', linkStart.fromOffset || 0);
-  // Store the real orthogonal vertices already shown to the user. Future mouse
-  // movement may extend the route, but can no longer reinterpret prior bends.
-  const committed = buildVertices([start, ...linkWaypoints, point], linkStart.port || 'center');
-  linkWaypoints = committed.slice(1).filter((current, index, list) =>
-    index === 0 || current.x !== list[index - 1].x || current.y !== list[index - 1].y);
+  if (generalConfig.routeStyle === 'free') {
+    // Free (diagonal) mode: the click IS the bend — never bake 90° corners.
+    // Angle-snap relative to the previous control point (5° steps) so the
+    // segment lands on a clean angle, exactly like dragging an existing wp.
+    const prev = linkWaypoints.length > 0
+      ? linkWaypoints[linkWaypoints.length - 1]
+      : getLinkPortPos(from, linkStart.port || 'center', linkStart.fromOffset || 0);
+    const dx = point.x - prev.x, dy = point.y - prev.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 2) {
+      linkWaypoints.push({ x: prev.x, y: prev.y });
+    } else {
+      const angle = Math.round(Math.atan2(dy, dx) / FREE_ROUTE_ANGLE_STEP) * FREE_ROUTE_ANGLE_STEP;
+      linkWaypoints.push({
+        x: Math.round((prev.x + Math.cos(angle) * dist) * 100) / 100,
+        y: Math.round((prev.y + Math.sin(angle) * dist) * 100) / 100
+      });
+    }
+  } else {
+    const start = getLinkPortPos(from, linkStart.port || 'center', linkStart.fromOffset || 0);
+    // Store the real orthogonal vertices already shown to the user. Future mouse
+    // movement may extend the route, but can no longer reinterpret prior bends.
+    const committed = buildVertices([start, ...linkWaypoints, point], linkStart.port || 'center');
+    linkWaypoints = committed.slice(1).filter((current, index, list) =>
+      index === 0 || current.x !== list[index - 1].x || current.y !== list[index - 1].y);
+  }
   renderPendingLinkWaypoints();
   setStatus(`Tramo fijado en (${point.x}, ${point.y}) — ${linkWaypoints.length} punto(s) · clic en destino para conectar`);
 }
@@ -705,7 +712,10 @@ document.addEventListener('mousemove', e => {
 
   if (draggingWaypoint) {
     const l = getLink(draggingWaypoint.linkId); if (l) {
-      l.waypoints[draggingWaypoint.wpIndex] = { x: snap(pos.x), y: snap(pos.y) };
+      // Free routes snap the segment angle (5° steps); orthogonal routes snap to grid.
+      l.waypoints[draggingWaypoint.wpIndex] = l.routeStyle === 'free'
+        ? snapWaypointAngle(l, draggingWaypoint.wpIndex, pos)
+        : { x: snap(pos.x), y: snap(pos.y) };
       renderLinks();
     }
     return;
@@ -744,7 +754,9 @@ document.addEventListener('mousemove', e => {
     if (from) {
       const sp = getLinkPortPos(from, linkStart.port || 'center', linkStart.fromOffset || 0);
       const allPts = [sp, ...linkWaypoints, { x: pos.x, y: pos.y }];
-      linkPreviewEl.setAttribute('d', buildFullPath(allPts, linkStart.port || 'center'));
+      linkPreviewEl.setAttribute('d', generalConfig.routeStyle === 'free'
+        ? verticesToPath(allPts)
+        : buildFullPath(allPts, linkStart.port || 'center'));
     }
   }
 });

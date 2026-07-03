@@ -1,28 +1,30 @@
   /* ── TOPBAR ── */
   #topbar {
-    height: 56px;
+    height: 60px;
     background: color-mix(in srgb, var(--surface) 90%, transparent);
     border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
     box-shadow: 0 10px 30px rgba(0,0,0,.14), inset 0 1px rgba(255,255,255,.025);
     backdrop-filter: blur(18px) saturate(135%);
-    display: flex; align-items: center; padding: 0 16px; gap: 7px;
+    display: flex; align-items: center; padding: 0 18px; gap: 8px;
     z-index: 100; position: relative; flex-shrink: 0;
   }
   .logo {
-    font-family: 'Consolas', 'Cascadia Code', 'SF Mono', monospace;
+    font-family: var(--font-mono);
     font-weight: 700; font-size: 15px; letter-spacing: 2px; text-transform: uppercase;
-    color: var(--accent); margin-right: 5px; user-select: none;
-    text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 38%, transparent);
+    margin-right: 5px; user-select: none;
+    background: var(--accent-grad); -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: var(--accent);
+    filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 42%, transparent));
   }
-  .logo span { color: var(--text2); font-weight: 400; }
+  .logo span { -webkit-text-fill-color: var(--text2); color: var(--text2); font-weight: 400; filter: none; }
 
   .tb-btn {
-    height: 36px; min-height: 36px; padding: 0 13px; border-radius: var(--radius-sm);
+    height: 38px; min-height: 38px; padding: 0 14px; border-radius: var(--radius-sm);
     border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
     background: linear-gradient(180deg, color-mix(in srgb, var(--surface3) 72%, transparent), var(--surface2));
     color: var(--text2); cursor: pointer;
-    font-size: 12px; line-height: 1; font-weight: 650; font-family: inherit; letter-spacing: .01em;
-    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    font-size: 12.5px; line-height: 1; font-weight: 600; font-family: inherit; letter-spacing: .01em;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
     box-shadow: inset 0 1px rgba(255,255,255,.035), 0 1px 2px rgba(0,0,0,.14);
     transition: transform .16s ease, background .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease;
     white-space: nowrap;
@@ -32,11 +34,12 @@
   .tb-btn:focus-visible, .ct-btn:focus-visible, .modal-close:focus-visible, .toast-close:focus-visible { outline: none; box-shadow: var(--ring); }
   .tb-btn:disabled { opacity: 0.38; cursor: not-allowed; transform: none; box-shadow: none; }
   .tb-btn.primary {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent));
-    border-color: color-mix(in srgb, var(--accent) 75%, white); color: #031410;
-    box-shadow: 0 7px 20px color-mix(in srgb, var(--accent) 22%, transparent), inset 0 1px rgba(255,255,255,.35);
+    background: var(--accent-grad);
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--on-accent);
+    text-shadow: 0 1px 1px rgba(0,0,0,.25);
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 40%, transparent), 0 2px 8px color-mix(in srgb, var(--accent2) 24%, transparent), inset 0 1px rgba(255,255,255,.28);
   }
-  .tb-btn.primary:hover { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 78%, white), var(--accent)); color: #031410; }
+  .tb-btn.primary:hover { transform: translateY(-1px); filter: brightness(1.08) saturate(1.05); color: var(--on-accent); box-shadow: 0 12px 30px color-mix(in srgb, var(--accent) 48%, transparent), 0 3px 10px color-mix(in srgb, var(--accent2) 30%, transparent), inset 0 1px rgba(255,255,255,.32); }
   .tb-btn.active { background: color-mix(in srgb, var(--accent) 14%, var(--surface2)); border-color: color-mix(in srgb, var(--accent) 68%, var(--border)); color: var(--accent); }
   .tb-btn.toolbar-icon { width: 38px; min-width: 38px; padding: 0; }
   .tb-btn.compact-icon { width: 28px; min-width: 28px; height: 28px; min-height: 28px; padding: 0; border-radius: 7px; }
@@ -44,22 +47,24 @@
     width: 18px; height: 18px; display: inline-grid; place-items: center;
     line-height: 1; font-size: 14px; flex: 0 0 18px; transform: translateY(-.25px);
   }
-  .btn-icon svg, .ct-btn svg { width: 17px; height: 17px; display: block; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .ct-btn svg { width: 16px; height: 16px; }
+  .btn-icon svg, .ct-btn svg { width: 18px; height: 18px; display: block; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .ct-btn svg { width: 17px; height: 17px; }
   .btn-label { display: inline-flex; align-items: center; height: 100%; line-height: 1; }
 
   .spacer { flex: 1; }
-  .sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
-  #mode-label { font-size: 11px; color: var(--text3); letter-spacing: 0.3px; }
-  #node-count { font-size: 11px; color: var(--text3); font-family: 'Consolas','SF Mono',monospace; letter-spacing: 0.2px; }
+  .sep { width: 1px; height: 24px; background: color-mix(in srgb, var(--border) 90%, transparent); flex-shrink: 0; margin: 0 2px; }
+  #mode-label { font-size: 11.5px; color: var(--text3); letter-spacing: 0.3px; }
+  #node-count { font-size: 11.5px; color: var(--text3); font-family: var(--font-mono); letter-spacing: 0.2px; }
   .presentation-toggle { border-color: var(--accent-lo); color: var(--accent); }
   #presentation-view-control, #presentation-date-control, #presentation-refresh-control, .presentation-export,
-  #btn-save-map, #btn-open-map { display: none; }
+  #btn-save-map, #btn-open-map, #btn-presentation-info, #btn-hide-presentation-topbar { display: none; }
   body.presentation-mode #presentation-view-control,
   body.presentation-mode #presentation-date-control,
   body.presentation-mode #presentation-refresh-control { display: flex; align-items: center; gap: 6px; color: var(--text2); font-size: 11px; }
+  body.presentation-mode #presentation-date-control[hidden],
+  body.presentation-mode #presentation-refresh-control[hidden] { display: none !important; }
   body.presentation-mode .presentation-export { display: inline-flex; }
-  body.presentation-mode #btn-save-map, body.presentation-mode #btn-open-map { display: inline-flex; }
+  body.presentation-mode #btn-presentation-info, body.presentation-mode #btn-hide-presentation-topbar { display: inline-flex; }
   #presentation-date, #presentation-refresh {
     height: 30px; padding: 3px 7px; border: 1px solid var(--border); border-radius: 5px;
     background: var(--surface2); color: var(--text); color-scheme: dark; font: inherit; font-size: 12px;

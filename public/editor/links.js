@@ -71,6 +71,10 @@ function startLink(nodeId, requestedPort, pointer = null) {
   linkWaypoints = [];
   document.querySelectorAll('.link-wp-dot').forEach(d => d.remove());
   const n = getNode(nodeId);
+  if (isSupportNode(n)) {
+    showToast('Los elementos de apoyo (texto, iconos y gráficas) no admiten enlaces.', 'error');
+    return;
+  }
   const port = resolvePointerPort(n, requestedPort, pointer);
   const slot = closestFreePortSlot(nodeId, port, pointer);
   if (slot === null) {
@@ -92,6 +96,10 @@ function startLink(nodeId, requestedPort, pointer = null) {
 function onNodeClickForLink(toId, requestedPort, pointer = null) {
   if (!linkStart || linkStart.nodeId === toId) return;
   const target = getNode(toId);
+  if (isSupportNode(target)) {
+    showToast('Los elementos de apoyo (texto, iconos y gráficas) no admiten enlaces.', 'error');
+    return;
+  }
   const toPort = resolvePointerPort(target, requestedPort, pointer);
   const toSlot = closestFreePortSlot(toId, toPort, pointer);
   if (toSlot === null) {
@@ -127,6 +135,7 @@ function onNodeClickForLink(toId, requestedPort, pointer = null) {
     dividerPositionOverride:false, styleOverride:false,
     scaleOverride:false, scale:null,
     routeLane: 0,
+    routeStyle: generalConfig.routeStyle === 'free' ? 'free' : 'ortho',
     waypoints: [...linkWaypoints]
   });
   const newLink = links[links.length - 1];
@@ -398,6 +407,11 @@ function getLinkVertices(link) {
   if (!from || !to) return [];
   const fp = getLinkPortPos(from, link.fromPort || 'center', link.fromOffset || 0);
   const tp = getLinkPortPos(to, link.toPort || 'center', link.toOffset || 0);
+  // Free route: straight segments through the control points, at any angle.
+  // No auto-corners, approach stubs or lanes — the waypoints ARE the shape.
+  if (link.routeStyle === 'free') {
+    return uniqueVertices([fp, ...(link.waypoints || []), tp]);
+  }
   const fromPort = link.fromPort || 'center';
   const toPort = link.toPort || 'center';
   if (!(link.waypoints || []).length) {
@@ -407,6 +421,25 @@ function getLinkVertices(link) {
   const endApproach = endpointApproachPoint(tp, toPort);
   const controls = uniqueVertices([fp, startApproach, ...(link.waypoints || []), endApproach, tp]);
   return straightenTerminalHooks(uniqueVertices(buildVertices(controls, fromPort)));
+}
+
+// Free-route waypoints snap by angle — 5° steps measured from the previous
+// control point — instead of by grid, so diagonal segments land on clean angles.
+const FREE_ROUTE_ANGLE_STEP = 5 * Math.PI / 180;
+function snapWaypointAngle(link, wpIndex, pos) {
+  const from = getNode(link.from);
+  const prev = wpIndex > 0
+    ? link.waypoints[wpIndex - 1]
+    : from ? getLinkPortPos(from, link.fromPort || 'center', link.fromOffset || 0) : null;
+  if (!prev) return { x: Math.round(pos.x), y: Math.round(pos.y) };
+  const dx = pos.x - prev.x, dy = pos.y - prev.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 2) return { x: prev.x, y: prev.y };
+  const angle = Math.round(Math.atan2(dy, dx) / FREE_ROUTE_ANGLE_STEP) * FREE_ROUTE_ANGLE_STEP;
+  return {
+    x: Math.round((prev.x + Math.cos(angle) * dist) * 100) / 100,
+    y: Math.round((prev.y + Math.sin(angle) * dist) * 100) / 100
+  };
 }
 
 function findLinkOverlap(onlyLinkId = null) {
@@ -427,7 +460,7 @@ function findLinkOverlap(onlyLinkId = null) {
 }
 
 function tryAlternateLane(link) {
-  if ((link.waypoints || []).length) return false;
+  if (link.routeStyle === 'free' || (link.waypoints || []).length) return false;
   const original = link.routeLane || 0;
   for (let distance = 1; distance <= 500; distance++) {
     for (const lane of [distance, -distance]) {
@@ -475,8 +508,10 @@ function buildFullPath(allPts, fromPort) {
 }
 
 // Split by traveled distance, not by vertex count. Ratio is measured from source to target.
+// Callers pass FINAL rendered vertices (getLinkVertices) — never re-expand them
+// with buildVertices here: it would re-insert 90° corners into free routes.
 function splitPathAtMidpoint(allPts, fromPort, percentage = 50) {
-  const verts = buildVertices(allPts, fromPort);
+  const verts = uniqueVertices(allPts);
   const lengths = verts.slice(0, -1).map((p, i) => Math.hypot(verts[i + 1].x - p.x, verts[i + 1].y - p.y));
   const total = lengths.reduce((sum, len) => sum + len, 0);
   if (total === 0) {
@@ -612,7 +647,8 @@ function maxSegmentLength(verts) {
 }
 
 function ensureDoubleArrowRoom(link) {
-  if (link.midTermination !== 'arrows' || (link.waypoints || []).length) return true;
+  // Free routes have no lanes to shuffle; their geometry is already final.
+  if (link.midTermination !== 'arrows' || link.routeStyle === 'free' || (link.waypoints || []).length) return true;
   const width = Math.max(1, Math.min(24, Number(link.width) || 6));
   const metrics = doubleArrowMetrics({x:0,y:0}, {x:1,y:0}, width);
   const required = 2 * (metrics.size + metrics.gap/2 + width/2);
@@ -639,8 +675,10 @@ function renderLinkPointHints() {
   svg.querySelectorAll('.link-hint').forEach(el => el.remove());
   if (!document.body.classList.contains('linking') || presentationMode) return;
   const ns = 'http://www.w3.org/2000/svg';
-  const sideCol = { top: '#0DBFA6', bottom: '#28C97A', left: '#F09A38', right: '#E86060' };
+  const sideCol = { top: '#7C5CFF', bottom: '#28C97A', left: '#F09A38', right: '#E86060' };
   nodes.forEach(node => {
+    if (isSupportNode(node)) return; // support elements take no links
+
     ['top', 'bottom', 'left', 'right'].forEach(side => {
       const onSide = links.filter(l =>
         (l.from === node.id && (l.fromPort || 'center') === side) ||
@@ -656,13 +694,13 @@ function renderLinkPointHints() {
         const c = document.createElementNS(ns, 'circle');
         c.setAttribute('cx', pos.x); c.setAttribute('cy', pos.y); c.setAttribute('r', '9');
         c.setAttribute('fill', col);
-        c.setAttribute('stroke', '#070C13');
+        c.setAttribute('stroke', '#0A0912');
         c.setAttribute('stroke-width', '1.5');
         g.appendChild(c);
         const t = document.createElementNS(ns, 'text');
         t.setAttribute('x', pos.x); t.setAttribute('y', pos.y + 3.2);
         t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '10');
-        t.setAttribute('font-weight', '700'); t.setAttribute('fill', '#070C13');
+        t.setAttribute('font-weight', '700'); t.setAttribute('fill', '#0A0912');
         t.setAttribute('font-family', 'Consolas,monospace');
         t.textContent = String(item.slot);
         g.appendChild(t);
@@ -674,14 +712,14 @@ function renderLinkPointHints() {
 function renderConnectionHandles(nodeId) {
   clearConnectionHandles();
   if (currentTool !== 'select') return;
-  const n = getNode(nodeId); if (!n) return;
+  const n = getNode(nodeId); if (!n || isSupportNode(n)) return;
   const svg = document.getElementById('overlay-svg'); // renders above HTML nodes
 
   // Ten fixed positions per side. Occupied positions are solid; available ones
   // remain hollow so the user can see exactly where an endpoint may be moved.
   const grid = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   grid.classList.add('conn-slot-grid');
-  const sideColors = {top:'#0DBFA6', bottom:'#28C97A', left:'#F09A38', right:'#E86060'};
+  const sideColors = {top:'#7C5CFF', bottom:'#28C97A', left:'#F09A38', right:'#E86060'};
   ['top','bottom','left','right'].forEach(side => {
     const occupied = usedPortSlots(nodeId, side);
     for (let slot = 1; slot <= PORT_SLOT_COUNT; slot++) {
@@ -730,7 +768,7 @@ function renderConnectionHandles(nodeId) {
     // Handle circle
     const circ = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circ.setAttribute('cx', pos.x); circ.setAttribute('cy', pos.y); circ.setAttribute('r', '6');
-    circ.setAttribute('fill', '#F09A38'); circ.setAttribute('stroke', '#070C13');
+    circ.setAttribute('fill', '#F09A38'); circ.setAttribute('stroke', '#0A0912');
     circ.setAttribute('stroke-width', '2'); circ.setAttribute('pointer-events', 'all');
     circ.style.cursor = 'move';
     circ.dataset.connHandle = '1';
@@ -794,8 +832,17 @@ function distPtToSeg(p, a, b) {
   const t = Math.max(0, Math.min(1, ((p.x-a.x)*dx+(p.y-a.y)*dy)/lenSq));
   return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy));
 }
-function findNearestSegmentIdx(allPts, pt, fromPort) {
+function findNearestSegmentIdx(allPts, pt, fromPort, freeRoute = false) {
   // Returns index to splice into l.waypoints (0 = before first existing wp)
+  if (freeRoute) {
+    // Straight segments map 1:1 to control-point pairs — no corner mapping.
+    let minDist = Infinity, best = 0;
+    for (let i = 0; i < allPts.length - 1; i++) {
+      const d = distPtToSeg(pt, allPts[i], allPts[i + 1]);
+      if (d < minDist) { minDist = d; best = i; }
+    }
+    return best;
+  }
   const verts = buildVertices(allPts, fromPort);
   // Build mapping: vert segment k → allPts segment i
   const segMap = [];
@@ -836,7 +883,7 @@ function createMidpointMarker(point, nextPoint, type, width, firstColor, secondC
       const by = tipY - metrics.uy * metrics.size * direction;
       polygon.setAttribute('points', `${tipX},${tipY} ${bx + metrics.px*wing},${by + metrics.py*wing} ${bx - metrics.px*wing},${by - metrics.py*wing}`);
       polygon.setAttribute('fill', color);
-      polygon.setAttribute('stroke', '#070C13');
+      polygon.setAttribute('stroke', '#0A0912');
       polygon.setAttribute('stroke-width', '1');
       group.appendChild(polygon);
     };
@@ -850,21 +897,21 @@ function createMidpointMarker(point, nextPoint, type, width, firstColor, secondC
     shape.setAttribute('points',
       `${point.x + ux*half},${point.y + uy*half} ${point.x + px*half},${point.y + py*half} ` +
       `${point.x - ux*half},${point.y - uy*half} ${point.x - px*half},${point.y - py*half}`);
-    shape.setAttribute('fill', '#070C13');
+    shape.setAttribute('fill', '#0A0912');
   } else if (type === 'circle') {
     const r = Math.max(5, width/2 + 2);
     shape = document.createElementNS(ns, 'circle');
     shape.setAttribute('cx', point.x);
     shape.setAttribute('cy', point.y);
     shape.setAttribute('r', r);
-    shape.setAttribute('fill', '#070C13');
+    shape.setAttribute('fill', '#0A0912');
   } else if (type === 'square') {
     const side = Math.max(9, width + 5);
     shape = document.createElementNS(ns, 'rect');
     shape.setAttribute('x', point.x - side/2);
     shape.setAttribute('y', point.y - side/2);
     shape.setAttribute('width', side); shape.setAttribute('height', side);
-    shape.setAttribute('rx', '1'); shape.setAttribute('fill', '#070C13');
+    shape.setAttribute('rx', '1'); shape.setAttribute('fill', '#0A0912');
   } else if (type === 'bar') {
     shape = document.createElementNS(ns, 'line');
     shape.setAttribute('x1', point.x + px * half); shape.setAttribute('y1', point.y + py * half);
@@ -1004,7 +1051,7 @@ function renderLinks() {
       [firstHalf, secondHalf].forEach(d => {
         const hl = document.createElementNS('http://www.w3.org/2000/svg','path');
         hl.setAttribute('d', d);
-        hl.setAttribute('stroke', '#0DBFA640'); hl.setAttribute('stroke-width', String(W + 12));
+        hl.setAttribute('stroke', '#7C5CFF40'); hl.setAttribute('stroke-width', String(W + 12));
         hl.setAttribute('fill', 'none'); hl.setAttribute('stroke-linecap', 'butt');
         hl.setAttribute('pointer-events', 'none'); // decorative halo must not block the canvas
         g.appendChild(hl);
@@ -1032,8 +1079,9 @@ function renderLinks() {
         if (e.button !== 0) return;
         e.stopPropagation(); e.preventDefault();
         const pos = getCanvasPos(e);
-        const clickPt = { x: snap(pos.x), y: snap(pos.y) };
         const l = getLink(link.id); if (!l) return;
+        const isFree = l.routeStyle === 'free';
+        const clickPt = isFree ? { x: pos.x, y: pos.y } : { x: snap(pos.x), y: snap(pos.y) };
         geometryChangeSnapshot = getSnapshot();
         let insertIdx;
         if (l.routeLane && !(l.waypoints || []).length) {
@@ -1042,8 +1090,12 @@ function renderLinks() {
           insertIdx = 0;
         } else {
           const curAllPts = [fp, ...(l.waypoints||[]), tp];
-          insertIdx = findNearestSegmentIdx(curAllPts, clickPt, l.fromPort);
+          insertIdx = findNearestSegmentIdx(curAllPts, clickPt, l.fromPort, isFree);
           l.waypoints.splice(insertIdx, 0, clickPt);
+        }
+        // Free routes: angle-snap the inserted waypoint relative to its predecessor.
+        if (isFree) {
+          l.waypoints[insertIdx] = snapWaypointAngle(l, insertIdx, pos);
         }
         renderLinks();
         draggingWaypoint = { linkId: l.id, wpIndex: insertIdx };
@@ -1056,7 +1108,7 @@ function renderLinks() {
     const mkConnDot = (pt, col, isFrom) => {
       const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
       c.setAttribute('cx', pt.x); c.setAttribute('cy', pt.y); c.setAttribute('r', W/2 + 3);
-      c.setAttribute('fill', col); c.setAttribute('stroke', '#070C13'); c.setAttribute('stroke-width', '2');
+      c.setAttribute('fill', col); c.setAttribute('stroke', '#0A0912'); c.setAttribute('stroke-width', '2');
       c.setAttribute('pointer-events', 'all'); c.style.cursor = 'move';
       c.classList.add('conn-dot');
       // mousedown handled by delegation on #overlay-svg (ensureLinkDelegation).
@@ -1074,7 +1126,7 @@ function renderLinks() {
         const dividerHit = document.createElementNS('http://www.w3.org/2000/svg','circle');
         dividerHit.setAttribute('cx', midPt.x); dividerHit.setAttribute('cy', midPt.y);
         dividerHit.setAttribute('r', String(Math.max(12, W + 7)));
-        dividerHit.setAttribute('fill', 'transparent'); dividerHit.setAttribute('stroke', '#0DBFA688');
+        dividerHit.setAttribute('fill', 'transparent'); dividerHit.setAttribute('stroke', '#7C5CFF88');
         dividerHit.setAttribute('stroke-width', '1.5'); dividerHit.setAttribute('stroke-dasharray', '3 2');
         dividerHit.setAttribute('pointer-events', 'all'); dividerHit.style.cursor = 'grab';
         dividerHit.classList.add('divider-drag-handle');
@@ -1129,9 +1181,9 @@ function renderLinks() {
         const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
         bg.setAttribute('x', -bw/2); bg.setAttribute('y', -bh/2);
         bg.setAttribute('width', bw); bg.setAttribute('height', bh);
-        bg.setAttribute('fill', '#070C13E8'); bg.setAttribute('rx', '3');
+        bg.setAttribute('fill', '#0A0912E8'); bg.setAttribute('rx', '3');
         if (isActiveLabel) {
-          bg.setAttribute('stroke', '#0DBFA6'); bg.setAttribute('stroke-width', '1.5');
+          bg.setAttribute('stroke', '#7C5CFF'); bg.setAttribute('stroke-width', '1.5');
           bg.setAttribute('stroke-dasharray', '3 2');
         }
         labelGroup.appendChild(bg);
@@ -1171,7 +1223,7 @@ function renderLinks() {
       const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
       bg.setAttribute('x', -width/2); bg.setAttribute('y', -height/2);
       bg.setAttribute('width', width); bg.setAttribute('height', height);
-      bg.setAttribute('fill', '#070C13E8'); bg.setAttribute('rx', '3');
+      bg.setAttribute('fill', '#0A0912E8'); bg.setAttribute('rx', '3');
       group.appendChild(bg);
       const text = document.createElementNS('http://www.w3.org/2000/svg','text');
       text.setAttribute('x','0'); text.setAttribute('y',String(fontSize * 0.36)); text.setAttribute('text-anchor','middle');
@@ -1189,7 +1241,7 @@ function renderLinks() {
         const SZ = 10;
         sq.setAttribute('x', wp.x - SZ/2); sq.setAttribute('y', wp.y - SZ/2);
         sq.setAttribute('width', SZ); sq.setAttribute('height', SZ);
-        sq.setAttribute('fill', '#0DBFA6'); sq.setAttribute('stroke', '#070C13');
+        sq.setAttribute('fill', '#7C5CFF'); sq.setAttribute('stroke', '#0A0912');
         sq.setAttribute('stroke-width', '2'); sq.setAttribute('rx', '2');
         sq.setAttribute('pointer-events', 'all'); sq.style.cursor = 'move';
         sq.dataset.wpHandle = '1'; sq.dataset.linkId = link.id; sq.dataset.wpIdx = wpIdx;
@@ -1214,7 +1266,7 @@ function renderLinks() {
         const hint = document.createElementNS('http://www.w3.org/2000/svg','text');
         const midPtH = allPts[Math.floor(allPts.length / 2)];
         hint.setAttribute('x', midPtH.x + 8); hint.setAttribute('y', midPtH.y - 12);
-        hint.setAttribute('font-size', '10'); hint.setAttribute('fill', '#0DBFA666');
+        hint.setAttribute('font-size', '10'); hint.setAttribute('fill', '#7C5CFF66');
         hint.setAttribute('font-family', 'sans-serif'); hint.setAttribute('pointer-events', 'none');
         hint.textContent = 'drag to bend';
         g.appendChild(hint);

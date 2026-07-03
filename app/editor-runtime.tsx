@@ -23,6 +23,7 @@ const RUNTIME_PARTS = [
   "/editor/props.js",
   "/editor/ui.js",
   "/editor/maps.js",
+  "/editor/tooltips.js",
   "/editor/init.js",
 ];
 
@@ -41,9 +42,12 @@ export default function EditorRuntime() {
       window.jsPDF = jsPDF;
       // Guard against double-injection (e.g. React strict-mode remount).
       if (document.querySelector('script[data-editor-runtime]')) return;
+      // Cache-buster: /public assets get heuristic browser caching, which can
+      // serve a stale mix of editor parts after a deploy. Always fetch fresh.
+      const version = Date.now();
       for (const src of RUNTIME_PARTS) {
         const script = document.createElement("script");
-        script.src = src;
+        script.src = `${src}?v=${version}`;
         script.async = false; // preserve execution order
         script.dataset.editorRuntime = "";
         document.body.appendChild(script);

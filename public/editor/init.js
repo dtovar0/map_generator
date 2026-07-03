@@ -9,6 +9,7 @@ document.getElementById('presentation-refresh').value = String(presentationRefre
 updatePresentationViewControls();
 updatePaletteHotkeyTitles();
 syncTagsToggleBtn();
+syncFreeRoutingBtn();
 setupActionDelegation();
 // Seed history with the initial state so undo can't go below it
 history = [getSnapshot()]; historyIdx = 0; updateUndoBtns();

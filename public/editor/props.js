@@ -13,6 +13,10 @@ const SEG_OPTIONS = {
     ['circle','●','Círculo'], ['square','■','Cuadrado'], ['diamond','◆','Diamante'],
     ['bar','▮','Barra'], ['arrows','⇄','Flechas'], ['none','⊘','Ninguno']
   ],
+  routeStyle: [
+    ['ortho','<svg viewBox="0 0 24 24"><path d="M4 19h9V5h7"/><circle cx="4" cy="19" r="1.6"/><circle cx="20" cy="5" r="1.6"/></svg>','Ortogonal (ángulos de 90°)'],
+    ['free','<svg viewBox="0 0 24 24"><path d="m4 19 7-8 4 3 5-9"/><circle cx="4" cy="19" r="1.6"/><circle cx="20" cy="5" r="1.6"/></svg>','Libre (cualquier ángulo, pasos de 5°)']
+  ],
   usageFormat: [['percentage','%','Mostrar porcentaje'], ['human','1K','Utilización legible']],
   capacityUnit: [['Kbps','K','Kbps'], ['Mbps','M','Mbps'], ['Gbps','G','Gbps'], ['Tbps','T','Tbps']],
   usagePosition: [['above','↑','Arriba'], ['below','↓','Abajo'], ['center','⊙','Centro']],
@@ -32,10 +36,6 @@ function segToggleHtml(name, value, options, call, opts = {}) {
         + `<span class="seg-glyph" aria-hidden="true">${glyph}</span></label>`
       ).join('')
     + `</div>`;
-}
-function segToggleValue(name) {
-  const el = document.querySelector(`.seg-toggle input[name="${name}"]:checked`);
-  return el ? el.value : null;
 }
 function syncSegToggle(name, value, disabled) {
   const radios = document.querySelectorAll(`.seg-toggle input[name="${name}"]`);
@@ -76,6 +76,30 @@ function linkThresholdEditorHtml(link) {
       <button class="tb-btn" style="flex:1;font-size:10px" data-click="copyGeneralScaleToLink" data-args='["${link.id}"]'>Copiar general</button>
     </div>`;
 }
+function currentScalePresetName() {
+  const match = Object.entries(PRESETS).find(([, scale]) => JSON.stringify(scale) === JSON.stringify(currentScale));
+  return match?.[0] || 'custom';
+}
+function generalThresholdEditorHtml() {
+  const preset = currentScalePresetName();
+  return `<div class="prop-label">Paleta de umbrales</div>
+    <select class="prop-val" data-change="applyPreset" data-args='["$value"]'>
+      <option value="cacti" ${preset==='cacti'?'selected':''}>Cacti clásico</option>
+      <option value="traffic" ${preset==='traffic'?'selected':''}>Semáforo</option>
+      <option value="heat" ${preset==='heat'?'selected':''}>Mapa de calor</option>
+      <option value="cool" ${preset==='cool'?'selected':''}>Frío → cálido</option>
+      <option value="custom" ${preset==='custom'?'selected':''}>Personalizada</option>
+    </select>
+    <label class="prop-check u-mt-7"><input type="checkbox" ${generalConfig.scaleLegendThresholdTextVisible!==false?'checked':''} data-change="updateGeneralConfig" data-args='["scaleLegendThresholdTextVisible","$checked"]'> Mostrar textos</label>
+    <div style="height:10px;display:flex;border-radius:3px;overflow:hidden;margin:9px 0">${currentScale.map(item => `<span style="flex:1;background:${item.color}"></span>`).join('')}</div>
+    ${currentScale.map((item,index) => `<div class="scale-threshold-row threshold-editor-row">
+      <div class="sth-color" style="background:${item.color}"><input type="color" value="${item.color}" data-change="updateThresholdColor" data-args='[${index},"$value"]'><div class="sth-swatch" style="background:${item.color}"></div></div>
+      <div class="sth-pct-wrap"><input class="sth-pct" type="number" min="0" max="100" value="${item.pct}" data-change="updateThresholdPct" data-args='[${index},"$value"]'><span class="sth-pct-unit">%</span></div>
+      <input class="prop-val editable threshold-text-input" type="text" maxlength="30" placeholder="Texto opcional" value="${escapeHtml(item.text || '')}" data-change="updateThresholdText" data-args='[${index},"$value"]'>
+      ${currentScale.length > 2 ? `<button class="sth-del" data-click="removeThreshold" data-args='[${index}]' title="Eliminar">✕</button>` : '<div style="width:22px"></div>'}
+    </div>`).join('')}
+    <button class="tb-btn u-w-full u-mt-7" data-click="addThreshold">+ Agregar umbral</button>`;
+}
 function iconGridHtml(node) {
   return `<div class="icon-grid">${NODE_ICONS.map(icon => `
     <button class="icon-choice ${!node.image && node.icon===icon ? 'selected' : ''}"
@@ -94,6 +118,12 @@ const PROPERTY_TAB_CONFIG = {
   ],
   link: [
     ['data','Datos'], ['style','Estilo'], ['labels','Etiquetas'], ['thresholds','Umbrales']
+  ],
+  canvasDate: [
+    ['appearance','Apariencia']
+  ],
+  canvasLegend: [
+    ['appearance','Apariencia'], ['thresholds','Umbrales']
   ]
 };
 const PROPERTY_TAB_ICONS = {
@@ -148,10 +178,12 @@ function propertyTabForElement(element, profile) {
   const label = element.querySelector('.prop-label')?.textContent.trim() || '';
   const html = element.innerHTML || '';
   const source = `${html} ${element.getAttribute('onclick') || ''}`;
+  if (profile === 'canvasDate') return 'appearance';
+  if (profile === 'canvasLegend') return /Paleta de umbrales/.test(label) ? 'thresholds' : 'appearance';
   if (profile === 'link') {
     if (/^Enlace$|^Descripción$|^Capacidad del enlace/.test(label)) return 'data';
     if (/^Etiqueta de capacidad$|^Texto de utilización$/.test(label)) return 'labels';
-    if (/^Alineación|^Acciones del enlace|^Grosor visual|^Marcador intermedio$|^Posición del divisor/.test(label) || source.includes('useGeneralLinkConfig')) return 'style';
+    if (/^Alineación|^Acciones del enlace|^Tipo de ruta$|^Grosor visual|^Marcador intermedio$|^Posición del divisor/.test(label) || source.includes('useGeneralLinkConfig')) return 'style';
     return 'thresholds';
   }
   if (profile === 'text') {
@@ -169,14 +201,18 @@ function propertyTabForElement(element, profile) {
   return 'layout';
 }
 function mountPropertyTabs(container, profile, title, subtitle, entityId = null) {
-  const tabs = PROPERTY_TAB_CONFIG[profile];
+  let tabs = PROPERTY_TAB_CONFIG[profile];
   if (!tabs) return;
+  // Support elements (text, icon, chart) take no links → no "Ordenar" view.
+  const entity = entityId ? getNode(entityId) : null;
+  if (entity && isSupportNode(entity)) tabs = tabs.filter(([key]) => key !== 'arrange');
   const originalChildren = Array.from(container.children);
   container.closest('.panel-section')?.classList.add('has-property-tabs');
   const shell = document.createElement('div'); shell.className = `props-tabs-shell props-profile-${profile}`;
   const head = document.createElement('div'); head.className = 'props-entity-head';
-  head.innerHTML = `<span class="props-entity-icon"><svg viewBox="0 0 24 24">${profile === 'link' ? PROPERTY_TAB_ICONS.style : profile === 'chart' ? PROPERTY_TAB_ICONS.data : profile === 'text' ? PROPERTY_TAB_ICONS.content : PROPERTY_TAB_ICONS.layout}</svg></span><span class="props-entity-copy"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle)}</small></span><span class="props-live-dot" title="Elemento seleccionado"></span>`;
+  head.innerHTML = `<span class="props-entity-icon"><svg viewBox="0 0 24 24">${profile === 'link' ? PROPERTY_TAB_ICONS.style : profile === 'chart' ? PROPERTY_TAB_ICONS.data : profile === 'text' || profile === 'canvasDate' ? PROPERTY_TAB_ICONS.content : profile === 'canvasLegend' ? PROPERTY_TAB_ICONS.thresholds : PROPERTY_TAB_ICONS.layout}</svg></span><span class="props-entity-copy"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle)}</small></span><span class="props-live-dot" title="Elemento seleccionado"></span>`;
   const nav = document.createElement('div'); nav.className = 'props-tab-nav'; nav.setAttribute('role','tablist');
+  nav.style.gridTemplateColumns = `repeat(${tabs.length}, minmax(0,1fr))`;
   const stage = document.createElement('div'); stage.className = 'props-tab-stage';
   const storageKey = `mapgen_props_tab_${profile}`;
   const availableKeys = tabs.map(([key]) => key);
@@ -502,6 +538,36 @@ function updatePropsPanel() {
   const c = document.getElementById('props-content');
   c.closest('.panel-section')?.classList.remove('has-property-tabs');
   let tabContext = null;
+  if (selectedCanvasInfo) {
+    const isDate = selectedCanvasInfo === 'date';
+    if (isDate) {
+      c.innerHTML = `<div class="prop-row"><div class="prop-label">Apariencia y contenido</div>
+          <label class="prop-check"><input type="checkbox" ${generalConfig.dateStampVisible?'checked':''} data-change="updateGeneralConfig" data-args='["dateStampVisible","$checked"]'> Mostrar en el canvas</label>
+          <div class="prop-label u-mt-7">Prefijo</div><input class="prop-val editable" type="text" maxlength="40" value="${escapeHtml(generalConfig.dateStampLabel || '')}" data-change="updateGeneralConfig" data-args='["dateStampLabel","$value"]'>
+          <div class="prop-label u-mt-7">Fecha</div><input class="prop-val" type="date" value="${selectedMapDate}" data-change="updateCanvasDateValue" data-args='["$value"]'>
+          <div class="prop-label u-mt-7">Formato</div><select class="prop-val" data-change="updateGeneralConfig" data-args='["dateStampFormat","$value"]'>
+            <option value="iso" ${generalConfig.dateStampFormat==='iso'?'selected':''}>YYYY-MM-DD</option><option value="dmy" ${generalConfig.dateStampFormat==='dmy'?'selected':''}>DD/MM/YYYY</option><option value="mdy" ${generalConfig.dateStampFormat==='mdy'?'selected':''}>MM/DD/YYYY</option><option value="long" ${generalConfig.dateStampFormat==='long'?'selected':''}>Fecha larga</option></select></div>
+        <div class="prop-row"><div class="prop-label">Apariencia</div>
+          <div class="input-unit"><input class="prop-val coord" type="number" min="8" max="72" value="${generalConfig.dateStampFontSize}" data-change="updateGeneralConfig" data-args='["dateStampFontSize","$value"]'><span class="input-unit-suffix">px</span></div>
+          <div class="prop-pair u-mt-7"><label>Texto<input class="prop-val" type="color" value="${generalConfig.dateStampTextColor}" data-change="updateGeneralConfig" data-args='["dateStampTextColor","$value"]'></label><label>Icono<input class="prop-val" type="color" value="${generalConfig.dateStampIconColor}" data-change="updateGeneralConfig" data-args='["dateStampIconColor","$value"]'></label></div>
+          <div class="prop-pair u-mt-7"><label>Fondo<input class="prop-val" type="color" value="${generalConfig.dateStampBackground}" data-change="updateGeneralConfig" data-args='["dateStampBackground","$value"]'></label><label>Borde<input class="prop-val" type="color" value="${generalConfig.dateStampBorderColor}" data-change="updateGeneralConfig" data-args='["dateStampBorderColor","$value"]'></label></div></div>`;
+      mountPropertyTabs(c, 'canvasDate', 'Fecha de creación', 'Elemento del canvas');
+    } else {
+      c.innerHTML = `<div class="prop-row"><div class="prop-label">Apariencia y contenido</div>
+          <label class="prop-check"><input type="checkbox" ${generalConfig.scaleLegendVisible?'checked':''} data-change="updateGeneralConfig" data-args='["scaleLegendVisible","$checked"]'> Mostrar en el canvas</label>
+          <div class="prop-label u-mt-7">Título</div><input class="prop-val editable" type="text" maxlength="60" value="${escapeHtml(generalConfig.scaleLegendTitle || '')}" data-change="updateGeneralConfig" data-args='["scaleLegendTitle","$value"]'>
+          <label class="prop-check u-mt-7"><input type="checkbox" ${generalConfig.scaleLegendTitleVisible!==false?'checked':''} data-change="updateGeneralConfig" data-args='["scaleLegendTitleVisible","$checked"]'> Mostrar título</label>
+          <div class="prop-label u-mt-7">Orientación</div><select class="prop-val" data-change="updateGeneralConfig" data-args='["scaleLegendOrientation","$value"]'><option value="horizontal" ${generalConfig.scaleLegendOrientation==='horizontal'?'selected':''}>Horizontal</option><option value="vertical" ${generalConfig.scaleLegendOrientation==='vertical'?'selected':''}>Vertical</option></select>
+          <div class="prop-label u-mt-7">Diseño de la paleta</div><select class="prop-val" data-change="updateGeneralConfig" data-args='["scaleLegendPaletteStyle","$value"]'><option value="segmented" ${generalConfig.scaleLegendPaletteStyle==='segmented'?'selected':''}>Segmentada</option><option value="gradient" ${generalConfig.scaleLegendPaletteStyle==='gradient'?'selected':''}>Degradada</option></select></div>
+        <div class="prop-row"><div class="prop-label">Apariencia</div>
+          <div class="input-unit"><input class="prop-val coord" type="number" min="8" max="32" value="${generalConfig.scaleLegendFontSize}" data-change="updateGeneralConfig" data-args='["scaleLegendFontSize","$value"]'><span class="input-unit-suffix">px</span></div>
+          <div class="prop-pair u-mt-7"><label>Texto<input class="prop-val" type="color" value="${generalConfig.scaleLegendTextColor}" data-change="updateGeneralConfig" data-args='["scaleLegendTextColor","$value"]'></label><label>Fondo<input class="prop-val" type="color" value="${generalConfig.scaleLegendBackground}" data-change="updateGeneralConfig" data-args='["scaleLegendBackground","$value"]'></label></div>
+          <div class="prop-label u-mt-7">Borde</div><input class="prop-val" type="color" value="${generalConfig.scaleLegendBorderColor}" data-change="updateGeneralConfig" data-args='["scaleLegendBorderColor","$value"]'></div>
+        <div class="prop-row"><div class="prop-label">Paleta de umbrales</div>${generalThresholdEditorHtml()}</div>`;
+      mountPropertyTabs(c, 'canvasLegend', 'Leyenda de umbrales', 'Elemento del canvas');
+    }
+    return;
+  }
   if (selectionCount() > 1) {
     c.innerHTML = multiSelectPanelHtml(selectionCount());
     return;
@@ -530,10 +596,10 @@ function updatePropsPanel() {
           ${nodeFontOptions(n.fontFamily || 'system-ui')}
         </select>
         <div class="format-toolbar">
-          <div class="prop-pair">
+          <div class="input-unit">
             <input class="prop-val coord" type="number" min="8" max="120" value="${getNodeFontSize(n)}"
                    title="Tamaño de fuente" data-change="updateNodeAppearance" data-args='["${n.id}","fontSize","$value"]' />
-            <span style="font-size:11px;color:var(--text2)">px</span>
+            <span class="input-unit-suffix">px</span>
           </div>
           <div class="text-format-group" role="group" aria-label="Estilo de texto">
             <label class="format-toggle" data-format="bold" title="Negrita"><input type="checkbox" ${n.fontBold?'checked':''}
@@ -546,7 +612,7 @@ function updatePropsPanel() {
         <input class="prop-val" type="color" value="${textColor}" style="height:31px;padding:3px"
                data-change="updateNodeAppearance" data-args='["${n.id}","textColor","$value"]' />
       </div>
-      <div class="prop-row">
+      ${n.type === 'text' ? '' : `<div class="prop-row">
         <div class="prop-label">Apariencia del nodo</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
           <label style="font-size:10px;color:var(--text2)">Fondo
@@ -571,7 +637,7 @@ function updatePropsPanel() {
             <span class="input-unit-suffix">px</span>
           </div>
         </div>
-      </div>
+      </div>`}
       <div class="prop-row">
         <div class="prop-label">Contenedor del texto</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
@@ -612,15 +678,15 @@ function updatePropsPanel() {
         <button class="tb-btn" style="width:100%;font-size:11px;margin-bottom:9px" data-click="useGeneralNodeAppearance" data-args='["${n.id}"]'>
           ↺ Usar apariencia general
         </button>` : ''}
-      <div class="prop-row">
+      ${isSupportNode(n) ? '' : `<div class="prop-row">
         <div class="prop-label">Separación de enlaces</div>
-        <div class="prop-pair">
+        <div class="input-unit">
           <input class="prop-val coord" type="number" min="0" max="100"
                  value="${n.linkPadding ?? DEFAULT_LINK_PADDING}"
                  data-change="updateNodeLinkPadding" data-args='["${n.id}","$value"]' />
-          <span style="font-size:11px;color:var(--text2)">px</span>
+          <span class="input-unit-suffix">px</span>
         </div>
-      </div>
+      </div>`}
       ${(n.type !== 'text' && (n.sizeOverride || n.linkPaddingOverride)) ? `
         <button class="tb-btn" style="width:100%;font-size:11px;margin-bottom:9px" data-click="useGeneralNodeConfig" data-args='["${n.id}"]'>
           ↺ Usar configuración general
@@ -628,7 +694,14 @@ function updatePropsPanel() {
       ${n.type === 'chart' ? `
         <div class="prop-row">
           <div class="prop-label">Gráfica</div>
-          <button class="tb-btn primary" style="width:100%;font-size:12px" data-click="openChartWizard" data-args='["${n.id}"]'>📊 Editar gráfica</button>
+          <div class="prop-label" style="margin-top:7px">Tipo</div>
+          ${segToggleHtml(`chart-type-${n.id}`, n.graphConfig?.type || 'bar', SEG_OPTIONS.chartType, `updateChartConfig('${n.id}','type','%v')`, {label:'Tipo de gráfica'})}
+          <div class="prop-label" style="margin-top:7px">Color</div>
+          <input class="prop-val" type="color" value="${n.graphConfig?.color || '#7c5cff'}" style="height:31px;padding:3px"
+                 data-change="updateChartConfig" data-args='["${n.id}","color","$value"]' />
+          <div class="prop-label" style="margin-top:7px">Valores separados por coma</div>
+          <input class="prop-val editable" type="text" value="${escapeHtml((n.graphConfig?.values || []).join(', '))}"
+                 placeholder="25, 50, 35, 80, 60" data-change="updateChartConfig" data-args='["${n.id}","values","$value"]' />
         </div>` : n.type === 'text' ? `
         <div class="prop-row">
           <div class="prop-label">Contenido</div>
@@ -636,10 +709,10 @@ function updatePropsPanel() {
         </div>
         <div class="prop-row">
           <div class="prop-label">Rotación</div>
-          <div class="prop-pair">
+          <div class="input-unit">
             <input class="prop-val coord" type="number" min="0" max="359" value="${Number(n.textRotation)||0}"
                    data-change="updateTextRotation" data-args='["${n.id}","$value"]' />
-            <span style="font-size:11px;color:var(--text2)">°</span>
+            <span class="input-unit-suffix">°</span>
           </div>
           <div class="prop-label" style="margin-top:7px">Orientación</div>
           <div style="display:flex;gap:5px;margin-top:5px">
@@ -671,7 +744,7 @@ function updatePropsPanel() {
         </label>
       </div>`}
       `;
-    tabContext = {profile:n.type === 'text' ? 'text' : n.type === 'chart' ? 'chart' : 'regular', title:n.name, subtitle:n.type === 'text' ? 'Nodo de texto' : n.type === 'chart' ? 'Gráfica' : 'Nodo visual', entityId:n.id};
+    tabContext = {profile:n.type === 'text' ? 'text' : n.type === 'chart' ? 'chart' : 'regular', title:n.name, subtitle:n.type === 'text' ? 'Texto de apoyo' : n.type === 'chart' ? 'Gráfica' : n.type === 'icon' ? 'Icono de apoyo' : 'Nodo visual', entityId:n.id};
   } else if (selectedLinkId) {
     const l = getLink(selectedLinkId); if (!l) return;
     const from = getNode(l.from), to = getNode(l.to);
@@ -706,20 +779,27 @@ function updatePropsPanel() {
         <div class="prop-label" style="margin-top:7px">Posición del tag</div>
         ${segToggleHtml(`cap-place-${l.id}`, ['above','below','left'].includes(l.capacityLabelSide) ? l.capacityLabelSide : 'right', SEG_OPTIONS.placement, `updateLinkCapacityLabelPlacement('${l.id}','%v')`, {label:'Posición del tag', disabled:l.capacityLabelVisible===false})}
         <div class="prop-label" style="margin-top:7px">Tamaño del texto</div>
-        <div class="prop-pair"><input class="prop-val coord" type="number" min="8" max="72"
+        <div class="input-unit"><input class="prop-val coord" type="number" min="8" max="72"
              value="${l.capacityLabelFontSize ?? 11}" ${l.capacityLabelVisible===false?'disabled':''}
-             data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelFontSize","$value"]' /><span>px</span></div>
+             data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelFontSize","$value"]' /><span class="input-unit-suffix">px</span></div>
         <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${l.capacityLabelRotate?'checked':''} ${l.capacityLabelVisible===false?'disabled':''}
                data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelRotate","$checked"]' /> Rotar siguiendo el enlace</label>
         <label class="prop-check" style="margin-top:5px"><input type="checkbox" ${l.capacityLabelFlip?'checked':''} ${!l.capacityLabelRotate||l.capacityLabelVisible===false?'disabled':''}
                data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelFlip","$checked"]' /> Girar 180° sólo en vertical</label>
       </div>
       <div class="prop-row">
+        <div class="prop-label">Tipo de ruta</div>
+        ${segToggleHtml(`route-style-${l.id}`, l.routeStyle === 'free' ? 'free' : 'ortho', SEG_OPTIONS.routeStyle, `updateLinkRouteStyle('${l.id}','%v')`, {label:'Tipo de ruta'})}
+        <div style="margin-top:6px;font-size:10px;color:var(--text3);line-height:1.4">${l.routeStyle === 'free'
+          ? 'Segmentos rectos en cualquier ángulo; los puntos se ajustan en pasos de 5°.'
+          : 'Trazado con ángulos rectos (horizontal y vertical).'}</div>
+      </div>
+      <div class="prop-row">
         <div class="prop-label">Grosor visual del enlace</div>
-        <div class="prop-pair">
+        <div class="input-unit">
           <input class="prop-val coord" type="number" min="1" max="24" value="${l.width || 6}"
                  data-change="updateLinkWidth" data-args='["${l.id}","$value"]' />
-          <span style="font-size:11px;color:var(--text2)">px</span>
+          <span class="input-unit-suffix">px</span>
         </div>
       </div>
       <div class="prop-row">
@@ -848,8 +928,8 @@ function renderArrangeOverlays() {
       badge.className = 'arrange-badge';
       badge.style.cssText = `position:absolute;left:${pos.x}px;top:${pos.y}px;` +
         `transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;` +
-        `background:${col};border:1.5px solid #070C13;display:flex;align-items:center;` +
-        `justify-content:center;font-size:9px;font-weight:700;color:#070C13;` +
+        `background:${col};border:1.5px solid #0A0912;display:flex;align-items:center;` +
+        `justify-content:center;font-size:9px;font-weight:700;color:#0A0912;` +
         `pointer-events:none;z-index:50;font-family:Consolas,monospace;`;
       badge.textContent = String(item.slot);
       canvas.appendChild(badge);
@@ -974,7 +1054,7 @@ function renderArrangeForm() {
     if (!grp.length) {
       html += `<div class="arrange-empty">Arrastra aquí</div>`;
     } else {
-      const col = {top:'#0DBFA6',bottom:'#28C97A',left:'#F09A38',right:'#E86060'}[side];
+      const col = {top:'#7C5CFF',bottom:'#28C97A',left:'#F09A38',right:'#E86060'}[side];
       grp.forEach((item, i) => {
         html += `<div draggable="true"
           data-dragstart="_arrangeDragStart" data-dragstart-args='["${side}",${i}]'
@@ -1111,6 +1191,7 @@ function renameNode(id, name) {
   if (!clean || clean === n.name) { updatePropsPanel(); return; }
   n.name = clean;
   if (n.type === 'text') { autoFitTextNode(n); distributePortLinks(id); }
+  if (n.type === 'chart' && n.graphConfig) n.graphConfig = {...n.graphConfig, title:clean};
   renderNode(n); renderLinks(); updatePropsPanel(); pushHistory();
 }
 
@@ -1404,6 +1485,27 @@ function updateLinkWidth(id, value) {
   }
 }
 
+function updateLinkRouteStyle(id, value) {
+  const style = value === 'free' ? 'free' : 'ortho';
+  const l = getLink(id); if (!l || (l.routeStyle || 'ortho') === style) return;
+  const beforeStyle = getSnapshot();
+  if (style === 'free') {
+    // Preserve the route as drawn: bake the recreated vertices (auto corners,
+    // lanes, hooks) into waypoints so the shape doesn't jump to a straight line.
+    const rendered = getLinkVertices(l);
+    l.waypoints = rendered.slice(1, -1).map(p => ({ x: p.x, y: p.y }));
+  }
+  l.routeStyle = style;
+  if (style === 'free') l.routeLane = 0; // lanes only exist in orthogonal routing
+  l.styleOverride = true;
+  ensureDoubleArrowRoom(l);
+  renderLinks(); updatePropsPanel();
+  if (!revertIfLinksOverlap(beforeStyle, [id])) {
+    pushHistory();
+    setStatus(style === 'free' ? 'Ruta libre: segmentos en pasos de 5°' : 'Ruta ortogonal (90°)');
+  }
+}
+
 function updateLinkTermination(id, value) {
   if (!MID_TERMINATIONS.some(([type]) => type === value)) return;
   const l = getLink(id); if (!l || l.midTermination === value) return;
@@ -1490,6 +1592,10 @@ function copyGeneralScaleToLink(id) {
 
 function renderConfigUI() {
   const values = {
+    'cfg-date-stamp-label': generalConfig.dateStampLabel,
+    'cfg-date-stamp-font-size': generalConfig.dateStampFontSize,
+    'cfg-scale-legend-title': generalConfig.scaleLegendTitle,
+    'cfg-scale-legend-font-size': generalConfig.scaleLegendFontSize,
     'cfg-node-width': generalConfig.nodeWidth,
     'cfg-node-height': generalConfig.nodeHeight,
     'cfg-link-padding': generalConfig.linkPadding,
@@ -1511,6 +1617,7 @@ function renderConfigUI() {
     const el = document.getElementById(id); if (el) el.value = value;
   });
   [
+    ['cfg-route-style-host', 'cfg-route-style', generalConfig.routeStyle === 'free' ? 'free' : 'ortho', SEG_OPTIONS.routeStyle, "updateGeneralConfig('routeStyle','%v')", false],
     ['cfg-mid-termination-host', 'cfg-mid-termination', generalConfig.midTermination, SEG_OPTIONS.marker, "updateGeneralConfig('midTermination','%v')", false],
     ['cfg-usage-label-format-host', 'cfg-usage-label-format', generalConfig.usageLabelFormat, SEG_OPTIONS.usageFormat, "updateGeneralConfig('usageLabelFormat','%v')", false],
     ['cfg-usage-label-position-host', 'cfg-usage-label-position', generalConfig.usageLabelPosition, SEG_OPTIONS.usagePosition, "updateGeneralConfig('usageLabelPosition','%v')", false],
@@ -1521,6 +1628,9 @@ function renderConfigUI() {
   });
   const dividerLabel = document.getElementById('cfg-divider-position-value');
   if (dividerLabel) dividerLabel.textContent = `${generalConfig.dividerPosition}%`;
+  syncFreeRoutingBtn();
+  renderCanvasBadges();
+  applyCanvasBackground();
   const rotateLabel = document.getElementById('cfg-usage-label-rotate');
   if (rotateLabel) rotateLabel.checked = !!generalConfig.usageLabelRotate;
   const flipLabel = document.getElementById('cfg-usage-label-flip');
@@ -1552,7 +1662,9 @@ function renderConfigUI() {
     'cfg-text-node-background-transparent':generalConfig.textNodeBackgroundTransparent,
     'cfg-text-node-border-hidden':generalConfig.textNodeBorderHidden,
     'cfg-text-node-text-background-transparent':generalConfig.textNodeTextBackgroundTransparent,
-    'cfg-text-node-text-border-hidden':generalConfig.textNodeTextBorderHidden
+    'cfg-text-node-text-border-hidden':generalConfig.textNodeTextBorderHidden,
+    'cfg-date-stamp-visible':generalConfig.dateStampVisible,
+    'cfg-scale-legend-visible':generalConfig.scaleLegendVisible
   };
   Object.entries(checks).forEach(([id, checked]) => { const el=document.getElementById(id); if (el) el.checked=!!checked; });
   [
@@ -1572,7 +1684,8 @@ function updateGeneralConfig(field, rawValue) {
     nodeWidth:[32,2000], nodeHeight:[32,2000], linkPadding:[0,100], linkWidth:[1,24], dividerPosition:[5,95],
     regularFontSize:[8,120], regularNodeBorderWidth:[0,12], regularTextBorderWidth:[0,12],
     textNodeFontSize:[8,120], textNodeBorderWidth:[0,12], textNodeTextBorderWidth:[0,12],
-    capacityLabelFontSize:[8,72]
+    capacityLabelFontSize:[8,72], dateStampFontSize:[8,72], scaleLegendFontSize:[8,32],
+    dateStampX:[0,10000], dateStampY:[0,10000], scaleLegendX:[0,10000], scaleLegendY:[0,10000]
   };
   const appearanceMeta = GENERAL_NODE_APPEARANCE[field];
   let value = rawValue;
@@ -1590,6 +1703,26 @@ function updateGeneralConfig(field, rawValue) {
     value = !!rawValue;
   } else if (field === 'midTermination') {
     if (!MID_TERMINATIONS.some(([type]) => type === value)) return;
+  } else if (field === 'routeStyle') {
+    if (!['ortho', 'free'].includes(value)) return;
+  } else if (field === 'canvasBackgroundImage') {
+    value = rawValue == null ? null : String(rawValue);
+    if (value && !/^(data:image\/|https?:\/\/|\/)/.test(value)) return;
+  } else if (['dateStampVisible', 'scaleLegendVisible', 'scaleLegendTitleVisible', 'scaleLegendThresholdTextVisible'].includes(field)) {
+    value = !!rawValue;
+  } else if (field === 'dateStampLabel') {
+    value = String(rawValue).trim().slice(0, 40) || 'Creado:';
+  } else if (field === 'scaleLegendTitle') {
+    value = String(rawValue).trim().slice(0, 60) || 'Umbrales de utilización';
+  } else if (field === 'dateStampFormat') {
+    if (!['iso','dmy','mdy','long'].includes(value)) return;
+  } else if (field === 'scaleLegendOrientation') {
+    if (!['horizontal','vertical'].includes(value)) return;
+  } else if (field === 'scaleLegendPaletteStyle') {
+    if (!['segmented','gradient'].includes(value)) return;
+  } else if (['dateStampTextColor','dateStampIconColor','dateStampBackground','dateStampBorderColor','scaleLegendTextColor','scaleLegendBackground','scaleLegendBorderColor'].includes(field)) {
+    if (!/^#[0-9a-f]{6}$/i.test(String(rawValue))) return;
+    value = String(rawValue).toLowerCase();
   } else if (field === 'usageLabelFormat') {
     if (!['percentage','human'].includes(value)) return;
   } else if (field === 'usageLabelPosition') {
@@ -1619,6 +1752,9 @@ function updateGeneralConfig(field, rawValue) {
     nodes.forEach(n => { n.linkPadding = value; });
   } else if (field === 'linkWidth') {
     links.forEach(l => { l.width = value; });
+  } else if (['canvasBackgroundImage','dateStampVisible','dateStampLabel','dateStampFormat','dateStampX','dateStampY','dateStampFontSize','dateStampTextColor','dateStampIconColor','dateStampBackground','dateStampBorderColor','scaleLegendVisible','scaleLegendTitle','scaleLegendTitleVisible','scaleLegendThresholdTextVisible','scaleLegendFontSize','scaleLegendX','scaleLegendY','scaleLegendOrientation','scaleLegendPaletteStyle','scaleLegendTextColor','scaleLegendBackground','scaleLegendBorderColor','routeStyle'].includes(field)) {
+    // Canvas-level settings / defaults for NEW elements: existing links keep
+    // their own route style — it is changed per link from the inspector.
   } else if (field === 'dividerPosition') {
     links.forEach(l => { l.dividerPosition = value; });
   } else if (['usageLabelFormat','usageLabelPosition','usageLabelRotate','usageLabelFlip'].includes(field)) {
@@ -1665,6 +1801,8 @@ function useGeneralLinkConfig(id) {
   const beforeReset = getSnapshot();
   l.width = generalConfig.linkWidth;
   l.midTermination = generalConfig.midTermination;
+  l.routeStyle = generalConfig.routeStyle === 'free' ? 'free' : 'ortho';
+  if (l.routeStyle === 'free') l.routeLane = 0;
   l.dividerPosition = generalConfig.dividerPosition;
   l.dividerPositionOverride = false;
   l.usageLabelFormat = generalConfig.usageLabelFormat;
@@ -1685,4 +1823,3 @@ function useGeneralLinkConfig(id) {
     pushHistory(); setStatus('Enlace vinculado a la configuración general');
   }
 }
-

@@ -25,6 +25,7 @@ async function fetchWithTimeout(url, options = {}, ms = 15000) {
 // ════════════════════════════════════════════════════
 let nodes = [], links = [];
 let selectedId = null, selectedLinkId = null;
+let selectedCanvasInfo = null; // 'date' | 'legend'
 let selectedNodeIds = new Set();   // multi-selection; selectedId = primary (last picked)
 let selectedLinkIds = new Set();   // multi-selection of links (marquee / shift-click)
 let nodeCounter = 0, linkCounter = 0;
@@ -50,13 +51,12 @@ let selectedMapDate = lsGet('mapgen_current_server_date') || localToday();
 let currentServerMapId = lsGet('mapgen_current_server_id') || null;
 let currentServerMapName = lsGet('mapgen_current_server_name') || '';
 let currentTool = 'select';
-const DEFAULT_TOOL_HOTKEYS = { select:'s', node:'n', link:'l', icon:'i', text:'t', chart:'g' };
+const DEFAULT_TOOL_HOTKEYS = { select:'s', node:'n', link:'l', text:'t', chart:'g' };
 const HOTKEY_RESERVED = new Set(['p']);
 const HOTKEY_TOOLS = [
   {id:'select', label:'Seleccionar', description:'Seleccionar y mover elementos', paletteId:'pal-select', icon:'<path d="m5 4 13 8-6 1-3 6z"/>'},
   {id:'node', label:'Nodo', description:'Colocar un nodo nuevo', paletteId:'pal-node', icon:'<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 9h6M9 13h4"/>'},
   {id:'link', label:'Link', description:'Conectar dos elementos', paletteId:'pal-link', icon:'<path d="M8.5 15.5 6 18a3.5 3.5 0 0 1-5-5l3-3a3.5 3.5 0 0 1 5 0M15.5 8.5 18 6a3.5 3.5 0 0 1 5 5l-3 3a3.5 3.5 0 0 1-5 0M8 16l8-8"/>'},
-  {id:'icon', label:'Icono', description:'Agregar una imagen o icono', paletteId:'pal-icon', icon:'<rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="9" cy="10" r="1.5"/><path d="m6 17 4-4 3 3 2-2 3 3"/>'},
   {id:'text', label:'Texto', description:'Agregar un bloque de texto', paletteId:'pal-text', icon:'<path d="M5 6V4h14v2M12 4v16M8 20h8"/>'},
   {id:'chart', label:'Gráfica', description:'Crear una visualización de datos', paletteId:'chart-pal', icon:'<path d="M5 19V10h4v9M10 19V5h4v14M15 19v-7h4v7M3 19h18"/>'}
 ];
@@ -79,7 +79,13 @@ const GRID = 20, DEFAULT_LINK_PADDING = 12, PORT_SLOT_COUNT = 11; let zoom = 1;
 const EDITOR_IN_COLOR = '#2D8CFF', EDITOR_OUT_COLOR = '#F06432';
 const DEFAULT_GENERAL_CONFIG = {
   nodeWidth: 120, nodeHeight: 120, linkPadding: DEFAULT_LINK_PADDING,
-  linkWidth: 6, midTermination: 'circle', dividerPosition:50,
+  linkWidth: 6, midTermination: 'circle', dividerPosition:50, routeStyle:'ortho',
+  canvasBackgroundImage:null,
+  dateStampVisible:false, dateStampX:14, dateStampY:14, dateStampWidth:null, dateStampHeight:null, dateStampLabel:'Creado:', dateStampFormat:'iso', dateStampFontSize:12,
+  dateStampTextColor:'#c2d4e8', dateStampIconColor:'#2d8cff', dateStampBackground:'#101e30', dateStampBorderColor:'#1b2e46',
+  scaleLegendVisible:false, scaleLegendX:14, scaleLegendY:58, scaleLegendWidth:null, scaleLegendHeight:null, scaleLegendTitle:'Umbrales de utilización', scaleLegendTitleVisible:true, scaleLegendFontSize:10,
+  scaleLegendOrientation:'horizontal', scaleLegendPaletteStyle:'segmented', scaleLegendTextColor:'#8294aa', scaleLegendBackground:'#101e30', scaleLegendBorderColor:'#1b2e46',
+  scaleLegendThresholdTextVisible:true,
   usageLabelFormat:'percentage', usageLabelPosition:'above', usageLabelRotate:false, usageLabelFlip:false,
   capacityLabelVisible:true, capacityLabelSide:'right', capacityLabelRotate:false, capacityLabelFlip:false, capacityLabelFontSize:11,
   regularFontSize:11, regularFontFamily:'system-ui', regularFontBold:false, regularFontItalic:false,
@@ -128,7 +134,6 @@ function hasCustomNodeAppearance(node) {
 
 let placingItem = null;
 let multiPlacementEnabled = false;
-let chartWizardEditingId = null;
 let arrangeEmbeddedInTab = false;
 let editingTextNodeId = null, inlineTextSnapshot = null, finishingInlineText = false;
 const chartInstances = new Map();
@@ -186,6 +191,12 @@ function getLink(id) {
     _linkIndexRef = links; _linkIndexLen = links.length;
   }
   return _linkIndex.get(id);
+}
+
+// Support elements (text, icons, charts) are decorative: they never take
+// links, so they have no ports and no "Ordenar" (endpoint arrange) view.
+function isSupportNode(node) {
+  return !!node && ['text', 'chart', 'icon'].includes(node.type);
 }
 
 // Links incident on a node (both endpoints), and just their ids — used all over

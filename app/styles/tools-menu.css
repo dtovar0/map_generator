@@ -1,6 +1,6 @@
   /* ── TOOL BUTTONS (topbar icons) ── */
   .ct-btn {
-    width: 36px; min-width: 36px; height: 36px; border-radius: var(--radius-sm);
+    width: 38px; min-width: 38px; height: 38px; border-radius: var(--radius-sm);
     display: flex; align-items: center; justify-content: center;
     font-size: 15px; line-height: 1; cursor: pointer; color: var(--text2);
     transition: transform .16s, background .16s, border-color .16s, color .16s, box-shadow .16s;
@@ -10,13 +10,34 @@
   .ct-btn:hover { transform: translateY(-1px); background: var(--surface2); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-sm); }
   .ct-btn:active { transform: scale(.96); }
   .ct-btn.active { background: color-mix(in srgb, var(--accent) 14%, var(--surface2)); border-color: color-mix(in srgb, var(--accent) 65%, var(--border)); color: var(--accent); box-shadow: inset 0 1px rgba(255,255,255,.05); }
-  .ct-btn.disabled { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
+  .ct-btn.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
   #zoom-label {
     width: auto !important; padding: 0 6px; font-size: 11px; color: var(--text2);
-    cursor: default; min-width: 44px; text-align: center;
-    font-family: 'Consolas','SF Mono',monospace;
+    cursor: pointer; min-width: 44px; text-align: center;
+    font-family: var(--font-mono); user-select: none;
   }
-  .ct-sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+  #zoom-label:hover { background: var(--surface2); border-color: var(--border); color: var(--text); }
+  #zoom-label::after {
+    content: ''; display: inline-block; width: 0; height: 0; margin-left: 4px;
+    border-left: 3.5px solid transparent; border-right: 3.5px solid transparent;
+    border-top: 4px solid currentColor; opacity: .5; vertical-align: middle;
+  }
+  #zoom-dropdown { position: relative; display: flex; }
+  #zoom-dropdown .dropdown-menu {
+    left: 50%; transform: translateX(-50%) translateY(-7px) scale(.98);
+    transform-origin: top center; min-width: 100px;
+  }
+  #zoom-dropdown .dropdown-menu.open {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  .zoom-presets .dd-item {
+    justify-content: center; font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+    padding: 6px 14px;
+  }
+  .zoom-presets .dd-item.active {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  .ct-sep { width: 1px; height: 22px; background: color-mix(in srgb, var(--border) 90%, transparent); margin: 0 3px; }
 
   /* ── DROPDOWN ── */
   .dropdown { position: relative; }
@@ -31,15 +52,15 @@
   }
   .dropdown-menu.open { opacity: 1; visibility: visible; transform: translateY(0) scale(1); pointer-events: auto; }
   .dd-item {
-    padding: 6px 11px; border-radius: 5px; cursor: pointer;
-    font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; border-radius: 7px; cursor: pointer;
+    font-size: 12.5px; color: var(--text2); display: flex; align-items: center; gap: 8px;
     transition: background 0.1s, color 0.1s; border: none; background: transparent;
     text-align: left; width: 100%; font-family: inherit;
   }
   .dd-item:hover { background: var(--surface2); color: var(--text); }
   .dd-item.active { color: var(--ok); }
   .dd-item.danger { color: var(--danger); }
-  .dd-item.danger:hover { background: rgba(232,96,96,0.08); }
+  .dd-item.danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
 
   /* Drop hint */
   #drop-hint {
@@ -73,11 +94,11 @@
   .empty-state-steps { width: 100%; display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 10px; margin: 23px 0 20px; }
   .empty-state-steps > i { color: var(--text3); font-size: 15px; font-style: normal; }
   .empty-step { min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--surface2) 76%, transparent); display: grid; grid-template-columns: 24px 1fr; column-gap: 8px; align-items: center; }
-  .empty-step > span { grid-row: 1 / 3; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px; color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, transparent); font: 700 8px/1 'Consolas','SF Mono',monospace; }
-  .empty-step strong { color: var(--text); font-size: 11px; line-height: 1.15; }
-  .empty-step small { color: var(--text3); font-size: 8px; line-height: 1.25; white-space: nowrap; }
-  .empty-state-tip { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; padding-top: 16px; width: 100%; border-top: 1px solid var(--border); color: var(--text3); font-size: 9px; }
-  .empty-state-tip kbd { min-width: 25px; height: 23px; padding: 0 6px; display: inline-grid; place-items: center; border-radius: 6px; color: var(--text2); background: var(--surface2); border: 1px solid var(--border); border-bottom-color: var(--border-hi); box-shadow: 0 2px 0 var(--border); font: 700 8px/1 'Consolas','SF Mono',monospace; }
+  .empty-step > span { grid-row: 1 / 3; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 7px; color: var(--accent); background: color-mix(in srgb, var(--accent) 11%, transparent); font: 700 10px/1 var(--font-mono); }
+  .empty-step strong { color: var(--text); font-size: 12px; line-height: 1.15; }
+  .empty-step small { color: var(--text3); font-size: 10px; line-height: 1.25; white-space: nowrap; }
+  .empty-state-tip { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px; padding-top: 16px; width: 100%; border-top: 1px solid var(--border); color: var(--text3); font-size: 10px; }
+  .empty-state-tip kbd { min-width: 25px; height: 23px; padding: 0 6px; display: inline-grid; place-items: center; border-radius: 6px; color: var(--text2); background: var(--surface2); border: 1px solid var(--border); border-bottom-color: var(--border-hi); box-shadow: 0 2px 0 var(--border); font: 700 10px/1 var(--font-mono); }
   .empty-state-tip span + kbd { margin-left: 8px; }
   @keyframes empty-spark { 0%,100% { transform: scale(.72); opacity: .48; } 50% { transform: scale(1); opacity: 1; } }
 

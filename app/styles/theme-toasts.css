@@ -1,3 +1,24 @@
+  /* ── PREMIUM TOOLTIP (built from native title attrs by tooltips.js) ── */
+  #ui-tooltip {
+    position: fixed; top: 0; left: 0; z-index: 12000; max-width: 260px;
+    padding: 7px 11px; border-radius: 9px;
+    font-family: inherit; font-size: 11.5px; line-height: 1.4; font-weight: 600; letter-spacing: .005em;
+    color: var(--text);
+    background: color-mix(in srgb, var(--surface3) 94%, var(--bg));
+    border: 1px solid var(--border-hi);
+    box-shadow: 0 12px 34px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.35), inset 0 1px rgba(255,255,255,.05);
+    pointer-events: none; opacity: 0; transform: translateY(-2px) scale(.97); transform-origin: top center;
+    transition: opacity .13s ease, transform .16s cubic-bezier(.16,1,.3,1);
+  }
+  #ui-tooltip.visible { opacity: 1; transform: translateY(0) scale(1); }
+  #ui-tooltip::after {
+    content: ''; position: absolute; left: var(--arrow-x, 50%); width: 9px; height: 9px;
+    transform: translateX(-50%) rotate(45deg);
+    background: color-mix(in srgb, var(--surface3) 94%, var(--bg)); border: 1px solid var(--border-hi);
+  }
+  #ui-tooltip[data-placement='bottom']::after { top: -5px; border-right: 0; border-bottom: 0; }
+  #ui-tooltip[data-placement='top']::after { bottom: -5px; border-left: 0; border-top: 0; }
+
   /* ── TOASTS ── */
   #toast-container {
     position: fixed; top: auto; bottom: 44px; right: 18px; z-index: 99999;
@@ -34,8 +55,8 @@
   .toast-icon svg { width: 22px; height: 22px; display: block; stroke: currentColor; }
   .toast-content { min-width: 0; }
   .toast-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
-  .toast-title { color: var(--text); font-size: 13px; line-height: 1.2; font-weight: 760; }
-  .toast-meta { color: var(--toast-accent); font-size: 9px; line-height: 1; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; opacity: .88; }
+  .toast-title { color: var(--text); font-size: 13px; line-height: 1.2; font-weight: 700; }
+  .toast-meta { color: var(--toast-accent); font-size: 10px; line-height: 1; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; opacity: .88; }
   .toast-msg { color: var(--text2); font-size: 12px; line-height: 1.42; overflow-wrap: anywhere; }
   .toast-close {
     width: 28px; height: 28px; border-radius: 8px; border: 1px solid transparent;

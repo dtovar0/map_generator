@@ -4,11 +4,13 @@
 async function newMap() {
   const ok = await showConfirm('Se perderán todos los cambios no guardados.', 'Nuevo mapa', 'Crear nuevo');
   if (!ok) return;
+  const name = await showPrompt('Nombre del nuevo mapa', 'Mi mapa');
+  if (!name?.trim()) { setStatus('Creación de mapa cancelada'); return; }
   cancelPlacing(); cancelLink();
   destroyAllCharts();
   nodes.forEach(n => document.getElementById(n.id)?.remove());
   nodes=[]; links=[]; nodeCounter=0; linkCounter=0;
-  rememberCurrentServerMap(null, '');
+  rememberCurrentServerMap(null, name.trim());
   selectedMapDate = localToday();
   document.getElementById('presentation-date').value = selectedMapDate;
   zoom = 1; panX = 0; panY = 0; applyTransform();
@@ -17,8 +19,8 @@ async function newMap() {
   clearLocalDraft();
   showPropsPanel();
   hideRightPanel();
-  setStatus('Nuevo mapa');
-  showToast('Nuevo mapa creado', 'success');
+  setStatus(`Nuevo mapa: ${name.trim()}`);
+  showToast(`Mapa “${name.trim()}” creado`, 'success');
 }
 function rememberCurrentServerMap(id, name, date = selectedMapDate) {
   currentServerMapId = id || null;
@@ -35,10 +37,11 @@ function rememberCurrentServerMap(id, name, date = selectedMapDate) {
 }
 
 async function saveMap() {
-  let name = currentServerMapName;
-  if (!currentServerMapId) {
-    name = await showPrompt('Nombre del mapa', name || 'Mi mapa');
-    if (!name) { setStatus('Guardado cancelado'); return; }
+  const name = currentServerMapName;
+  if (!name) {
+    setStatus('No hay un mapa activo para guardar');
+    showToast('Crea un mapa nuevo o usa Guardar como', 'info');
+    return;
   }
   try {
     showToast('Guardando…', 'info');
@@ -135,42 +138,67 @@ async function selectPresentationDate(date, autoRefresh = false) {
 }
 
 
+let mapModalMaps = [];
+let mapModalQuery = '';
+let mapModalPage = 0;
+const MAP_MODAL_PAGE_SIZE = 8;
+
+function mapModalGhosts() {
+  return Array.from({length:MAP_MODAL_PAGE_SIZE}, () => `<div class="map-card map-card-ghost" aria-hidden="true"><div class="ghost-preview"></div><div class="map-card-body"><i></i><i></i></div></div>`).join('');
+}
+
+function renderMapModalPage() {
+  const grid = document.getElementById('map-modal-grid');
+  const pagination = document.getElementById('map-modal-pagination');
+  const filtered = mapModalMaps.filter(map => !mapModalQuery || map.name.toLowerCase().includes(mapModalQuery));
+  const pages = Math.max(1, Math.ceil(filtered.length / MAP_MODAL_PAGE_SIZE));
+  mapModalPage = Math.min(mapModalPage, pages - 1);
+  const pageMaps = filtered.slice(mapModalPage * MAP_MODAL_PAGE_SIZE, (mapModalPage + 1) * MAP_MODAL_PAGE_SIZE);
+  grid.classList.remove('loading'); grid.setAttribute('aria-busy', 'false');
+  if (!pageMaps.length) {
+    grid.innerHTML = `<div class="map-modal-empty"><strong>${mapModalQuery ? 'Sin coincidencias' : 'No hay mapas guardados'}</strong><span>${mapModalQuery ? 'Prueba con otro nombre.' : 'Importa un JSON o guarda tu primer mapa.'}</span></div>`;
+  } else {
+    grid.innerHTML = pageMaps.map(map => `
+      <div class="map-card" data-id="${map.id}" data-name="${escapeHtml(map.name.toLowerCase())}" data-click="openServerMapAndClose" data-args='["${map.id}"]'>
+        <canvas class="map-card-canvas" id="mpcv-${map.id}" width="280" height="160"></canvas>
+        <div class="map-card-body"><strong>${escapeHtml(map.name)}</strong><span>${new Date(map.updatedAt).toLocaleDateString()} · ${map.dates.length} fecha(s)</span></div>
+      </div>`).join('');
+    pageMaps.forEach(async map => {
+      try {
+        const r = await fetch(`/api/maps/${encodeURIComponent(map.id)}`, {cache:'no-store'});
+        const data = await r.json(); if (!r.ok) return;
+        const cv = document.getElementById(`mpcv-${map.id}`); if (cv) renderMapPreview(data.snapshot, cv);
+      } catch(e) { /* preview silently fails */ }
+    });
+  }
+  pagination.innerHTML = pages > 1 ? Array.from({length:pages}, (_, index) => `<button class="map-page-dot ${index===mapModalPage?'active':''}" data-click="setMapModalPage" data-args='[${index}]' aria-label="Página ${index+1}" aria-current="${index===mapModalPage?'page':'false'}"></button>`).join('') : '';
+}
+
+function setMapModalPage(page) { mapModalPage = Math.max(0, Number(page) || 0); renderMapModalPage(); }
+
 async function openMapModal() {
   const modal = document.getElementById('map-modal');
   const grid = document.getElementById('map-modal-grid');
   const searchEl = document.getElementById('map-modal-search');
-  if (searchEl) searchEl.value = '';
+  if (searchEl) { searchEl.value = ''; searchEl.disabled = true; }
+  mapModalMaps = [];
+  mapModalQuery = ''; mapModalPage = 0;
   modal.classList.add('open');
-  grid.innerHTML = '<p class="prop-empty" style="padding:24px;text-align:center;grid-column:1/-1">Cargando mapas…</p>';
+  document.getElementById('map-modal-pagination').innerHTML = '';
+  grid.classList.add('loading'); grid.setAttribute('aria-busy', 'true');
+  grid.innerHTML = `<div class="map-loader"><span></span><strong>Cargando mapas</strong></div>${mapModalGhosts()}`;
   try {
     const res = await fetch('/api/maps', {cache:'no-store'});
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'Error');
-    const maps = result.maps;
-    if (!maps.length) {
-      grid.innerHTML = '<p class="prop-empty" style="padding:24px;text-align:center;grid-column:1/-1">No hay mapas guardados en el servidor.</p>';
-      return;
-    }
-    grid.innerHTML = maps.map(map => `
-      <div class="map-card" data-id="${map.id}" data-name="${escapeHtml(map.name.toLowerCase())}" data-click="openServerMapAndClose" data-args='["${map.id}"]'>
-        <canvas class="map-card-canvas" id="mpcv-${map.id}" width="280" height="160"></canvas>
-        <div class="map-card-body">
-          <strong>${escapeHtml(map.name)}</strong>
-          <span>${new Date(map.updatedAt).toLocaleDateString()} · ${map.dates.length} fecha(s)</span>
-        </div>
-      </div>`).join('');
-    maps.forEach(async map => {
-      try {
-        const r = await fetch(`/api/maps/${encodeURIComponent(map.id)}`, {cache:'no-store'});
-        const data = await r.json();
-        if (!r.ok) return;
-        const cv = document.getElementById(`mpcv-${map.id}`);
-        if (cv) renderMapPreview(data.snapshot, cv);
-      } catch(e) { /* preview silently fails */ }
-    });
+    mapModalMaps = result.maps || [];
+    if (searchEl) searchEl.disabled = false;
+    renderMapModalPage();
   } catch(err) {
     console.error(err);
-    grid.innerHTML = '<p class="prop-empty" style="padding:24px;text-align:center;grid-column:1/-1">No se pudo consultar el servidor.</p>';
+    grid.classList.remove('loading'); grid.setAttribute('aria-busy', 'false');
+    if (searchEl) searchEl.disabled = false;
+    grid.innerHTML = '<div class="map-modal-empty"><strong>No se pudo consultar el servidor</strong><span>Inténtalo nuevamente en unos momentos.</span></div>';
   }
 }
 
@@ -179,10 +207,7 @@ function closeMapModal() {
 }
 
 function filterMapModal(query) {
-  const q = query.toLowerCase().trim();
-  document.querySelectorAll('#map-modal-grid .map-card').forEach(card => {
-    card.style.display = (!q || card.dataset.name.includes(q)) ? '' : 'none';
-  });
+  mapModalQuery = query.toLowerCase().trim(); mapModalPage = 0; renderMapModalPage();
 }
 
 function renderMapPreview(snapshot, canvas) {
@@ -228,7 +253,7 @@ function renderMapPreview(snapshot, canvas) {
   allNodes.forEach(n => {
     const cx = tx(n.x), cy = ty(n.y);
     const w = Math.max((n.w || 80) * scale, 4), h = Math.max((n.h || 40) * scale, 3);
-    ctx.fillStyle = n.color || '#0DBFA6';
+    ctx.fillStyle = n.color || '#7C5CFF';
     ctx.beginPath();
     const r = Math.min(3, w / 4, h / 4);
     if (ctx.roundRect) { ctx.roundRect(cx - w / 2, cy - h / 2, w, h, r); }
@@ -317,7 +342,7 @@ async function capturePresentationImage() {
   try {
     await document.fonts?.ready;
     return await window.htmlToImage.toPng(wrap, {
-      backgroundColor:'#070C13', pixelRatio:2, cacheBust:true,
+      backgroundColor:'#0A0912', pixelRatio:2, cacheBust:true,
       width:wrap.clientWidth, height:wrap.clientHeight
     });
   } finally {
@@ -412,7 +437,7 @@ function loadDemo() {
       capacityLabelRotate:generalConfig.capacityLabelRotate, capacityLabelFlip:generalConfig.capacityLabelFlip,
       capacityLabelFontSize:generalConfig.capacityLabelFontSize,
       capacityLabelOverride:false,
-      routeLane:0,
+      routeLane:0, routeStyle: generalConfig.routeStyle === 'free' ? 'free' : 'ortho',
       inPct:0, outPct:0 });
   });
   // Distribute ports on all nodes after links are created
@@ -476,9 +501,10 @@ function _highlightCurrentSearch() {
   document.getElementById(id)?.classList.add('search-current');
   const n = getNode(id);
   if (n) {
+    // n.x / n.y ARE the node's center (nodes render with translate(-50%,-50%)).
     const wrap = document.getElementById('canvas-wrap');
-    panX = wrap.clientWidth  / 2 - (n.x + (n.w || 120) / 2) * zoom;
-    panY = wrap.clientHeight / 2 - (n.y + (n.h || 120) / 2) * zoom;
+    panX = wrap.clientWidth  / 2 - n.x * zoom;
+    panY = wrap.clientHeight / 2 - n.y * zoom;
     applyTransform();
   }
 }
@@ -511,28 +537,28 @@ function _updateSearchCount() {
 const THEMES = {
   'dark': {
     name: 'Oscuro',
-    preview: ['#070C13','#0DBFA6','#0C1520','#F09A38'],
+    preview: ['#0A0912','#7C5CFF','#22D3EE','#FFB020'],
     vars: {
-      '--bg':'#070C13','--surface':'#0C1520','--surface2':'#101E30','--surface3':'#172438',
-      '--border':'#1B2E46','--border-hi':'#274565',
-      '--accent':'#0DBFA6','--accent-lo':'#094F44',
-      '--warm':'#F09A38',
-      '--text':'#C2D4E8','--text2':'#527090','--text3':'#3D6080',
-      '--ok':'#28C97A','--danger':'#E86060',
-      '--grid-dot':'#1E3A5820','--grid-line':'#1E3A5818'
+      '--bg':'#0A0912','--surface':'#12111E','--surface2':'#1A1829','--surface3':'#232038',
+      '--border':'#2A2740','--border-hi':'#3E3A5E',
+      '--accent':'#7C5CFF','--accent2':'#22D3EE','--accent-lo':'#241F45',
+      '--warm':'#FFB020',
+      '--text':'#E6E3F5','--text2':'#9995B8','--text3':'#7D79A2',
+      '--ok':'#34E5B5','--danger':'#FF5D6C',
+      '--grid-dot':'rgba(124,92,255,0.10)','--grid-line':'rgba(124,92,255,0.055)'
     }
   },
   'light': {
     name: 'Claro',
-    preview: ['#EDF2F7','#0891B2','#FFFFFF','#D97706'],
+    preview: ['#ECEBF5','#6A45F0','#0E9DC4','#D97706'],
     vars: {
-      '--bg':'#E8EFF6','--surface':'#FFFFFF','--surface2':'#F0F4F8','--surface3':'#E2EAF2',
-      '--border':'#CBD5E1','--border-hi':'#94A3B8',
-      '--accent':'#0891B2','--accent-lo':'#BAE6FD',
+      '--bg':'#ECEBF5','--surface':'#FFFFFF','--surface2':'#F4F3FB','--surface3':'#EAE8F6',
+      '--border':'#DCDAEC','--border-hi':'#B6B2D6',
+      '--accent':'#6A45F0','--accent2':'#0E9DC4','--accent-lo':'#E9E4FC',
       '--warm':'#D97706',
-      '--text':'#1E293B','--text2':'#475569','--text3':'#64748B',
-      '--ok':'#16A34A','--danger':'#DC2626',
-      '--grid-dot':'rgba(0,0,0,0.10)','--grid-line':'rgba(0,0,0,0.06)'
+      '--text':'#17152B','--text2':'#524F76','--text3':'#6B678C',
+      '--ok':'#0E9F6E','--danger':'#E23A50',
+      '--grid-dot':'rgba(106,69,240,0.12)','--grid-line':'rgba(106,69,240,0.06)'
     }
   }
 };

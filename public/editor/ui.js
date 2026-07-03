@@ -63,6 +63,10 @@ function setTool(t) {
   // Restore persistent panel controls after resetting tool states.
   document.getElementById('tool-toggle-palette')?.classList.toggle('active', !document.body.classList.contains('hide-palette'));
   syncRightPanelControls();
+  syncTagsToggleBtn();
+  syncFreeRoutingBtn();
+  renderCanvasBadges();
+  document.getElementById('tool-multi-place')?.classList.toggle('active', multiPlacementEnabled);
   document.body.classList.toggle('linking', t==='link');
   if (!placingItem) document.getElementById('mode-label').textContent = t==='link' ? 'Modo: Conectar' : 'Modo: Seleccionar';
   renderLinkPointHints();   // draw hints when entering link mode / clear them when leaving
@@ -99,6 +103,189 @@ function setAutoOrderEnabled(enabled) {
     setStatus(autoOrderEnabled ? 'Ordenamiento automático activado' : 'Ordenamiento automático desactivado');
   }
 }
+// Topbar toggle for "inclined" links: flips the global route style between
+// orthogonal (90°) and free (any angle, waypoints snap in 5° steps).
+function syncFreeRoutingBtn() {
+  const btn = document.getElementById('tool-route-style');
+  if (!btn) return;
+  const free = generalConfig.routeStyle === 'free';
+  btn.classList.toggle('active', free);
+  btn.setAttribute('aria-pressed', String(free));
+  const tip = free
+    ? 'Los enlaces nuevos salen inclinados (pasos de 5°) — los existentes no cambian'
+    : 'Los enlaces nuevos salen ortogonales (90°) — clic para crearlos inclinados';
+  btn.title = tip;
+  btn.dataset.tip = tip;
+}
+function toggleFreeRouting() {
+  updateGeneralConfig('routeStyle', generalConfig.routeStyle === 'free' ? 'ortho' : 'free');
+  syncFreeRoutingBtn();
+  setStatus(generalConfig.routeStyle === 'free'
+    ? 'Enlaces nuevos: inclinados en pasos de 5° (cada enlace se cambia desde su panel)'
+    : 'Enlaces nuevos: ortogonales (90°)');
+}
+// ── Canvas informational badges (creation date + threshold legend) ──
+function formatCanvasDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+  if (!match) return value || '';
+  const [, year, month, day] = match;
+  if (generalConfig.dateStampFormat === 'dmy') return `${day}/${month}/${year}`;
+  if (generalConfig.dateStampFormat === 'mdy') return `${month}/${day}/${year}`;
+  if (generalConfig.dateStampFormat === 'long') {
+    return new Intl.DateTimeFormat('es-MX', {day:'numeric', month:'long', year:'numeric'}).format(new Date(Number(year), Number(month)-1, Number(day), 12));
+  }
+  return value;
+}
+function renderCanvasBadges() {
+  const date = document.getElementById('date-stamp');
+  const legend = document.getElementById('scale-legend');
+  if (!date || !legend) return;
+  date.classList.toggle('show', !!generalConfig.dateStampVisible);
+  date.style.left = (generalConfig.dateStampX ?? 14) + 'px';
+  date.style.top = (generalConfig.dateStampY ?? 14) + 'px';
+  date.style.width = generalConfig.dateStampWidth ? generalConfig.dateStampWidth + 'px' : '';
+  date.style.height = generalConfig.dateStampHeight ? generalConfig.dateStampHeight + 'px' : '';
+  date.style.fontSize = (generalConfig.dateStampFontSize || 12) + 'px';
+  date.style.background = generalConfig.dateStampBackground;
+  date.style.borderColor = generalConfig.dateStampBorderColor;
+  date.style.color = generalConfig.dateStampTextColor;
+  const dateIcon = date.querySelector('.canvas-badge-icon');
+  if (dateIcon) dateIcon.style.color = generalConfig.dateStampIconColor;
+  const dateText = document.getElementById('date-stamp-text');
+  if (dateText) {
+    dateText.textContent = `${generalConfig.dateStampLabel || 'Creado:'} ${formatCanvasDate(selectedMapDate || localToday())}`;
+    dateText.style.color = generalConfig.dateStampTextColor;
+  }
+  legend.classList.toggle('show', !!generalConfig.scaleLegendVisible);
+  legend.style.left = (generalConfig.scaleLegendX ?? 14) + 'px';
+  legend.style.top = (generalConfig.scaleLegendY ?? 58) + 'px';
+  legend.style.width = generalConfig.scaleLegendWidth ? generalConfig.scaleLegendWidth + 'px' : '';
+  legend.style.height = generalConfig.scaleLegendHeight ? generalConfig.scaleLegendHeight + 'px' : '';
+  legend.style.fontSize = (generalConfig.scaleLegendFontSize || 10) + 'px';
+  legend.style.background = generalConfig.scaleLegendBackground;
+  legend.style.borderColor = generalConfig.scaleLegendBorderColor;
+  legend.style.color = generalConfig.scaleLegendTextColor;
+  legend.classList.toggle('vertical', generalConfig.scaleLegendOrientation === 'vertical');
+  const legendTitle = legend.querySelector('.scale-legend-title');
+  if (legendTitle) {
+    legendTitle.textContent = generalConfig.scaleLegendTitle || 'Umbrales de utilización';
+    legendTitle.style.color = generalConfig.scaleLegendTextColor;
+    legendTitle.style.display = generalConfig.scaleLegendTitleVisible === false ? 'none' : '';
+  }
+  const bar = document.getElementById('scale-legend-bar');
+  if (bar) {
+    const vertical = generalConfig.scaleLegendOrientation === 'vertical';
+    const gradient = generalConfig.scaleLegendPaletteStyle === 'gradient';
+    bar.innerHTML = gradient ? '' : currentScale.map(item => `<span style="background:${item.color}" title="≥ ${item.pct}%"></span>`).join('');
+    bar.style.background = gradient ? `linear-gradient(to ${vertical ? 'bottom' : 'right'}, ${currentScale.map(item => `${item.color} ${item.pct}%`).join(',')})` : '';
+  }
+  const labels = document.getElementById('scale-legend-labels');
+  if (labels) {
+    labels.innerHTML = currentScale.map(item => `<span>${item.pct}%${generalConfig.scaleLegendThresholdTextVisible !== false && item.text ? ` ${escapeHtml(item.text)}` : ''}</span>`).join('');
+    labels.style.color = generalConfig.scaleLegendTextColor;
+  }
+  [['tool-date-stamp', generalConfig.dateStampVisible], ['tool-legend', generalConfig.scaleLegendVisible]]
+    .forEach(([id, on]) => {
+      const btn = document.getElementById(id);
+      btn?.classList.toggle('active', !!on);
+      btn?.setAttribute('aria-pressed', String(!!on));
+    });
+}
+function updateCanvasDateValue(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return;
+  selectedMapDate = value;
+  lsSet('mapgen_current_server_date', value);
+  const input = document.getElementById('presentation-date');
+  if (input) input.value = value;
+  renderCanvasBadges(); pushHistory(); updatePropsPanel(); setStatus('Fecha del mapa actualizada');
+}
+function toggleDateStamp() {
+  updateGeneralConfig('dateStampVisible', !generalConfig.dateStampVisible);
+  selectCanvasInfo('date');
+}
+function toggleScaleLegend() {
+  updateGeneralConfig('scaleLegendVisible', !generalConfig.scaleLegendVisible);
+  selectCanvasInfo('legend');
+}
+
+// Both badges are draggable; their position persists in the general config.
+['date-stamp', 'scale-legend'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    selectCanvasInfo(id === 'date-stamp' ? 'date' : 'legend');
+    const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
+    const start = { x: e.clientX, y: e.clientY, left: el.offsetLeft, top: el.offsetTop };
+    const move = ev => {
+      el.style.left = Math.max(4, Math.min(wrap.width - el.offsetWidth - 4, start.left + ev.clientX - start.x)) + 'px';
+      el.style.top = Math.max(4, Math.min(wrap.height - el.offsetHeight - 4, start.top + ev.clientY - start.y)) + 'px';
+    };
+    const up = () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      if (el.offsetLeft === start.left && el.offsetTop === start.top) return;
+      if (id === 'date-stamp') { generalConfig.dateStampX = el.offsetLeft; generalConfig.dateStampY = el.offsetTop; }
+      else { generalConfig.scaleLegendX = el.offsetLeft; generalConfig.scaleLegendY = el.offsetTop; }
+      pushHistory(); updatePropsPanel();
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  });
+  el.addEventListener('click', e => e.stopPropagation());
+  el.querySelectorAll('.resize-handle').forEach(handle => handle.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const isDate = id === 'date-stamp';
+    selectCanvasInfo(isDate ? 'date' : 'legend');
+    const dir = handle.dataset.dir || 'se';
+    const start = {x:e.clientX, y:e.clientY, left:el.offsetLeft, top:el.offsetTop, width:el.offsetWidth, height:el.offsetHeight};
+    const minWidth = isDate ? 120 : 110, minHeight = isDate ? 34 : 58;
+    const move = ev => {
+      const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
+      let width = start.width, height = start.height, left = start.left, top = start.top;
+      if (dir.includes('e')) width = Math.max(minWidth, start.width + dx);
+      if (dir.includes('s')) height = Math.max(minHeight, start.height + dy);
+      if (dir.includes('w')) { width = Math.max(minWidth, start.width - dx); left = start.left + start.width - width; }
+      if (dir.includes('n')) { height = Math.max(minHeight, start.height - dy); top = start.top + start.height - height; }
+      Object.assign(el.style, {width:Math.round(width)+'px', height:Math.round(height)+'px', left:Math.round(left)+'px', top:Math.round(top)+'px'});
+    };
+    const up = () => {
+      document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up);
+      const prefix = isDate ? 'dateStamp' : 'scaleLegend';
+      generalConfig[prefix+'Width'] = el.offsetWidth; generalConfig[prefix+'Height'] = el.offsetHeight;
+      generalConfig[prefix+'X'] = el.offsetLeft; generalConfig[prefix+'Y'] = el.offsetTop;
+      pushHistory(); updatePropsPanel();
+    };
+    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+  }));
+});
+
+// ── Canvas background image (floor plan / backdrop) ──
+let _appliedCanvasBackground = null;
+function applyCanvasBackground() {
+  const el = document.getElementById('canvas-bg-image');
+  if (!el) return;
+  const src = generalConfig.canvasBackgroundImage || '';
+  if (_appliedCanvasBackground === src) return;
+  _appliedCanvasBackground = src;
+  el.style.backgroundImage = src ? `url("${src}")` : '';
+  const clearBtn = document.getElementById('cfg-canvas-bg-clear');
+  if (clearBtn) clearBtn.style.display = src ? '' : 'none';
+}
+function setCanvasBackgroundFromFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    updateGeneralConfig('canvasBackgroundImage', reader.result);
+    input.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+function clearCanvasBackground() { updateGeneralConfig('canvasBackgroundImage', null); }
+
 function toggleGrid() { setGridEnabled(!gridEnabled); }
 function toggleSnap() { setSnapEnabled(!snapEnabled); }
 function toggleAutoOrder() { setAutoOrderEnabled(!autoOrderEnabled); }
@@ -177,7 +364,7 @@ function captureHotkey(event, action) {
   if (duplicateAction) hotkeyDraft[duplicateAction] = previousKey;
   hotkeyDraft[action] = key;
   renderHotkeysDraft();
-  const nextButton = document.querySelector(`.hotkey-capture[onkeydown*="'${action}'"]`);
+  const nextButton = document.querySelector(`.hotkey-capture[data-args*='"${action}"']`);
   nextButton?.focus();
 }
 function resetHotkeysDraft() {
@@ -202,7 +389,7 @@ function activateToolHotkey(action) {
 }
 // Currently open modal dialog, if any, so focus can be trapped inside it.
 function openModalElement() {
-  const dialogs = document.querySelectorAll('.modal-backdrop.open, #chart-wizard.open');
+  const dialogs = document.querySelectorAll('.modal-backdrop.open');
   return dialogs.length ? dialogs[dialogs.length - 1] : null;
 }
 // Keep Tab focus within the open modal (accessibility): a dialog should not
@@ -233,14 +420,6 @@ document.addEventListener('keydown', e => {
   }
   if (document.getElementById('prompt-modal')?.classList.contains('open')) {
     if (e.key === 'Escape') { e.preventDefault(); resolvePrompt(null); }
-    return;
-  }
-  if (document.getElementById('chart-wizard')?.classList.contains('open')) {
-    if (e.key === 'Escape') { e.preventDefault(); closeChartWizard(); }
-    return;
-  }
-  if (document.getElementById('cacti-binding-modal')?.classList.contains('open')) {
-    if (e.key === 'Escape') { e.preventDefault(); closeCactiBindingModal(); }
     return;
   }
   if (document.getElementById('map-modal')?.classList.contains('open')) {
@@ -279,7 +458,7 @@ document.addEventListener('keydown', e => {
   if (hotkeyAction) { e.preventDefault(); if (!e.repeat) activateToolHotkey(hotkeyAction); return; }
   if (e.key==='Escape') { revertCancel(); cancelPlacing(); cancelLink(); clearSelection(); setTool('select'); if (multiPlacementEnabled) toggleMultiPlacement(); }
   if (e.key==='Enter') {
-    if (selectedLinkId || selectedId || selectionCount()) {
+    if (selectedLinkId || selectedId || selectedCanvasInfo || selectionCount()) {
       savedStateForCancel = null; clearSelection(); setTool('select');
     } else {
       saveMap(); setStatus('✓ Guardado');
@@ -302,7 +481,64 @@ function setZoom(z, pivotX, pivotY) {
 }
 function zoomIn()  { setZoom(zoom + 0.1); }
 function zoomOut() { setZoom(zoom - 0.1); }
-function zoomFit() { zoom = 1; panX = 0; panY = 0; applyTransform(); }
+// Fit the whole map in the viewport (or reset the view on an empty canvas).
+function zoomFit() {
+  if (!nodes.length) { zoom = 1; panX = 0; panY = 0; applyTransform(); return; }
+  const wrap = document.getElementById('canvas-wrap').getBoundingClientRect();
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  nodes.forEach(n => {
+    const w = n.w || generalConfig.nodeWidth, h = n.h || generalConfig.nodeHeight;
+    minX = Math.min(minX, n.x - w / 2); maxX = Math.max(maxX, n.x + w / 2);
+    minY = Math.min(minY, n.y - h / 2); maxY = Math.max(maxY, n.y + h / 2);
+  });
+  const pad = 60;
+  zoom = Math.max(0.25, Math.min(
+    (wrap.width  - pad * 2) / Math.max(1, maxX - minX),
+    (wrap.height - pad * 2) / Math.max(1, maxY - minY),
+    1.5
+  ));
+  panX = (wrap.width  - (minX + maxX) * zoom) / 2;
+  panY = (wrap.height - (minY + maxY) * zoom) / 2;
+  applyTransform();
+}
+// ── Zoom dropdown preset menu ──────────────────────
+function toggleZoomDropdown() {
+  document.dispatchEvent(new CustomEvent('ui-tooltip-hide'));
+  const menu = document.getElementById('zoom-menu');
+  const label = document.getElementById('zoom-label');
+  if (!menu) return;
+  const opening = !menu.classList.contains('open');
+  menu.classList.toggle('open', opening);
+  label.setAttribute('aria-expanded', String(opening));
+  if (opening) syncZoomPresetActive();
+}
+function closeZoomDropdown() {
+  const menu = document.getElementById('zoom-menu');
+  const label = document.getElementById('zoom-label');
+  if (!menu) return;
+  menu.classList.remove('open');
+  if (label) label.setAttribute('aria-expanded', 'false');
+}
+function setZoomPreset(level) {
+  setZoom(level);
+  closeZoomDropdown();
+}
+function syncZoomPresetActive() {
+  const menu = document.getElementById('zoom-menu');
+  if (!menu) return;
+  const rounded = Math.round(zoom * 100) / 100;
+  menu.querySelectorAll('.dd-item').forEach(btn => {
+    const preset = parseFloat(btn.dataset.args ? JSON.parse(btn.dataset.args)[0] : 0);
+    btn.classList.toggle('active', Math.abs(preset - rounded) < 0.01);
+  });
+}
+document.addEventListener('click', e => {
+  const dropdown = document.getElementById('zoom-dropdown');
+  if (dropdown && !dropdown.contains(e.target)) closeZoomDropdown();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeZoomDropdown();
+});
 document.getElementById('canvas-wrap').addEventListener('wheel', e => {
   e.preventDefault();
   const rect = document.getElementById('canvas-wrap').getBoundingClientRect();

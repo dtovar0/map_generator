@@ -131,7 +131,8 @@ function applySnapshot(snap) {
     capacityLabelFontSize:generalConfig.capacityLabelFontSize,
     capacityLabelOverride:false,
     dividerPosition:generalConfig.dividerPosition, dividerPositionOverride:false,
-    routeLane:0, styleOverride:false, fromPortLocked:false, toPortLocked:false,
+    routeLane:0, routeStyle:'ortho',
+    styleOverride:false, fromPortLocked:false, toPortLocked:false,
     dataSource:null, telemetryError:null, telemetryTimestamp:null, ...l
   })).map(l => {
     const capacity = Math.max(.01, Number(l.capacity) || 100);
@@ -179,8 +180,14 @@ function redo() {
   updateUndoBtns(); saveLocalDraft(true); setStatus('Rehacer');
 }
 function updateUndoBtns() {
-  document.getElementById('btn-undo')?.classList.toggle('disabled', historyIdx <= 0);
-  document.getElementById('btn-redo')?.classList.toggle('disabled', historyIdx >= history.length - 1);
+  const undoBtn = document.getElementById('btn-undo');
+  const redoBtn = document.getElementById('btn-redo');
+  const undoDisabled = historyIdx <= 0;
+  const redoDisabled = historyIdx >= history.length - 1;
+  undoBtn?.classList.toggle('disabled', undoDisabled);
+  undoBtn?.setAttribute('aria-disabled', String(undoDisabled));
+  redoBtn?.classList.toggle('disabled', redoDisabled);
+  redoBtn?.setAttribute('aria-disabled', String(redoDisabled));
 }
 
 // ════════════════════════════════════════════════════
@@ -250,6 +257,14 @@ function updateThresholdColor(idx, color) {
   pushHistory(); setStatus('Color general actualizado');
 }
 
+function updateThresholdText(idx, text) {
+  if (!currentScale[idx]) return;
+  const value = String(text || '').trim().slice(0, 30);
+  if ((currentScale[idx].text || '') === value) return;
+  currentScale[idx].text = value;
+  renderScaleUI(); pushHistory(); setStatus('Texto del umbral actualizado');
+}
+
 function getColor(pct, scale = currentScale) {
   const p = Array.isArray(scale) && scale.length >= 2 ? scale : currentScale;
   if (pct <= p[0].pct) return p[0].color;
@@ -298,6 +313,8 @@ function renderScaleUI() {
         ? `<button class="sth-del" data-click="removeThreshold" data-args='[${i}]' title="Eliminar">✕</button>`
         : `<div style="width:22px"></div>`}
     </div>`).join('');
+  renderCanvasBadges(); // the on-canvas threshold legend mirrors this scale
+  if (selectedCanvasInfo === 'legend') updatePropsPanel();
 }
 
 // ════════════════════════════════════════════════════
@@ -323,7 +340,10 @@ function applyTransform() {
   const after = document.getElementById('canvas-bg');
   after.style.setProperty('--pan-x', (panX % 100) + 'px');
   after.style.setProperty('--pan-y', (panY % 100) + 'px');
-  document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
+  const zoomText = Math.round(zoom * 100) + '%';
+  document.getElementById('zoom-label').textContent = zoomText;
+  const floatingZoomLabel = document.getElementById('floating-zoom-label');
+  if (floatingZoomLabel) floatingZoomLabel.textContent = zoomText;
   scheduleLocalDraftSave();
 }
 function setStatus(msg) {
