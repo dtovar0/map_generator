@@ -1,7 +1,6 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
-export const mapsDirectory = path.join(process.cwd(), "data", "maps");
+import { randomUUID } from "node:crypto";
+import type { RowDataPacket } from "mysql2/promise";
+import { dbReady, mapgenPool } from "../db";
 
 export interface MapRecord {
   id: string;
@@ -9,6 +8,14 @@ export interface MapRecord {
   createdAt: string;
   updatedAt: string;
   days: Record<string, unknown>;
+}
+
+export interface MapSummary {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  dates: string[];
 }
 
 export function validId(id: unknown): id is string {
@@ -25,12 +32,71 @@ export function validSnapshot(snapshot: unknown): snapshot is { nodes: unknown[]
   return Array.isArray(value.nodes) && Array.isArray(value.links);
 }
 
-export async function readRecord(id: string): Promise<MapRecord | null> {
+function parseDays(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object") return value as Record<string, unknown>;
   try {
-    return JSON.parse(await readFile(path.join(mapsDirectory, `${id}.json`), "utf8")) as MapRecord;
+    return JSON.parse(String(value)) as Record<string, unknown>;
   } catch {
-    return null;
+    return {};
   }
+}
+
+function toRecord(row: RowDataPacket): MapRecord {
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    createdAt: new Date(row.created_at as string).toISOString(),
+    updatedAt: new Date(row.updated_at as string).toISOString(),
+    days: parseDays(row.days),
+  };
+}
+
+export async function listMaps(): Promise<MapSummary[]> {
+  await dbReady();
+  const [rows] = await mapgenPool().query<RowDataPacket[]>(
+    `SELECT id, name, created_at, updated_at, JSON_KEYS(days) AS dates FROM maps ORDER BY updated_at DESC`,
+  );
+  return rows.map((row) => ({
+    id: String(row.id),
+    name: String(row.name),
+    createdAt: new Date(row.created_at as string).toISOString(),
+    updatedAt: new Date(row.updated_at as string).toISOString(),
+    dates: (Array.isArray(row.dates) ? row.dates.map(String) : (JSON.parse(String(row.dates || "[]")) as string[])).sort(),
+  }));
+}
+
+export async function readRecord(id: string): Promise<MapRecord | null> {
+  await dbReady();
+  const [rows] = await mapgenPool().query<RowDataPacket[]>(
+    `SELECT id, name, days, created_at, updated_at FROM maps WHERE id = ?`, [id],
+  );
+  return rows.length ? toRecord(rows[0]) : null;
+}
+
+export async function saveDay(input: {
+  id?: string; name?: string; date: string; snapshot: Record<string, unknown>; userId: number | null;
+}): Promise<MapSummary> {
+  await dbReady();
+  const id = validId(input.id) ? input.id : randomUUID();
+  // Serialize saves per map so concurrent writes can't lose a day.
+  return withMapLock(id, async () => {
+    const existing = await readRecord(id);
+    const name = String(input.name || existing?.name || "Mapa sin nombre").trim().slice(0, 80) || "Mapa sin nombre";
+    const days = existing?.days || {};
+    days[input.date] = input.snapshot;
+    await mapgenPool().query(
+      `INSERT INTO maps (id, name, days, updated_by) VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE name = VALUES(name), days = VALUES(days), updated_by = VALUES(updated_by)`,
+      [id, name, JSON.stringify(days), input.userId],
+    );
+    const saved = await readRecord(id);
+    return {
+      id, name,
+      createdAt: saved?.createdAt || new Date().toISOString(),
+      updatedAt: saved?.updatedAt || new Date().toISOString(),
+      dates: Object.keys(days).sort(),
+    };
+  });
 }
 
 // Per-id serialization: two concurrent saves of the same map otherwise

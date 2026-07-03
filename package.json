@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "test": "node --import tsx --test tests/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "maps:import": "node scripts/import-maps.mjs"
   },
   "dependencies": {
     "chart.js": "4.5.1",
