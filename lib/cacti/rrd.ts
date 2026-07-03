@@ -25,6 +25,47 @@ async function resolveRrdPath(storedPath: string): Promise<string> {
   return filename;
 }
 
+export type RrdConsolidation = "AVERAGE" | "MIN" | "MAX" | "LAST";
+export interface RrdSeriesPoint { timestamp: number; value: number | null }
+
+const RRD_RANGES: Record<string, string> = {
+  "1h":"now-1h", "6h":"now-6h", "24h":"now-24h", "7d":"now-7d",
+  "30d":"now-30d", "90d":"now-90d", "1y":"now-1y",
+};
+
+/** Fetches every consolidated point selected by rrdtool for the requested range. */
+export async function getRrdSeries(
+  localDataId: number,
+  dsName: string,
+  range = "24h",
+  consolidation: RrdConsolidation = "AVERAGE",
+): Promise<RrdSeriesPoint[]> {
+  const paths = await getDataSourcePaths([localDataId]);
+  const storedPath = paths.get(localDataId);
+  if (!storedPath) return [];
+  const filename = await resolveRrdPath(storedPath);
+  const { rrdTool } = getCactiConfig();
+  const start = RRD_RANGES[range] || RRD_RANGES["24h"];
+  const cf: RrdConsolidation = ["AVERAGE", "MIN", "MAX", "LAST"].includes(consolidation) ? consolidation : "AVERAGE";
+  const { stdout } = await execFileAsync(rrdTool, ["fetch", filename, cf, "--start", start, "--end", "now"], {
+    timeout: 20_000,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  const lines = stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  const names = lines[0].split(/\s+/);
+  const index = names.indexOf(dsName);
+  if (index < 0) return [];
+  return lines.slice(1).flatMap((line) => {
+    const separator = line.indexOf(":");
+    if (separator < 0) return [];
+    const timestamp = Number(line.slice(0, separator));
+    const raw = line.slice(separator + 1).trim().split(/\s+/)[index];
+    const value = Number(raw);
+    return Number.isFinite(timestamp) ? [{timestamp, value:Number.isFinite(value) ? value : null}] : [];
+  });
+}
+
 function dateRange(date?: string): [string, string] {
   if (!date) return ["now-20m", "now"];
   const start = new Date(`${date}T00:00:00`);

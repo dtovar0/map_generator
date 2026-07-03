@@ -158,6 +158,15 @@
   .cacti-picker .prop-val { width: 100%; margin-top: 4px; }
   .cacti-ds-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
   .cacti-ds-grid label { color: var(--text2); font-size: 10px; }
+  .cacti-direction-picker { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: stretch; gap: 7px; margin: 9px 0; }
+  .cacti-direction-value { min-width: 0; display: grid; gap: 4px; padding: 9px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  .cacti-direction-value small { color: var(--text3); font-size: 8px; font-weight: 750; letter-spacing: .35px; text-transform: uppercase; }
+  .cacti-direction-value strong { color: var(--text); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cacti-direction-swap { min-width: 52px; display: grid; place-items: center; align-content: center; gap: 1px; padding: 5px 7px; border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--border)); border-radius: 10px; background: color-mix(in srgb, var(--accent) 9%, var(--surface2)); color: var(--accent); font-size: 17px; cursor: pointer; transition: transform .15s, background .15s, border-color .15s; }
+  .cacti-direction-swap span { font-size: 8px; font-weight: 700; }
+  .cacti-direction-swap:hover:not(:disabled) { transform: translateY(-1px); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--surface2)); }
+  .cacti-direction-picker.disabled { opacity: .58; }
+  .cacti-direction-swap:disabled { cursor: not-allowed; }
   .cacti-modal-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 10px 0; }
   .cacti-modal-grid label, .cacti-picker .cacti-ds-grid label {
     display: grid; gap: 5px; color: var(--text2); font-size: 10px; font-weight: 600; letter-spacing: .15px;
@@ -202,6 +211,15 @@
   .cacti-source-option em { max-width: 38%; padding: 3px 6px; border-radius: 999px; background: var(--surface3); color: var(--text2); font-size: 8px; font-style: normal; overflow: hidden; text-overflow: ellipsis; }
   .cacti-source-empty { padding: 15px; color: var(--text3); font-size: 10px; text-align: center; }
   .cacti-source-select.disabled .cacti-source-trigger { opacity: .55; cursor: not-allowed; box-shadow: none; transform: none; }
+  .chart-series-list { display:grid; gap:6px; margin-top:9px; }
+  .chart-series-item { display:grid; grid-template-columns:26px minmax(0,1fr) 24px; align-items:center; gap:7px; padding:7px; border:1px solid var(--border); border-radius:9px; background:var(--surface2); }
+  .chart-series-item input[type="color"] { width:26px; height:26px; padding:2px; border:0; background:transparent; }
+  .chart-series-item span { min-width:0; display:grid; gap:2px; }
+  .chart-series-item strong, .chart-series-item small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chart-series-item strong { color:var(--text); font-size:10px; } .chart-series-item small { color:var(--text3); font-size:8px; }
+  .chart-source-form { display:grid; gap:7px; margin-top:8px; padding:9px; border:1px solid var(--border); border-radius:10px; background:var(--surface2); }
+  .chart-source-form label { display:grid; gap:4px; color:var(--text3); font-size:9px; }
+  .chart-ds-add { width:100%; margin-top:5px; text-align:left; }
   .theme-scope-btn {
     width: 100%; display: flex; align-items: center; gap: 9px; margin: 5px 0 10px; padding: 9px 10px;
     border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border)); border-radius: 10px;
@@ -220,7 +238,7 @@
     border-radius: 12px; background: color-mix(in srgb, var(--accent) 7%, var(--surface2));
   }
   .cacti-preview.error { border-color: color-mix(in srgb, var(--danger) 42%, transparent); background: color-mix(in srgb, var(--danger) 8%, var(--surface2)); }
-  .cacti-preview-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .cacti-preview-head { display: flex; align-items: center; justify-content: center; gap: 10px; text-align: center; }
   .cacti-preview-head strong { color: var(--text); font-size: 11px; }
   .cacti-preview-head span { color: var(--text2); font-size: 10px; text-align: right; }
   .cacti-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }

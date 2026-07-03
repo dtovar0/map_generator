@@ -141,7 +141,10 @@ function applySnapshot(snap) {
       Object.assign(n, n.appearanceThemes[activeTheme]);
     }
     if (n.type === 'chart') {
-      n.graphConfig ||= {type:'bar', color:activeTheme === 'light' ? '#6a45f0' : '#7c5cff', values:[25,50,35,80,60], title:n.name || 'Gráfica'};
+      n.graphConfig ||= {type:'line', title:n.name || 'Gráfica', range:'24h', consolidation:'AVERAGE', series:[]};
+      n.graphConfig.type = n.graphConfig.type === 'donut' ? 'line' : (n.graphConfig.type || 'line');
+      n.graphConfig.range ||= '24h'; n.graphConfig.consolidation ||= 'AVERAGE'; n.graphConfig.series ||= [];
+      delete n.graphConfig.mode; delete n.graphConfig.values;
       n.graphConfigThemes ||= {};
       n.graphConfigThemes[activeTheme] ||= {type:n.graphConfig.type || 'bar', color:n.graphConfig.color || (activeTheme === 'light' ? '#6a45f0' : '#7c5cff')};
       Object.assign(n.graphConfig, n.graphConfigThemes[activeTheme]);

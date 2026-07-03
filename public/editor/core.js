@@ -220,13 +220,16 @@ let multiPlacementEnabled = false;
 let arrangeEmbeddedInTab = false;
 let editingTextNodeId = null, inlineTextSnapshot = null, finishingInlineText = false;
 const chartInstances = new Map();
+const chartSeriesCache = new Map();
 function destroyChartInstance(id) {
   chartInstances.get(id)?.destroy();
   chartInstances.delete(id);
+  chartSeriesCache.delete(id);
 }
 function destroyAllCharts() {
   chartInstances.forEach(chart => chart.destroy());
   chartInstances.clear();
+  chartSeriesCache.clear();
 }
 let draggingNode = null, dragOffX = 0, dragOffY = 0;
 let dragGroupStart = [];           // [{id,x,y}] start positions for group move

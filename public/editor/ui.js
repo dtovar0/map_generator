@@ -324,6 +324,7 @@ function deleteSelected() {
   clearSelection(); renderLinks(); updateHint(); updateCounter(); pushHistory();
   setStatus(total > 1 ? `${total} elementos eliminados`
     : removingNodes.size ? 'Nodo eliminado' : 'Enlace eliminado');
+  showToast(total > 1 ? `${total} elementos eliminados.` : removingNodes.size ? 'Nodo eliminado.' : 'Enlace eliminado.', 'success');
 }
 function updatePaletteHotkeyTitles() {
   HOTKEY_TOOLS.forEach(tool => {

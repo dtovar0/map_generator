@@ -24,7 +24,7 @@ const SEG_OPTIONS = {
   chartType: [
     ['bar','<svg viewBox="0 0 24 24"><path d="M5 19V10h4v9M10 19V5h4v14M15 19v-7h4v7M3 19h18"/></svg>','Barras'],
     ['line','<svg viewBox="0 0 24 24"><path d="M4 15l5-6 4 4 6-8"/><path d="M3 19h18"/></svg>','Línea'],
-    ['donut','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3"/></svg>','Dona']
+    ['area','<svg viewBox="0 0 24 24"><path d="M4 16l5-7 4 4 7-8v14H4Z"/></svg>','Área']
   ]
 };
 function segToggleHtml(name, value, options, call, opts = {}) {
@@ -705,14 +705,27 @@ function updatePropsPanel() {
       ${n.type === 'chart' ? `
         <div class="prop-row">
           <div class="prop-label">Gráfica</div>
+          <div class="cacti-state connected" style="margin-top:7px">● Fuente Cacti configurada (DB o RRD)</div>
           <div class="prop-label" style="margin-top:7px">Tipo</div>
           ${segToggleHtml(`chart-type-${n.id}`, n.graphConfig?.type || 'bar', SEG_OPTIONS.chartType, `updateChartConfig('${n.id}','type','%v')`, {label:'Tipo de gráfica'})}
-          <div class="prop-label" style="margin-top:7px">Color</div>
-          <input class="prop-val" type="color" value="${n.graphConfig?.color || '#7c5cff'}" style="height:31px;padding:3px"
-                 data-change="updateChartConfig" data-args='["${n.id}","color","$value"]' />
-          <div class="prop-label" style="margin-top:7px">Valores separados por coma</div>
-          <input class="prop-val editable" type="text" value="${escapeHtml((n.graphConfig?.values || []).join(', '))}"
-                 placeholder="25, 50, 35, 80, 60" data-change="updateChartConfig" data-args='["${n.id}","values","$value"]' />
+          <div class="prop-label" style="margin-top:9px">Escala temporal</div>
+          <select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","range","$value"]'>
+            ${[['1h','Última hora'],['6h','Últimas 6 horas'],['24h','Últimas 24 horas'],['7d','Últimos 7 días'],['30d','Últimos 30 días'],['90d','Últimos 90 días'],['1y','Último año']].map(([value,label]) => `<option value="${value}" ${n.graphConfig?.range===value?'selected':''}>${label}</option>`).join('')}
+          </select>
+          <div class="prop-label" style="margin-top:7px">Consolidación</div>
+          <select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","consolidation","$value"]'>
+            ${[['AVERAGE','Promedio'],['MAX','Máximo'],['MIN','Mínimo'],['LAST','Último']].map(([value,label]) => `<option value="${value}" ${n.graphConfig?.consolidation===value?'selected':''}>${label}</option>`).join('')}
+          </select>
+          <div class="chart-series-list">${chartSeriesListHtml(n)}</div>
+          <button class="tb-btn primary u-w-full u-mt-7" data-click="toggleChartSourcePicker" data-args='["${n.id}"]'>+ Agregar fuente</button>
+          <div id="chart-source-picker-${n.id}"></div>
+          <div class="prop-label" style="margin-top:9px">Presentación</div>
+          <label class="prop-check"><input type="checkbox" ${n.graphConfig?.stacked?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","stacked","$checked"]'> Apilar series</label>
+          <label class="prop-check"><input type="checkbox" ${n.graphConfig?.fill || n.graphConfig?.type==='area'?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","fill","$checked"]'> Rellenar área</label>
+          <label class="prop-check"><input type="checkbox" ${n.graphConfig?.legend!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","legend","$checked"]'> Mostrar leyenda</label>
+          <label class="prop-check"><input type="checkbox" ${n.graphConfig?.showAxes!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","showAxes","$checked"]'> Mostrar ejes</label>
+          <label class="prop-check"><input type="checkbox" ${n.graphConfig?.points?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","points","$checked"]'> Mostrar puntos</label>
+          <button class="tb-btn u-w-full u-mt-7" data-click="refreshChartRrd" data-args='["${n.id}"]'>↻ Actualizar datos</button>
         </div>` : n.type === 'text' ? `
         <div class="prop-row">
           <div class="prop-label">Contenido</div>

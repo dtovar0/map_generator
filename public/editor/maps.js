@@ -2,8 +2,6 @@
 // MAP ACTIONS
 // ════════════════════════════════════════════════════
 async function newMap() {
-  const ok = await showConfirm('Se perderán todos los cambios no guardados.', 'Nuevo mapa', 'Crear nuevo');
-  if (!ok) return;
   const name = await showPrompt('Nombre del nuevo mapa', 'Mi mapa');
   if (!name?.trim()) { setStatus('Creación de mapa cancelada'); return; }
   cancelPlacing(); cancelLink();
@@ -21,6 +19,27 @@ async function newMap() {
   hideRightPanel();
   setStatus(`Nuevo mapa: ${name.trim()}`);
   showToast(`Mapa “${name.trim()}” creado`, 'success');
+}
+
+async function clearCanvas() {
+  const total = nodes.length + links.length;
+  if (!total) {
+    showToast('El canvas ya está vacío.', 'info');
+    return;
+  }
+  const ok = await showConfirm(
+    `Se eliminarán ${total} elemento${total === 1 ? '' : 's'} del canvas. Podrás deshacer esta acción.`,
+    'Limpiar canvas',
+    'Limpiar canvas'
+  );
+  if (!ok) return;
+  cancelPlacing(); cancelLink(); destroyAllCharts();
+  nodes.forEach(node => document.getElementById(node.id)?.remove());
+  nodes = []; links = []; nodeCounter = 0; linkCounter = 0;
+  clearSelection(); renderLinks(); updateHint(); updateCounter();
+  pushHistory();
+  setStatus('Canvas limpio');
+  showToast(`${total} elemento${total === 1 ? '' : 's'} eliminado${total === 1 ? '' : 's'} del canvas.`, 'success');
 }
 function rememberCurrentServerMap(id, name, date = selectedMapDate) {
   currentServerMapId = id || null;
@@ -357,8 +376,10 @@ async function exportMapImage() {
     const anchor = document.createElement('a');
     anchor.href = dataUrl; anchor.download = `mapa-${selectedMapDate}.png`; anchor.click();
     setStatus(`✓ Imagen exportada: ${selectedMapDate}`);
+    showToast('Imagen PNG exportada.', 'success');
   } catch (err) {
     console.error(err); setStatus('⚠ No se pudo exportar la imagen');
+    showToast('No se pudo exportar la imagen.', 'error');
   }
 }
 async function exportMapPdf() {
@@ -375,8 +396,10 @@ async function exportMapPdf() {
     pdf.addImage(dataUrl, 'PNG', 0, 0, width, height);
     pdf.save(`mapa-${selectedMapDate}.pdf`);
     setStatus(`✓ PDF exportado: ${selectedMapDate}`);
+    showToast('Documento PDF exportado.', 'success');
   } catch (err) {
     console.error(err); setStatus('⚠ No se pudo exportar el PDF');
+    showToast('No se pudo exportar el PDF.', 'error');
   }
 }
 function autoLayout() {
@@ -389,6 +412,7 @@ function autoLayout() {
   if (!revertIfLinksOverlap(beforeLayout)) {
     pushHistory();
     setStatus('Auto-layout aplicado');
+    showToast('Distribución automática aplicada.', 'success');
   }
 }
 

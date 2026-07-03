@@ -439,6 +439,86 @@ const cactiDemoCatalog = {
   ])
 };
 const cactiCatalog = { devices:null, graphs:new Map(), sources:new Map(), demo:false };
+
+function chartSeriesListHtml(node) {
+  const series = Array.isArray(node.graphConfig?.series) ? node.graphConfig.series : [];
+  if (!series.length) return '<div class="cacti-state" style="margin-top:8px">Sin series vinculadas.</div>';
+  return series.map((item,index) => `<div class="chart-series-item">
+    <input type="color" value="${escapeHtml(item.color || '#7c5cff')}" data-change="updateChartSeries" data-args='["${node.id}",${index},"color","$value"]'>
+    <span><strong>${escapeHtml(item.label || item.dsName)}</strong><small>${escapeHtml(item.deviceName || '')} · ${escapeHtml(item.sourceName || '')}</small></span>
+    <button class="sth-del" data-click="removeChartSeries" data-args='["${node.id}",${index}]' title="Quitar serie">✕</button>
+  </div>`).join('');
+}
+
+function chartPaletteColor(index) {
+  return ['#7c5cff','#22c55e','#f59e0b','#06b6d4','#ef4444','#ec4899','#84cc16','#3b82f6'][index % 8];
+}
+
+async function toggleChartSourcePicker(nodeId) {
+  const wrap = document.getElementById(`chart-source-picker-${nodeId}`); if (!wrap) return;
+  if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = '<span class="cacti-state">Cargando equipos…</span>';
+  try {
+    if (!cactiCatalog.devices) {
+      const response = await fetch('/api/cacti/devices', {cache:'no-store'}), result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Cacti no disponible');
+      cactiCatalog.devices = result.devices;
+    }
+    wrap.innerHTML = `<div class="chart-source-form"><label><span>Equipo</span><select class="prop-val" data-change="loadChartSources" data-args='["${nodeId}","$value"]'><option value="">Selecciona…</option>${cactiCatalog.devices.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('')}</select></label><div id="chart-source-fields-${nodeId}"></div></div>`;
+  } catch (error) { wrap.innerHTML = `<span class="cacti-state error">⚠ ${escapeHtml(error.message)}</span>`; }
+}
+
+async function loadChartSources(nodeId, rawHostId) {
+  const hostId = Number(rawHostId), wrap = document.getElementById(`chart-source-fields-${nodeId}`); if (!wrap) return;
+  if (!hostId) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = '<span class="cacti-state">Buscando fuentes de Cacti…</span>';
+  try {
+    if (!cactiCatalog.sources.has(hostId)) {
+      const response = await fetch(`/api/cacti/devices/${hostId}/data-sources`, {cache:'no-store'}), result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'No se pudieron cargar las fuentes');
+      cactiCatalog.sources.set(hostId, result.dataSources);
+    }
+    const sources = cactiCatalog.sources.get(hostId) || [];
+    wrap.innerHTML = `<label><span>Fuente</span><select id="chart-source-${nodeId}" class="prop-val" data-change="loadChartDataSources" data-args='["${nodeId}",${hostId},"$value"]'><option value="">Selecciona…</option>${sources.map(s => `<option value="${s.localDataId}">${escapeHtml(s.name || cactiSourceDisplayName(s))}</option>`).join('')}</select></label><div id="chart-ds-${nodeId}"></div>`;
+  } catch (error) { wrap.innerHTML = `<span class="cacti-state error">⚠ ${escapeHtml(error.message)}</span>`; }
+}
+
+function loadChartDataSources(nodeId, hostId, rawLocalDataId) {
+  const localDataId = Number(rawLocalDataId), wrap = document.getElementById(`chart-ds-${nodeId}`);
+  const source = (cactiCatalog.sources.get(Number(hostId)) || []).find(s => Number(s.localDataId) === localDataId);
+  if (!wrap || !source) { if (wrap) wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `<div class="prop-label" style="margin-top:7px">DS disponibles</div>${(source.dataSourceNames || []).map(ds => `<button class="tb-btn chart-ds-add" data-click="addChartSeries" data-args='["${nodeId}",${hostId},${localDataId},"${escapeHtml(ds)}"]'>+ ${escapeHtml(ds)}</button>`).join('')}`;
+}
+
+function addChartSeries(nodeId, hostId, localDataId, dsName) {
+  const node = getNode(nodeId); if (!node) return;
+  const source = (cactiCatalog.sources.get(Number(hostId)) || []).find(s => Number(s.localDataId) === Number(localDataId));
+  const device = (cactiCatalog.devices || []).find(d => Number(d.id) === Number(hostId));
+  node.graphConfig ||= {}; node.graphConfig.series ||= [];
+  if (node.graphConfig.series.some(s => Number(s.localDataId) === Number(localDataId) && s.dsName === dsName)) {
+    showToast('Esta serie ya está agregada.', 'info'); return;
+  }
+  const index = node.graphConfig.series.length;
+  node.graphConfig.series.push({id:`s${Date.now()}-${index}`, hostId:Number(hostId), localDataId:Number(localDataId), dsName,
+    label:dsName, deviceName:device?.name || '', sourceName:source?.name || cactiSourceDisplayName(source), color:chartPaletteColor(index), multiplier:1});
+  chartSeriesCache.delete(nodeId); pushHistory(); updatePropsPanel(); loadChartRrdData(node, true);
+  showToast('Serie RRD agregada.', 'success');
+}
+
+function removeChartSeries(nodeId, index) {
+  const node = getNode(nodeId); if (!node?.graphConfig?.series) return;
+  node.graphConfig.series.splice(index, 1); chartSeriesCache.delete(nodeId); pushHistory(); renderNode(node); updatePropsPanel();
+}
+
+function updateChartSeries(nodeId, index, key, value) {
+  const node = getNode(nodeId), series = node?.graphConfig?.series?.[index]; if (!series) return;
+  series[key] = value; pushHistory(); renderNode(node); updatePropsPanel();
+}
+
+function refreshChartRrd(nodeId) {
+  const node = getNode(nodeId); if (!node) return;
+  chartSeriesCache.delete(nodeId); loadChartRrdData(node, true); setStatus('Actualizando series RRD…');
+}
 let cactiPickerOpenLinkId = null;
 
 function setCactiPanelState(message, type = '') {
@@ -467,7 +547,6 @@ function cactiBindingHtml(link) {
     <div id="cacti-picker-${link.id}" class="cacti-picker"></div>
     <div class="cacti-binding-actions" style="margin-top:8px">
       <button class="tb-btn primary" type="button" data-click="saveCactiBindingFromPanel" data-args='["${link.id}"]'>Guardar vínculo</button>
-      <button class="tb-btn" type="button" data-click="resetCactiDemoCatalog">Usar demo</button>
     </div>` : ''}
   </div>`;
 }
@@ -569,12 +648,16 @@ function chooseCactiDevice(linkId, hostId) {
   picker?.classList.remove('open'); loadCactiGraphs(linkId, hostId);
 }
 
+function cactiSourceDisplayName(source) {
+  return source?.graphName || source?.snmpIndex || `Fuente ${source?.localDataId || '—'}`;
+}
+
 function cactiSourcePickerHtml(linkId, hostId, sources, selectedId = null, fixedGraphId = null) {
   const selected = sources.find(source => Number(source.localDataId) === Number(selectedId));
   const buttonLabel = selected
-    ? escapeHtml(selected.name)
+    ? escapeHtml(cactiSourceDisplayName(selected))
     : sources.length ? 'Selecciona una fuente…' : 'No hay fuentes disponibles';
-  const buttonMeta = selected?.snmpIndex ? `<small>${escapeHtml(selected.snmpIndex)}</small>` : '';
+  const buttonMeta = selected?.graphName && selected?.snmpIndex ? `<small>${escapeHtml(selected.snmpIndex)}</small>` : '';
   const nativeOptions = sources.map(source => {
     const graphId = fixedGraphId || source.graphId || '';
     return `<option value="${source.localDataId}" data-graph-id="${graphId}" ${Number(selectedId)===Number(source.localDataId)?'selected':''}>${escapeHtml(source.name)}</option>`;
@@ -585,7 +668,7 @@ function cactiSourcePickerHtml(linkId, hostId, sources, selectedId = null, fixed
     return `<button type="button" class="cacti-source-option ${Number(selectedId)===Number(source.localDataId)?'selected':''}"
       data-search="${escapeHtml(search)}" data-click="chooseCactiSource"
       data-args='["${linkId}",${hostId},${source.localDataId},${graphId || 'null'}]'>
-      <span><strong>${escapeHtml(source.name)}</strong>${source.graphName ? `<small>${escapeHtml(source.graphName)}</small>` : ''}</span>
+      <span><strong>${escapeHtml(cactiSourceDisplayName(source))}</strong></span>
       ${source.snmpIndex ? `<em>${escapeHtml(source.snmpIndex)}</em>` : ''}
     </button>`;
   }).join('');
@@ -659,7 +742,7 @@ function chooseCactiSource(linkId, hostId, localDataId, graphId = null) {
   const picker = document.getElementById(`cacti-source-picker-${linkId}`);
   const source = (cactiCatalog.sources.get(Number(hostId)) || []).find(item => Number(item.localDataId) === Number(localDataId));
   const trigger = picker?.querySelector('.cacti-source-trigger span');
-  if (trigger && source) trigger.innerHTML = `${escapeHtml(source.name)}${source.snmpIndex ? `<small>${escapeHtml(source.snmpIndex)}</small>` : ''}`;
+  if (trigger && source) trigger.innerHTML = `${escapeHtml(cactiSourceDisplayName(source))}${source.graphName && source.snmpIndex ? `<small>${escapeHtml(source.snmpIndex)}</small>` : ''}`;
   picker?.querySelectorAll('.cacti-source-option').forEach(option => option.classList.toggle('selected', option.dataset.args?.includes(`,${localDataId},`)));
   const menu = picker?.querySelector('.cacti-source-menu');
   if (menu) menu.hidden = true;
@@ -674,13 +757,35 @@ function cactiDisabledFlowHtml(linkId, sourceText = 'Primero selecciona un equip
       </select></label>
     </div>
     <div id="cacti-ds-wrap-${linkId}">
-      <div class="cacti-ds-grid">
-        <label>Entrada<select class="prop-val" id="cacti-in-${linkId}" disabled><option>${escapeHtml(dsText)}</option></select></label>
-        <label>Salida<select class="prop-val" id="cacti-out-${linkId}" disabled><option>${escapeHtml(dsText)}</option></select></label>
-      </div>
+      ${cactiDirectionPickerHtml(linkId, '', '', null, null, dsText)}
       ${cactiPreviewHtml('Selecciona una fuente y sus DS para ver valores de muestra.')}
     </div>
   </div>`;
+}
+
+function cactiDirectionPickerHtml(linkId, inDs, outDs, hostId = null, localDataId = null, placeholder = '') {
+  const enabled = !!(hostId && localDataId && (inDs || outDs));
+  const value = (name, fallback) => name ? escapeHtml(name) : escapeHtml(placeholder || fallback);
+  return `<div class="cacti-direction-picker ${enabled ? '' : 'disabled'}">
+    <input type="hidden" id="cacti-in-${linkId}" value="${escapeHtml(inDs || '')}">
+    <input type="hidden" id="cacti-out-${linkId}" value="${escapeHtml(outDs || '')}">
+    <div class="cacti-direction-value"><small>Entrada</small><strong id="cacti-in-label-${linkId}">${value(inDs, 'No detectada')}</strong></div>
+    <button type="button" class="cacti-direction-swap" ${enabled ? '' : 'disabled'} data-click="invertCactiDirections" data-args='["${linkId}",${hostId || 'null'},${localDataId || 'null'}]' title="Invertir entrada y salida" aria-label="Invertir entrada y salida">⇄<span>Invertir</span></button>
+    <div class="cacti-direction-value"><small>Salida</small><strong id="cacti-out-label-${linkId}">${value(outDs, 'No detectada')}</strong></div>
+  </div>`;
+}
+
+function invertCactiDirections(linkId, hostId, localDataId) {
+  const inInput = document.getElementById(`cacti-in-${linkId}`);
+  const outInput = document.getElementById(`cacti-out-${linkId}`);
+  if (!inInput || !outInput) return;
+  [inInput.value, outInput.value] = [outInput.value, inInput.value];
+  const inLabel = document.getElementById(`cacti-in-label-${linkId}`);
+  const outLabel = document.getElementById(`cacti-out-label-${linkId}`);
+  if (inLabel) inLabel.textContent = inInput.value || 'No detectada';
+  if (outLabel) outLabel.textContent = outInput.value || 'No detectada';
+  previewCactiBinding(linkId, hostId, localDataId);
+  setCactiPanelState('Dirección de tráfico invertida. Guarda el vínculo para aplicar.', 'connected');
 }
 
 function cactiDisabledCatalogHtml(linkId, deviceText = 'Cargando equipos…', sourceText = 'Primero selecciona un equipo…', dsText = 'Primero selecciona una fuente…') {
@@ -691,7 +796,7 @@ function cactiDisabledCatalogHtml(linkId, deviceText = 'Cargando equipos…', so
 
 function cactiPreviewHtml(message = 'Sin vista previa todavía.') {
   return `<div class="cacti-preview" id="cacti-preview">
-    <div class="cacti-preview-head"><strong>Vista previa</strong><span>${escapeHtml(message)}</span></div>
+    <div class="cacti-preview-head"><strong>Vista previa</strong></div>
     <div class="cacti-preview-grid">
       <div><small>Entrada</small><b id="cacti-preview-in">—</b><em id="cacti-preview-in-ds">DS no seleccionado</em></div>
       <div><small>Salida</small><b id="cacti-preview-out">—</b><em id="cacti-preview-out-ds">DS no seleccionado</em></div>
@@ -815,10 +920,7 @@ async function loadCactiGraphs(linkId, rawHostId) {
     wrap.innerHTML = `<div id="cacti-source-wrap-${linkId}"><div class="cacti-modal-grid">
       <label><span>Fuente de la gráfica</span>${cactiSourcePickerHtml(linkId, hostId, sources, link?.dataSource?.localDataId)}</label>
       </div><div id="cacti-ds-wrap-${linkId}">
-        <div class="cacti-ds-grid">
-          <label>Entrada<select class="prop-val" id="cacti-in-${linkId}" disabled><option>Selecciona una fuente…</option></select></label>
-          <label>Salida<select class="prop-val" id="cacti-out-${linkId}" disabled><option>Selecciona una fuente…</option></select></label>
-        </div>
+        ${cactiDirectionPickerHtml(linkId, '', '', null, null, 'Selecciona una fuente…')}
         ${cactiPreviewHtml('Selecciona una fuente y sus DS para ver valores de muestra.')}
       </div></div>`;
     const selected = link?.dataSource?.localDataId || (sources.length === 1 ? sources[0].localDataId : null);
@@ -836,10 +938,11 @@ function loadCactiGraphSources(linkId, hostId, rawGraphId) {
   const graphId = Number(rawGraphId), wrap = document.getElementById(`cacti-source-wrap-${linkId}`);
   const graph = (cactiCatalog.graphs.get(Number(hostId)) || []).find(item => item.id === graphId);
   if (!wrap || !graph) { if (wrap) wrap.innerHTML = ''; return; }
-  cactiCatalog.sources.set(Number(hostId), graph.dataSources || []);
+  const graphSources = (graph.dataSources || []).map(source => ({...source, graphId:graph.id, graphName:graph.name}));
+  cactiCatalog.sources.set(Number(hostId), graphSources);
   const link = getLink(linkId);
   wrap.innerHTML = `<div class="cacti-modal-grid">
-    <label><span>Fuente de la gráfica</span>${cactiSourcePickerHtml(linkId, hostId, graph.dataSources, link?.dataSource?.localDataId, graphId)}</label>
+    <label><span>Fuente de la gráfica</span>${cactiSourcePickerHtml(linkId, hostId, graphSources, link?.dataSource?.localDataId, graphId)}</label>
     </div><div id="cacti-ds-wrap-${linkId}"></div>`;
   const selected = link?.dataSource?.graphId === graphId ? link.dataSource.localDataId : (graph.dataSources.length === 1 ? graph.dataSources[0].localDataId : null);
   if (selected) {
@@ -872,18 +975,15 @@ function renderCactiDsPicker(linkId, hostId, rawLocalDataId, graphId = null) {
   const localDataId = Number(rawLocalDataId), wrap = document.getElementById(`cacti-ds-wrap-${linkId}`);
   const source = (cactiCatalog.sources.get(Number(hostId)) || []).find(item => item.localDataId === localDataId);
   if (!wrap || !source) {
-    if (wrap) wrap.innerHTML = `<div class="cacti-ds-grid">
-      <label>Entrada<select class="prop-val" id="cacti-in-${linkId}" disabled><option>Selecciona una fuente…</option></select></label>
-      <label>Salida<select class="prop-val" id="cacti-out-${linkId}" disabled><option>Selecciona una fuente…</option></select></label>
-    </div>${cactiPreviewHtml('Selecciona una fuente y sus DS para ver valores de muestra.')}`;
+    if (wrap) wrap.innerHTML = `${cactiDirectionPickerHtml(linkId, '', '', null, null, 'Selecciona una fuente…')}${cactiPreviewHtml('Selecciona una fuente y sus DS para ver valores de muestra.')}`;
     return;
   }
-  const link = getLink(linkId), names = source.dataSourceNames;
+  const link = getLink(linkId), names = Array.isArray(source.dataSourceNames) ? source.dataSourceNames : [];
   const guess = side => names.find(name => new RegExp(`(^|_)${side}($|_)`, 'i').test(name)) || '';
-  const inDs = link?.dataSource?.localDataId === localDataId ? link.dataSource.inDs : guess('in');
-  const outDs = link?.dataSource?.localDataId === localDataId ? link.dataSource.outDs : guess('out');
-  const options = selected => `<option value="">Ninguna</option>${names.map(name => `<option value="${escapeHtml(name)}" ${name===selected?'selected':''}>${escapeHtml(name)}</option>`).join('')}`;
-  wrap.innerHTML = `<div class="cacti-ds-grid"><label>Entrada<select class="prop-val" id="cacti-in-${linkId}" data-change="previewCactiBinding" data-args='["${linkId}",${hostId},${localDataId}]'>${options(inDs)}</select></label><label>Salida<select class="prop-val" id="cacti-out-${linkId}" data-change="previewCactiBinding" data-args='["${linkId}",${hostId},${localDataId}]'>${options(outDs)}</select></label></div>
+  const savedBinding = link?.dataSource?.localDataId === localDataId ? link.dataSource : null;
+  const inDs = savedBinding?.inDs || guess('in') || names[0] || '';
+  const outDs = savedBinding?.outDs || guess('out') || names.find(name => name !== inDs) || '';
+  wrap.innerHTML = `${cactiDirectionPickerHtml(linkId, inDs, outDs, hostId, localDataId)}
     ${cactiPreviewHtml('Calculando vista previa…')}`;
   previewCactiBinding(linkId, hostId, localDataId);
 }
@@ -895,7 +995,7 @@ async function applyCactiBinding(linkId, hostId, localDataId, graphId = null) {
   const graph = (cactiCatalog.graphs.get(Number(hostId)) || []).find(item => item.id === Number(graphId));
   if (!link || !source) return;
   link.dataSource = { provider:'cacti', hostId:Number(hostId), localDataId:Number(localDataId),
-    deviceName:device?.name || '', graphId:graph?.id || source.graphId || null, graphName:graph?.name || source.graphName || '', sourceName:source.name,
+    deviceName:device?.name || '', graphId:graph?.id || source.graphId || null, graphName:graph?.name || source.graphName || '', sourceName:cactiSourceDisplayName(source),
     inDs:document.getElementById(`cacti-in-${linkId}`)?.value || '', outDs:document.getElementById(`cacti-out-${linkId}`)?.value || '',
     multiplier:8, capacityBps:Number(source.capacityBps) > 0 ? Number(source.capacityBps) : null };
   if (Number(source.capacityBps) > 0) {
@@ -960,8 +1060,10 @@ async function testCactiBinding(linkId) {
   try {
     const result = await refreshCactiMetrics(null, linkId);
     setStatus(result.errors ? '⚠ El colector aún no ha guardado datos' : '✓ Fuente Cacti conectada');
+    showToast(result.errors ? 'Vínculo guardado; aún no hay métricas recolectadas.' : 'Fuente Cacti vinculada correctamente.', result.errors ? 'info' : 'success');
   } catch (error) {
     const link = getLink(linkId); if (link) link.telemetryError = error.message;
     updatePropsPanel(); setStatus('⚠ No se pudieron consultar las métricas');
+    showToast('El vínculo se guardó, pero no fue posible consultar sus métricas.', 'error');
   }
 }

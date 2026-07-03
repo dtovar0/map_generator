@@ -80,6 +80,17 @@ def required_bindings(maps_dir: Path) -> dict[int, set[str]]:
                 continue
             names = {str(source.get("inDs") or ""), str(source.get("outDs") or "")}
             required.setdefault(local_data_id, set()).update(name for name in names if name)
+        for node in (snapshot or {}).get("nodes", []):
+            if node.get("type") != "chart":
+                continue
+            for series in (node.get("graphConfig") or {}).get("series", []):
+                try:
+                    local_data_id = int(series["localDataId"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                ds_name = str(series.get("dsName") or "")
+                if ds_name:
+                    required.setdefault(local_data_id, set()).add(ds_name)
     return required
 
 

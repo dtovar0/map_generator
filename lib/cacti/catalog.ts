@@ -160,6 +160,35 @@ export interface StoredMetric {
   valueRaw: number | null;
 }
 
+export interface StoredSeriesPoint { timestamp: number; value: number | null }
+
+const SERIES_WINDOWS: Record<string, {seconds:number; bucket:number}> = {
+  "1h":{seconds:3600,bucket:60}, "6h":{seconds:21600,bucket:300},
+  "24h":{seconds:86400,bucket:900}, "7d":{seconds:604800,bucket:3600},
+  "30d":{seconds:2592000,bucket:14400}, "90d":{seconds:7776000,bucket:43200},
+  "1y":{seconds:31536000,bucket:86400},
+};
+
+/** Returns a downsampled historical series from the collector table. */
+export async function getStoredSeries(
+  localDataId: number,
+  dsName: string,
+  range = "24h",
+  consolidation: "AVERAGE" | "MIN" | "MAX" | "LAST" = "AVERAGE",
+): Promise<StoredSeriesPoint[]> {
+  const window = SERIES_WINDOWS[range] || SERIES_WINDOWS["24h"];
+  const aggregate = consolidation === "MIN" ? "MIN(value_raw)" : consolidation === "MAX" ? "MAX(value_raw)" :
+    consolidation === "LAST" ? "CAST(SUBSTRING_INDEX(GROUP_CONCAT(value_raw ORDER BY sample_time DESC), ',', 1) AS DOUBLE)" : "AVG(value_raw)";
+  const [rows] = await cactiPool().query<RowDataPacket[]>(
+    `SELECT FLOOR(UNIX_TIMESTAMP(sample_time) / ?) * ? AS bucket_timestamp, ${aggregate} AS bucket_value
+       FROM mapgen_rrd_samples
+      WHERE local_data_id = ? AND ds_name = ? AND sample_time >= FROM_UNIXTIME(UNIX_TIMESTAMP() - ?)
+      GROUP BY bucket_timestamp ORDER BY bucket_timestamp`,
+    [window.bucket, window.bucket, localDataId, dsName, window.seconds],
+  );
+  return rows.map((row) => ({timestamp:Number(row.bucket_timestamp), value:row.bucket_value == null ? null : Number(row.bucket_value)}));
+}
+
 export async function getDataSourcePaths(localDataIds: number[]): Promise<Map<number, string>> {
   const ids = [...new Set(localDataIds.filter((id) => Number.isInteger(id) && id > 0))];
   if (!ids.length) return new Map();

@@ -47,7 +47,8 @@ function toggleMultiPlacement() {
 
 function startChartPlacementMode() {
   if (placingItem?.type === 'chart') { cancelPlacing(); return; }
-  const defaultConfig = {type:'bar', color:activeTheme === 'light' ? '#6a45f0' : '#7c5cff', values:[25,50,35,80,60], title:'Gráfica'};
+  const defaultConfig = {type:'line', title:'Gráfica', range:'24h', consolidation:'AVERAGE', stacked:false,
+    legend:true, fill:false, points:false, showAxes:true, unit:'auto', series:[]};
   beginChartPlacement('Gráfica', defaultConfig, 240, 160);
 }
 
@@ -68,14 +69,9 @@ function beginChartPlacement(title, graphConfig, width, height) {
 
 function updateChartConfig(id, key, rawValue) {
   const n = getNode(id); if (!n || n.type !== 'chart') return;
-  const cfg = {type:'bar', color:'#7c5cff', values:[25,50,35,80,60], title:n.name || 'Gráfica', ...(n.graphConfig || {})};
-  if (key === 'values') {
-    const values = String(rawValue).split(',').map(v => Number(v.trim())).filter(Number.isFinite);
-    if (!values.length) {
-      setStatus('⚠ Agrega al menos un valor numérico');
-      updatePropsPanel(); return;
-    }
-    cfg.values = values;
+  const cfg = {type:'line', title:n.name || 'Gráfica', range:'24h', consolidation:'AVERAGE', series:[], ...(n.graphConfig || {})};
+  if (['stacked','legend','fill','points','showAxes'].includes(key)) {
+    cfg[key] = rawValue === true || rawValue === 'true';
   } else {
     cfg[key] = rawValue;
   }
@@ -90,6 +86,29 @@ function updateChartConfig(id, key, rawValue) {
   }
   renderNode(n); pushHistory(); updatePropsPanel();
   setStatus('Gráfica actualizada');
+}
+
+async function loadChartRrdData(node, force = false) {
+  const cfg = node.graphConfig || {}, series = Array.isArray(cfg.series) ? cfg.series : [];
+  if (!series.length) return;
+  const requestKey = JSON.stringify([cfg.range,cfg.consolidation,series.map(s => [s.id,s.localDataId,s.dsName,s.multiplier])]);
+  const cached = chartSeriesCache.get(node.id);
+  if (!force && cached?.requestKey === requestKey && Date.now() - cached.loadedAt < 60000) return;
+  chartSeriesCache.set(node.id, {requestKey, loading:true, loadedAt:Date.now(), data:cached?.data || []});
+  renderNode(node);
+  try {
+    const response = await fetch('/api/cacti/series', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+      range:cfg.range || '24h', consolidation:cfg.consolidation || 'AVERAGE',
+      series:series.map(s => ({id:s.id, localDataId:Number(s.localDataId), dsName:s.dsName, multiplier:Number(s.multiplier) || 1}))
+    })});
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'No se pudieron consultar los RRD');
+    chartSeriesCache.set(node.id, {requestKey, loading:false, loadedAt:Date.now(), data:result.series || []});
+  } catch (error) {
+    chartSeriesCache.set(node.id, {requestKey, loading:false, loadedAt:Date.now(), data:[], error:error.message});
+  }
+  renderNode(node);
+  if (selectedNodeId === node.id) updatePropsPanel();
 }
 
 // ════════════════════════════════════════════════════
@@ -166,9 +185,9 @@ function createNode(type, icon, label, x, y, w, h, extra = {}) {
 
 function renderChartVisual(container, node) {
   const cfg = node.graphConfig || {};
-  const values = (cfg.values || [25,50,35,80,60]).map(Number).filter(Number.isFinite);
-  const data = values.length ? values : [0];
-  const key = JSON.stringify([activeTheme,cfg.title,cfg.type,cfg.color,data,node.w,node.h]);
+  const cached = chartSeriesCache.get(node.id);
+  if (Array.isArray(cfg.series) && cfg.series.length) queueMicrotask(() => loadChartRrdData(node));
+  const key = JSON.stringify([activeTheme,cfg.title,cfg.type,node.w,node.h,cfg.range,cfg.stacked,cfg.legend,cfg.fill,cfg.points,cfg.showAxes,cfg.series,cached]);
   if (container.dataset.chartKey === key && chartInstances.has(node.id)) return;
   chartInstances.get(node.id)?.destroy(); chartInstances.delete(node.id);
   container.textContent = '';
@@ -179,29 +198,31 @@ function renderChartVisual(container, node) {
   }
   const canvas = document.createElement('canvas');
   canvas.className = 'chart-canvas'; container.appendChild(canvas);
-  const color = cfg.color || '#7c5cff';
-  const labels = data.map((_,i) => `Dato ${i+1}`);
-  const type = cfg.type === 'donut' ? 'doughnut' : (cfg.type || 'bar');
-  const donutColors = data.map((_,i) => `${color}${Math.max(55, 255-i*28).toString(16).padStart(2,'0')}`);
-  const dataset = {
-    label:cfg.title || node.name || 'Gráfica', data,
-    backgroundColor:type === 'doughnut' ? donutColors : `${color}bb`,
-    borderColor:color, borderWidth:2,
-    tension:.32, pointRadius:3, pointBackgroundColor:activeTheme === 'light' ? '#ffffff' : '#111827', fill:false
-  };
+  const type = cfg.type === 'area' ? 'line' : (cfg.type || 'line');
+  const palette = ['#7c5cff','#22c55e','#f59e0b','#06b6d4','#ef4444','#ec4899','#84cc16','#3b82f6'];
+  const rrdDatasets = (cached?.data || []).map((item,index) => {
+    const source = (cfg.series || []).find(s => String(s.id) === String(item.id)) || cfg.series?.[index] || {};
+    const seriesColor = source.color || palette[index % palette.length];
+    return {label:source.label || item.dsName, data:item.points || [], parsing:false, borderColor:seriesColor,
+      backgroundColor:`${seriesColor}55`, borderWidth:Number(source.lineWidth) || 2, tension:.25,
+      pointRadius:cfg.points ? 2 : 0, fill:cfg.type === 'area' || !!cfg.fill, spanGaps:true, stack:cfg.stacked ? 'rrd' : undefined};
+  });
+  const effectiveType = type;
   chartInstances.set(node.id, new Chart(canvas, {
-    type, data:{labels,datasets:[dataset]},
+    type:effectiveType, data:{datasets:rrdDatasets},
     options:{
       responsive:true, maintainAspectRatio:false, animation:false,
-      plugins:{legend:{display:false},tooltip:{enabled:true}},
-      scales:type === 'doughnut' ? {} : {
-        x:{grid:{display:false},ticks:{display:false},border:{color:activeTheme === 'light' ? '#b6b2d6' : '#536179'}},
-        y:{beginAtZero:true,grid:{color:activeTheme === 'light' ? '#dcdaec' : '#263247'},ticks:{display:false},border:{display:false}}
+      plugins:{legend:{display:cfg.legend !== false, labels:{boxWidth:10,color:activeTheme === 'light' ? '#403c5c' : '#cbd5e1'}},tooltip:{enabled:true,mode:'index',intersect:false}},
+      scales:effectiveType === 'doughnut' ? {} : {
+        x:{type:'linear',stacked:!!cfg.stacked,grid:{display:false},ticks:{display:cfg.showAxes !== false,color:activeTheme === 'light' ? '#625e78' : '#94a3b8',maxTicksLimit:6,callback:value => new Date(value).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})},border:{color:activeTheme === 'light' ? '#b6b2d6' : '#536179'}},
+        y:{beginAtZero:true,stacked:!!cfg.stacked,grid:{color:activeTheme === 'light' ? '#dcdaec' : '#263247'},ticks:{display:cfg.showAxes !== false,color:activeTheme === 'light' ? '#625e78' : '#94a3b8'},border:{display:false}}
       },
       cutout:type === 'doughnut' ? '58%' : undefined
     }
   }));
   container.dataset.chartKey = key;
+  if (cached?.loading && !rrdDatasets.length) container.title = 'Cargando datos de Cacti…';
+  else if (cached?.error) container.title = cached.error;
 }
 
 function renderNode(n) {

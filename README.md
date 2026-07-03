@@ -60,7 +60,7 @@ para ejecutar el binario configurado en `CACTI_RRDTOOL`.
    GRANT SELECT ON cacti.poller_item TO 'cacti_map_reader'@'localhost';
    GRANT SELECT, INSERT, UPDATE, DELETE ON cacti.mapgen_rrd_samples TO 'cacti_map_reader'@'localhost';
    ```
-5. Selecciona un enlace en el editor y usa **Fuente de datos · Cacti**.
+5. Vincula fuentes desde **Fuente de datos · Cacti** en los enlaces o agrega series Cacti a las gráficas.
 6. Ejecuta el colector después del poller. Por ejemplo, si Cacti corre cada cinco minutos:
 
    ```cron
@@ -74,7 +74,9 @@ El colector usa un lock no bloqueante (`MAPGEN_COLLECTOR_LOCK`) para evitar dos 
 simultáneas si un ciclo del poller tarda más de lo normal.
 
 La vista Live toma la muestra almacenada más reciente de los últimos 30 minutos. La vista por
-día calcula el promedio de las muestras guardadas para esa fecha. El colector elimina datos
+día calcula el promedio de las muestras guardadas para esa fecha. Las gráficas consultan la
+misma tabla y agrupan las muestras según su escala temporal y consolidación. El colector detecta
+tanto las fuentes de enlaces como cada serie usada por las gráficas. El colector elimina datos
 anteriores a `MAPGEN_METRICS_RETENTION_DAYS` (400 días por defecto). Cacti suele almacenar
 tráfico en bytes/s, por lo que el binding aplica por defecto el multiplicador 8; puede
 cambiarse a bits/s para plantillas que ya entreguen esa unidad.
