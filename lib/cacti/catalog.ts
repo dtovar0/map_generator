@@ -175,8 +175,10 @@ export async function getStoredSeries(
   dsName: string,
   range = "24h",
   consolidation: "AVERAGE" | "MIN" | "MAX" | "LAST" = "AVERAGE",
+  requestedStep?: number,
 ): Promise<StoredSeriesPoint[]> {
   const window = SERIES_WINDOWS[range] || SERIES_WINDOWS["24h"];
+  const bucket = requestedStep && Number.isInteger(requestedStep) && requestedStep > 0 ? requestedStep : window.bucket;
   const aggregate = consolidation === "MIN" ? "MIN(value_raw)" : consolidation === "MAX" ? "MAX(value_raw)" :
     consolidation === "LAST" ? "CAST(SUBSTRING_INDEX(GROUP_CONCAT(value_raw ORDER BY sample_time DESC), ',', 1) AS DOUBLE)" : "AVG(value_raw)";
   const [rows] = await cactiPool().query<RowDataPacket[]>(
@@ -184,7 +186,7 @@ export async function getStoredSeries(
        FROM mapgen_rrd_samples
       WHERE local_data_id = ? AND ds_name = ? AND sample_time >= FROM_UNIXTIME(UNIX_TIMESTAMP() - ?)
       GROUP BY bucket_timestamp ORDER BY bucket_timestamp`,
-    [window.bucket, window.bucket, localDataId, dsName, window.seconds],
+    [bucket, bucket, localDataId, dsName, window.seconds],
   );
   return rows.map((row) => ({timestamp:Number(row.bucket_timestamp), value:row.bucket_value == null ? null : Number(row.bucket_value)}));
 }

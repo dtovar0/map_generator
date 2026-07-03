@@ -712,6 +712,11 @@ function updatePropsPanel() {
           <select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","range","$value"]'>
             ${[['1h','Última hora'],['6h','Últimas 6 horas'],['24h','Últimas 24 horas'],['7d','Últimos 7 días'],['30d','Últimos 30 días'],['90d','Últimos 90 días'],['1y','Último año']].map(([value,label]) => `<option value="${value}" ${n.graphConfig?.range===value?'selected':''}>${label}</option>`).join('')}
           </select>
+          <div class="prop-label" style="margin-top:7px">Step / resolución</div>
+          <select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","step","$value"]'>
+            ${[[0,'Automático (según escala)'],[60,'1 minuto'],[300,'5 minutos'],[900,'15 minutos'],[1800,'30 minutos'],[3600,'1 hora'],[14400,'4 horas'],[21600,'6 horas'],[43200,'12 horas'],[86400,'1 día']].map(([value,label]) => `<option value="${value}" ${Number(n.graphConfig?.step||0)===value?'selected':''}>${label}</option>`).join('')}
+          </select>
+          <div class="cacti-state" style="margin-top:5px">RRD usa el archivo con la resolución disponible más cercana.</div>
           <div class="prop-label" style="margin-top:7px">Consolidación</div>
           <select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","consolidation","$value"]'>
             ${[['AVERAGE','Promedio'],['MAX','Máximo'],['MIN','Mínimo'],['LAST','Último']].map(([value,label]) => `<option value="${value}" ${n.graphConfig?.consolidation===value?'selected':''}>${label}</option>`).join('')}

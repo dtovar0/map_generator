@@ -47,7 +47,7 @@ function toggleMultiPlacement() {
 
 function startChartPlacementMode() {
   if (placingItem?.type === 'chart') { cancelPlacing(); return; }
-  const defaultConfig = {type:'line', title:'Gráfica', range:'24h', consolidation:'AVERAGE', stacked:false,
+  const defaultConfig = {type:'line', title:'Gráfica', range:'24h', step:0, consolidation:'AVERAGE', stacked:false,
     legend:true, fill:false, points:false, showAxes:true, unit:'auto', series:[]};
   beginChartPlacement('Gráfica', defaultConfig, 240, 160);
 }
@@ -69,7 +69,7 @@ function beginChartPlacement(title, graphConfig, width, height) {
 
 function updateChartConfig(id, key, rawValue) {
   const n = getNode(id); if (!n || n.type !== 'chart') return;
-  const cfg = {type:'line', title:n.name || 'Gráfica', range:'24h', consolidation:'AVERAGE', series:[], ...(n.graphConfig || {})};
+  const cfg = {type:'line', title:n.name || 'Gráfica', range:'24h', step:0, consolidation:'AVERAGE', series:[], ...(n.graphConfig || {})};
   if (['stacked','legend','fill','points','showAxes'].includes(key)) {
     cfg[key] = rawValue === true || rawValue === 'true';
   } else {
@@ -91,14 +91,14 @@ function updateChartConfig(id, key, rawValue) {
 async function loadChartRrdData(node, force = false) {
   const cfg = node.graphConfig || {}, series = Array.isArray(cfg.series) ? cfg.series : [];
   if (!series.length) return;
-  const requestKey = JSON.stringify([cfg.range,cfg.consolidation,series.map(s => [s.id,s.localDataId,s.dsName,s.multiplier])]);
+  const requestKey = JSON.stringify([cfg.range,cfg.step,cfg.consolidation,series.map(s => [s.id,s.localDataId,s.dsName,s.multiplier])]);
   const cached = chartSeriesCache.get(node.id);
   if (!force && cached?.requestKey === requestKey && Date.now() - cached.loadedAt < 60000) return;
   chartSeriesCache.set(node.id, {requestKey, loading:true, loadedAt:Date.now(), data:cached?.data || []});
   renderNode(node);
   try {
     const response = await fetch('/api/cacti/series', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
-      range:cfg.range || '24h', consolidation:cfg.consolidation || 'AVERAGE',
+      range:cfg.range || '24h', step:Number(cfg.step) || 0, consolidation:cfg.consolidation || 'AVERAGE',
       series:series.map(s => ({id:s.id, localDataId:Number(s.localDataId), dsName:s.dsName, multiplier:Number(s.multiplier) || 1}))
     })});
     const result = await response.json();
@@ -187,7 +187,7 @@ function renderChartVisual(container, node) {
   const cfg = node.graphConfig || {};
   const cached = chartSeriesCache.get(node.id);
   if (Array.isArray(cfg.series) && cfg.series.length) queueMicrotask(() => loadChartRrdData(node));
-  const key = JSON.stringify([activeTheme,cfg.title,cfg.type,node.w,node.h,cfg.range,cfg.stacked,cfg.legend,cfg.fill,cfg.points,cfg.showAxes,cfg.series,cached]);
+  const key = JSON.stringify([activeTheme,cfg.title,cfg.type,node.w,node.h,cfg.range,cfg.step,cfg.stacked,cfg.legend,cfg.fill,cfg.points,cfg.showAxes,cfg.series,cached]);
   if (container.dataset.chartKey === key && chartInstances.has(node.id)) return;
   chartInstances.get(node.id)?.destroy(); chartInstances.delete(node.id);
   container.textContent = '';

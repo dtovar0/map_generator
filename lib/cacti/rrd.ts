@@ -39,6 +39,7 @@ export async function getRrdSeries(
   dsName: string,
   range = "24h",
   consolidation: RrdConsolidation = "AVERAGE",
+  step?: number,
 ): Promise<RrdSeriesPoint[]> {
   const paths = await getDataSourcePaths([localDataId]);
   const storedPath = paths.get(localDataId);
@@ -47,7 +48,9 @@ export async function getRrdSeries(
   const { rrdTool } = getCactiConfig();
   const start = RRD_RANGES[range] || RRD_RANGES["24h"];
   const cf: RrdConsolidation = ["AVERAGE", "MIN", "MAX", "LAST"].includes(consolidation) ? consolidation : "AVERAGE";
-  const { stdout } = await execFileAsync(rrdTool, ["fetch", filename, cf, "--start", start, "--end", "now"], {
+  const args = ["fetch", filename, cf, "--start", start, "--end", "now"];
+  if (step && Number.isInteger(step) && step > 0) args.push("--resolution", String(step));
+  const { stdout } = await execFileAsync(rrdTool, args, {
     timeout: 20_000,
     maxBuffer: 8 * 1024 * 1024,
   });
