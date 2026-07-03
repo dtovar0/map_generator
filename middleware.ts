@@ -8,6 +8,14 @@ import type { NextRequest } from "next/server";
 // 'unsafe-eval' so HMR/react-refresh keep working.
 export function middleware(request: NextRequest) {
   const isDev = process.env.NODE_ENV !== "production";
+  // Behind Apache, X-Forwarded-Proto represents the protocol used by the
+  // browser. Do not upgrade assets while the site is intentionally served over
+  // HTTP; enable the directive automatically once TLS is terminated upstream.
+  const forwardedProto = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    .trim();
+  const isHttps = (forwardedProto ?? request.nextUrl.protocol.replace(":", "")) === "https";
   const nonce = btoa(crypto.randomUUID());
   const scriptSrc = isDev
     ? "'self' 'unsafe-inline' 'unsafe-eval'"
@@ -24,7 +32,7 @@ export function middleware(request: NextRequest) {
     "base-uri 'self'",
     "frame-ancestors 'self'",
     "form-action 'self'",
-    "upgrade-insecure-requests",
+    ...(isHttps ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
 
   const requestHeaders = new Headers(request.headers);
