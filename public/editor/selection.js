@@ -454,6 +454,64 @@ function chartPaletteColor(index) {
   return ['#7c5cff','#22c55e','#f59e0b','#06b6d4','#ef4444','#ec4899','#84cc16','#3b82f6'][index % 8];
 }
 
+function chartDevicePickerHtml(nodeId, devices) {
+  const context = `chart-${nodeId}`;
+  const options = devices.map(device => `<option value="${device.id}">${escapeHtml(device.name)}</option>`).join('');
+  const items = devices.map(device => {
+    const search = `${device.name || ''} ${device.hostname || ''}`.toLocaleLowerCase();
+    return `<button type="button" class="cacti-source-option" data-search="${escapeHtml(search)}" data-click="chooseChartDevice" data-args='["${nodeId}",${device.id}]'>
+      <span><strong>${escapeHtml(device.name)}</strong>${device.hostname ? `<small>${escapeHtml(device.hostname)}</small>` : ''}</span><em>Host ${device.id}</em>
+    </button>`;
+  }).join('');
+  return `<div class="cacti-source-select cacti-device-select" id="cacti-device-picker-${context}" data-blur="closeCactiDevicePicker" data-args='["${context}","$self"]'>
+    <select class="cacti-native-source" id="cacti-device-${context}" tabindex="-1" aria-hidden="true"><option value="">Selecciona un equipo…</option>${options}</select>
+    <button type="button" class="cacti-source-trigger" data-click="toggleCactiDevicePicker" data-args='["${context}","$self"]' aria-haspopup="listbox" aria-expanded="false"><span>Selecciona un equipo…</span><i aria-hidden="true"></i></button>
+    <div class="cacti-source-menu" hidden><div class="cacti-source-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="Buscar equipo o hostname…" autocomplete="off" data-input="filterCactiDevices" data-input-args='["${context}","$value"]' data-keydown="handleCactiDeviceSearchKey" data-keydown-args='["${context}","$event"]'></div>
+      <div class="cacti-source-options" role="listbox">${items}</div><div class="cacti-source-empty" hidden>Sin equipos coincidentes</div></div>
+  </div>`;
+}
+
+function chooseChartDevice(nodeId, hostId) {
+  const context = `chart-${nodeId}`, select = document.getElementById(`cacti-device-${context}`);
+  if (select) select.value = String(hostId);
+  const picker = document.getElementById(`cacti-device-picker-${context}`), device = (cactiCatalog.devices || []).find(item => Number(item.id) === Number(hostId));
+  const trigger = picker?.querySelector('.cacti-source-trigger span');
+  if (trigger && device) trigger.innerHTML = `${escapeHtml(device.name)}${device.hostname ? `<small>${escapeHtml(device.hostname)}</small>` : ''}`;
+  picker?.querySelectorAll('.cacti-source-option').forEach(option => option.classList.toggle('selected', option.dataset.args?.endsWith(`,${hostId}]`)));
+  const menu = picker?.querySelector('.cacti-source-menu'); if (menu) menu.hidden = true;
+  picker?.classList.remove('open'); loadChartSources(nodeId, hostId);
+}
+
+function chartSourcePickerHtml(nodeId, hostId, sources) {
+  const context = `chart-${nodeId}`;
+  const options = sources.map(source => `<option value="${source.localDataId}">${escapeHtml(source.name)}</option>`).join('');
+  const items = sources.map(source => {
+    const search = `${source.name || ''} ${source.snmpIndex || ''}`.toLocaleLowerCase();
+    return `<button type="button" class="cacti-source-option" data-search="${escapeHtml(search)}" data-click="chooseChartSource" data-args='["${nodeId}",${hostId},${source.localDataId}]'>
+      <span><strong>${escapeHtml(cactiSourceDisplayName(source))}</strong>${source.name && source.name !== cactiSourceDisplayName(source) ? `<small>${escapeHtml(source.name)}</small>` : ''}</span>${source.snmpIndex ? `<em>${escapeHtml(source.snmpIndex)}</em>` : ''}
+    </button>`;
+  }).join('');
+  return `<div class="cacti-source-select ${sources.length ? '' : 'disabled'}" id="cacti-source-picker-${context}" data-blur="closeCactiSourcePicker" data-args='["${context}","$self"]'>
+    <select class="cacti-native-source" id="cacti-source-${context}" tabindex="-1" aria-hidden="true"><option value="">Selecciona una fuente…</option>${options}</select>
+    <button type="button" class="cacti-source-trigger" ${sources.length ? '' : 'disabled'} data-click="toggleCactiSourcePicker" data-args='["${context}","$self"]' aria-haspopup="listbox" aria-expanded="false"><span>${sources.length ? 'Selecciona una fuente…' : 'No hay fuentes disponibles'}</span><i aria-hidden="true"></i></button>
+    <div class="cacti-source-menu" hidden><div class="cacti-source-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="Buscar interfaz o fuente…" autocomplete="off" data-input="filterCactiSources" data-input-args='["${context}","$value"]' data-keydown="handleCactiSourceSearchKey" data-keydown-args='["${context}","$value","$event"]'></div>
+      <div class="cacti-source-options" role="listbox">${items}</div><div class="cacti-source-empty" hidden>Sin coincidencias</div></div>
+  </div>`;
+}
+
+function chooseChartSource(nodeId, hostId, localDataId) {
+  const context = `chart-${nodeId}`, select = document.getElementById(`cacti-source-${context}`);
+  if (select) select.value = String(localDataId);
+  const picker = document.getElementById(`cacti-source-picker-${context}`), source = (cactiCatalog.sources.get(Number(hostId)) || []).find(item => Number(item.localDataId) === Number(localDataId));
+  const trigger = picker?.querySelector('.cacti-source-trigger span');
+  if (trigger && source) trigger.innerHTML = `${escapeHtml(cactiSourceDisplayName(source))}${source.snmpIndex ? `<small>${escapeHtml(source.snmpIndex)}</small>` : ''}`;
+  picker?.querySelectorAll('.cacti-source-option').forEach(option => option.classList.toggle('selected', option.dataset.args?.endsWith(`,${localDataId}]`)));
+  const menu = picker?.querySelector('.cacti-source-menu'); if (menu) menu.hidden = true;
+  picker?.classList.remove('open');
+  addChartDirectionPair(nodeId, hostId, localDataId);
+  loadChartDataSources(nodeId, hostId, localDataId);
+}
+
 async function toggleChartSourcePicker(nodeId) {
   const wrap = document.getElementById(`chart-source-picker-${nodeId}`); if (!wrap) return;
   if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
@@ -464,7 +522,7 @@ async function toggleChartSourcePicker(nodeId) {
       if (!response.ok) throw new Error(result.error || 'Cacti no disponible');
       cactiCatalog.devices = result.devices;
     }
-    wrap.innerHTML = `<div class="chart-source-form"><label><span>Equipo</span><select class="prop-val" data-change="loadChartSources" data-args='["${nodeId}","$value"]'><option value="">Selecciona…</option>${cactiCatalog.devices.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('')}</select></label><div id="chart-source-fields-${nodeId}"></div></div>`;
+    wrap.innerHTML = `<div class="chart-source-form"><label><span>Equipo</span>${chartDevicePickerHtml(nodeId, cactiCatalog.devices)}</label><div id="chart-source-fields-${nodeId}"></div></div>`;
   } catch (error) { wrap.innerHTML = `<span class="cacti-state error">⚠ ${escapeHtml(error.message)}</span>`; }
 }
 
@@ -479,7 +537,7 @@ async function loadChartSources(nodeId, rawHostId) {
       cactiCatalog.sources.set(hostId, result.dataSources);
     }
     const sources = cactiCatalog.sources.get(hostId) || [];
-    wrap.innerHTML = `<label><span>Fuente</span><select id="chart-source-${nodeId}" class="prop-val" data-change="loadChartDataSources" data-args='["${nodeId}",${hostId},"$value"]'><option value="">Selecciona…</option>${sources.map(s => `<option value="${s.localDataId}">${escapeHtml(s.name || cactiSourceDisplayName(s))}</option>`).join('')}</select></label><div id="chart-ds-${nodeId}"></div>`;
+    wrap.innerHTML = `<label><span>Fuente</span>${chartSourcePickerHtml(nodeId, hostId, sources)}</label><div id="chart-ds-${nodeId}"></div>`;
   } catch (error) { wrap.innerHTML = `<span class="cacti-state error">⚠ ${escapeHtml(error.message)}</span>`; }
 }
 
@@ -487,20 +545,63 @@ function loadChartDataSources(nodeId, hostId, rawLocalDataId) {
   const localDataId = Number(rawLocalDataId), wrap = document.getElementById(`chart-ds-${nodeId}`);
   const source = (cactiCatalog.sources.get(Number(hostId)) || []).find(s => Number(s.localDataId) === localDataId);
   if (!wrap || !source) { if (wrap) wrap.innerHTML = ''; return; }
-  wrap.innerHTML = `<div class="prop-label" style="margin-top:7px">DS disponibles</div>${(source.dataSourceNames || []).map(ds => `<button class="tb-btn chart-ds-add" data-click="addChartSeries" data-args='["${nodeId}",${hostId},${localDataId},"${escapeHtml(ds)}"]'>+ ${escapeHtml(ds)}</button>`).join('')}`;
+  const existing = getNode(nodeId)?.graphConfig?.series || [];
+  const options = (source.dataSourceNames || []).map(ds => {
+    const added = existing.some(item => Number(item.localDataId) === localDataId && item.dsName === ds);
+    return `<button type="button" class="cacti-source-option ${added ? 'selected' : ''}" data-click="toggleChartSeriesDs" data-args='["${nodeId}",${hostId},${localDataId},"${escapeHtml(ds)}"]'>
+      <span><strong>${escapeHtml(ds)}</strong><small>${added ? 'Visible · clic para ocultar' : 'Oculta · clic para mostrar'}</small></span><em>${added ? '✓' : '+'}</em>
+    </button>`;
+  }).join('');
+  wrap.innerHTML = `<div class="prop-label" style="margin-top:7px">DS disponibles</div><div class="cacti-source-options chart-ds-options">${options}</div>`;
+}
+
+function chartDirectionNames(source) {
+  const names = Array.isArray(source?.dataSourceNames) ? source.dataSourceNames : [];
+  const find = direction => names.find(name => new RegExp(`(^|[_-])${direction}($|[_-])`, 'i').test(name));
+  const inDs = find('in') || names.find(name => /(input|receive|rx)/i.test(name)) || names[0] || '';
+  const outDs = find('out') || names.find(name => /(output|transmit|tx)/i.test(name)) || names.find(name => name !== inDs) || '';
+  return [...new Set([inDs, outDs].filter(Boolean))];
+}
+
+function makeChartSeries(node, hostId, localDataId, dsName) {
+  const source = (cactiCatalog.sources.get(Number(hostId)) || []).find(s => Number(s.localDataId) === Number(localDataId));
+  const device = (cactiCatalog.devices || []).find(d => Number(d.id) === Number(hostId));
+  const index = node.graphConfig.series.length;
+  return {id:`s${Date.now()}-${index}`, hostId:Number(hostId), localDataId:Number(localDataId), dsName,
+    label:dsName, deviceName:device?.name || '', sourceName:source?.name || cactiSourceDisplayName(source), color:chartPaletteColor(index), multiplier:8};
+}
+
+function syncChartSeriesChange(node) {
+  chartSeriesCache.delete(node.id); pushHistory(); renderNode(node);
+  const list = document.querySelector('.chart-series-list'); if (list) list.innerHTML = chartSeriesListHtml(node);
+  loadChartRrdData(node, true);
+}
+
+function addChartDirectionPair(nodeId, hostId, localDataId) {
+  const node = getNode(nodeId), source = (cactiCatalog.sources.get(Number(hostId)) || []).find(s => Number(s.localDataId) === Number(localDataId));
+  if (!node || !source) return;
+  node.graphConfig ||= {}; node.graphConfig.series ||= [];
+  const names = chartDirectionNames(source), missing = names.filter(dsName => !node.graphConfig.series.some(s => Number(s.localDataId) === Number(localDataId) && s.dsName === dsName));
+  missing.forEach(dsName => node.graphConfig.series.push(makeChartSeries(node, hostId, localDataId, dsName)));
+  if (missing.length) { syncChartSeriesChange(node); showToast(`${missing.length > 1 ? 'Entrada y salida agregadas' : 'Serie agregada'} automáticamente.`, 'success'); }
+}
+
+function toggleChartSeriesDs(nodeId, hostId, localDataId, dsName) {
+  const node = getNode(nodeId); if (!node) return;
+  node.graphConfig ||= {}; node.graphConfig.series ||= [];
+  const index = node.graphConfig.series.findIndex(s => Number(s.localDataId) === Number(localDataId) && s.dsName === dsName);
+  if (index >= 0) node.graphConfig.series.splice(index, 1);
+  else node.graphConfig.series.push(makeChartSeries(node, hostId, localDataId, dsName));
+  syncChartSeriesChange(node); loadChartDataSources(nodeId, hostId, localDataId);
 }
 
 function addChartSeries(nodeId, hostId, localDataId, dsName) {
   const node = getNode(nodeId); if (!node) return;
-  const source = (cactiCatalog.sources.get(Number(hostId)) || []).find(s => Number(s.localDataId) === Number(localDataId));
-  const device = (cactiCatalog.devices || []).find(d => Number(d.id) === Number(hostId));
   node.graphConfig ||= {}; node.graphConfig.series ||= [];
   if (node.graphConfig.series.some(s => Number(s.localDataId) === Number(localDataId) && s.dsName === dsName)) {
     showToast('Esta serie ya está agregada.', 'info'); return;
   }
-  const index = node.graphConfig.series.length;
-  node.graphConfig.series.push({id:`s${Date.now()}-${index}`, hostId:Number(hostId), localDataId:Number(localDataId), dsName,
-    label:dsName, deviceName:device?.name || '', sourceName:source?.name || cactiSourceDisplayName(source), color:chartPaletteColor(index), multiplier:1});
+  node.graphConfig.series.push(makeChartSeries(node, hostId, localDataId, dsName));
   chartSeriesCache.delete(nodeId); pushHistory(); updatePropsPanel(); loadChartRrdData(node, true);
   showToast('Serie RRD agregada.', 'success');
 }

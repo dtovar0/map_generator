@@ -108,7 +108,7 @@ async function loadChartRrdData(node, force = false) {
     chartSeriesCache.set(node.id, {requestKey, loading:false, loadedAt:Date.now(), data:[], error:error.message});
   }
   renderNode(node);
-  if (selectedNodeId === node.id) updatePropsPanel();
+  if (selectedNodeIds.has(node.id)) updatePropsPanel();
 }
 
 // ════════════════════════════════════════════════════
@@ -191,6 +191,7 @@ function renderChartVisual(container, node) {
   if (container.dataset.chartKey === key && chartInstances.has(node.id)) return;
   chartInstances.get(node.id)?.destroy(); chartInstances.delete(node.id);
   container.textContent = '';
+  container.removeAttribute('title');
   if (typeof Chart === 'undefined') {
     container.textContent = '📊';
     container.title = 'Chart.js no pudo cargarse';
@@ -208,21 +209,31 @@ function renderChartVisual(container, node) {
       pointRadius:cfg.points ? 2 : 0, fill:cfg.type === 'area' || !!cfg.fill, spanGaps:true, stack:cfg.stacked ? 'rrd' : undefined};
   });
   const effectiveType = type;
+  const humanValue = value => {
+    const number = Number(value); if (!Number.isFinite(number)) return '—';
+    const units = ['bps','Kbps','Mbps','Gbps','Tbps'];
+    let scaled = Math.abs(number), unit = 0;
+    while (scaled >= 1000 && unit < units.length - 1) { scaled /= 1000; unit++; }
+    const signed = number < 0 ? -scaled : scaled;
+    return `${signed.toLocaleString(undefined, {maximumFractionDigits:scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2})} ${units[unit]}`;
+  };
   chartInstances.set(node.id, new Chart(canvas, {
     type:effectiveType, data:{datasets:rrdDatasets},
     options:{
       responsive:true, maintainAspectRatio:false, animation:false,
-      plugins:{legend:{display:cfg.legend !== false, labels:{boxWidth:10,color:activeTheme === 'light' ? '#403c5c' : '#cbd5e1'}},tooltip:{enabled:true,mode:'index',intersect:false}},
+      plugins:{legend:{display:cfg.legend !== false, labels:{boxWidth:10,color:activeTheme === 'light' ? '#403c5c' : '#cbd5e1'}},tooltip:{enabled:true,mode:'index',intersect:false,callbacks:{
+        title:items => items[0]?.parsed?.x ? new Date(items[0].parsed.x).toLocaleString() : '',
+        label:item => `${item.dataset.label || 'Serie'}: ${humanValue(item.parsed.y)}`
+      }}},
       scales:effectiveType === 'doughnut' ? {} : {
         x:{type:'linear',stacked:!!cfg.stacked,grid:{display:false},ticks:{display:cfg.showAxes !== false,color:activeTheme === 'light' ? '#625e78' : '#94a3b8',maxTicksLimit:6,callback:value => new Date(value).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})},border:{color:activeTheme === 'light' ? '#b6b2d6' : '#536179'}},
-        y:{beginAtZero:true,stacked:!!cfg.stacked,grid:{color:activeTheme === 'light' ? '#dcdaec' : '#263247'},ticks:{display:cfg.showAxes !== false,color:activeTheme === 'light' ? '#625e78' : '#94a3b8'},border:{display:false}}
+        y:{beginAtZero:true,stacked:!!cfg.stacked,grid:{color:activeTheme === 'light' ? '#dcdaec' : '#263247'},ticks:{display:cfg.showAxes !== false,color:activeTheme === 'light' ? '#625e78' : '#94a3b8',callback:humanValue},border:{display:false}}
       },
       cutout:type === 'doughnut' ? '58%' : undefined
     }
   }));
   container.dataset.chartKey = key;
-  if (cached?.loading && !rrdDatasets.length) container.title = 'Cargando datos de Cacti…';
-  else if (cached?.error) container.title = cached.error;
+  if (cached?.error) container.title = cached.error;
 }
 
 function renderNode(n) {

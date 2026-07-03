@@ -219,7 +219,8 @@
   .chart-series-item strong { color:var(--text); font-size:10px; } .chart-series-item small { color:var(--text3); font-size:8px; }
   .chart-source-form { display:grid; gap:7px; margin-top:8px; padding:9px; border:1px solid var(--border); border-radius:10px; background:var(--surface2); }
   .chart-source-form label { display:grid; gap:4px; color:var(--text3); font-size:9px; }
-  .chart-ds-add { width:100%; margin-top:5px; text-align:left; }
+  .chart-ds-options { max-height:190px; margin-top:4px; padding:4px; border:1px solid var(--border); border-radius:9px; background:var(--surface); }
+  .chart-ds-options .cacti-source-option:disabled { opacity:.68; cursor:default; }
   .theme-scope-btn {
     width: 100%; display: flex; align-items: center; gap: 9px; margin: 5px 0 10px; padding: 9px 10px;
     border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border)); border-radius: 10px;
