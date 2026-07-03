@@ -114,11 +114,94 @@ const GENERAL_NODE_APPEARANCE = {
   textNodeTextBorderColor:['text','textBorderColor'], textNodeTextBorderWidth:['text','textBorderWidth'], textNodeTextBorderHidden:['text','textBorderHidden']
 };
 
-function getGeneralNodeAppearance(type) {
+const NODE_APPEARANCE_FIELDS = [...new Set(Object.values(GENERAL_NODE_APPEARANCE).map(([, field]) => field))];
+const GENERAL_APPEARANCE_FIELDS = Object.keys(GENERAL_NODE_APPEARANCE);
+const CANVAS_THEME_FIELDS = [
+  'dateStampFontSize','dateStampTextColor','dateStampIconColor','dateStampBackground','dateStampBorderColor',
+  'scaleLegendFontSize','scaleLegendTextColor','scaleLegendBackground','scaleLegendBorderColor'
+];
+const THEME_CONFIG_FIELDS = [...GENERAL_APPEARANCE_FIELDS, ...CANVAS_THEME_FIELDS];
+let applyAppearanceToBothThemes = false;
+let generalAppearanceByTheme = {
+  dark: Object.fromEntries(THEME_CONFIG_FIELDS.map(field => [field, generalConfig[field]])),
+  light: {
+    ...Object.fromEntries(THEME_CONFIG_FIELDS.map(field => [field, generalConfig[field]])),
+    regularTextColor:'#24213d', regularNodeBackground:'#ffffff', regularNodeBorderColor:'#c9c5df',
+    regularTextBackground:'#ffffff', regularTextBorderColor:'#d8d5e8',
+    textNodeTextColor:'#24213d', textNodeBackground:'#ffffff', textNodeBorderColor:'#c9c5df',
+    textNodeTextBackground:'#ffffff', textNodeTextBorderColor:'#d8d5e8',
+    dateStampTextColor:'#24213d', dateStampIconColor:'#6a45f0', dateStampBackground:'#ffffff', dateStampBorderColor:'#c9c5df',
+    scaleLegendTextColor:'#524f76', scaleLegendBackground:'#ffffff', scaleLegendBorderColor:'#c9c5df'
+  }
+};
+
+function getGeneralNodeAppearance(type, theme = (typeof activeTheme === 'string' ? activeTheme : 'dark')) {
   const group = type === 'text' ? 'text' : 'regular';
   return Object.fromEntries(Object.entries(GENERAL_NODE_APPEARANCE)
     .filter(([, [target]]) => target === group)
-    .map(([configField, [, nodeField]]) => [nodeField, generalConfig[configField]]));
+    .map(([configField, [, nodeField]]) => [nodeField, generalAppearanceByTheme[theme]?.[configField] ?? generalConfig[configField]]));
+}
+
+function captureNodeAppearance(node) {
+  return Object.fromEntries(NODE_APPEARANCE_FIELDS.map(field => [field, node[field]]));
+}
+
+function applyElementTheme(nextTheme, previousTheme) {
+  if (!generalAppearanceByTheme[nextTheme]) return;
+  THEME_CONFIG_FIELDS.forEach(field => { generalConfig[field] = generalAppearanceByTheme[nextTheme][field]; });
+  if (typeof scaleByTheme !== 'undefined') {
+    scaleByTheme[previousTheme] = currentScale.map(item => ({...item}));
+    currentScale = (scaleByTheme[nextTheme] || PRESETS.cacti).map(item => ({...item}));
+  }
+  nodes.forEach(node => {
+    if (node.appearanceOverride) {
+      node.appearanceThemes ||= {};
+      node.appearanceThemes[previousTheme] = captureNodeAppearance(node);
+      node.appearanceThemes[nextTheme] ||= getGeneralNodeAppearance(node.type, nextTheme);
+      Object.assign(node, node.appearanceThemes[nextTheme]);
+    } else {
+      Object.assign(node, getGeneralNodeAppearance(node.type, nextTheme));
+    }
+    if (node.type === 'chart') {
+      node.graphConfig ||= {};
+      node.graphConfigThemes ||= {};
+      node.graphConfigThemes[previousTheme] = {
+        type:node.graphConfig.type || 'bar',
+        color:node.graphConfig.color || (previousTheme === 'light' ? '#6a45f0' : '#7c5cff')
+      };
+      node.graphConfigThemes[nextTheme] ||= {
+        type:node.graphConfig.type || 'bar',
+        color:nextTheme === 'light' ? '#6a45f0' : '#7c5cff'
+      };
+      Object.assign(node.graphConfig, node.graphConfigThemes[nextTheme]);
+    }
+    if (node.type === 'text') autoFitTextNode(node);
+    renderNode(node);
+  });
+  links.forEach(link => {
+    if (!link.scaleOverride) return;
+    link.scaleThemes ||= {};
+    if (Array.isArray(link.scale)) link.scaleThemes[previousTheme] = link.scale.map(item => ({...item}));
+    link.scaleThemes[nextTheme] ||= (scaleByTheme[nextTheme] || currentScale).map(item => ({...item}));
+    link.scale = link.scaleThemes[nextTheme].map(item => ({...item}));
+  });
+  renderLinks();
+  if (typeof renderScaleUI === 'function') renderScaleUI();
+  if (typeof renderConfigUI === 'function') renderConfigUI();
+  if (typeof updatePropsPanel === 'function') updatePropsPanel();
+}
+
+function toggleAppearanceThemeScope() {
+  applyAppearanceToBothThemes = !applyAppearanceToBothThemes;
+  renderConfigUI(); updatePropsPanel();
+  setStatus(applyAppearanceToBothThemes ? 'Los cambios de apariencia se aplicarán a ambos temas' : `Los cambios sólo se aplicarán al tema ${activeTheme === 'light' ? 'claro' : 'oscuro'}`);
+}
+
+function appearanceThemeScopeHtml() {
+  return `<button type="button" class="theme-scope-btn ${applyAppearanceToBothThemes ? 'both' : ''}" data-click="toggleAppearanceThemeScope" aria-pressed="${applyAppearanceToBothThemes}">
+    <span class="theme-scope-icon">${applyAppearanceToBothThemes ? '◐' : activeTheme === 'light' ? '☀' : '☾'}</span>
+    <span><strong>${applyAppearanceToBothThemes ? 'Aplicar a ambos temas' : `Sólo tema ${activeTheme === 'light' ? 'claro' : 'oscuro'}`}</strong><small>${applyAppearanceToBothThemes ? 'Light y dark recibirán el cambio' : 'Haz clic para editar ambos'}</small></span>
+  </button>`;
 }
 
 function hasCustomNodeAppearance(node) {

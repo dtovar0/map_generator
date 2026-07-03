@@ -500,6 +500,103 @@ function resetCactiDemoCatalog() {
   }
 }
 
+function cactiSourcePickerHtml(linkId, hostId, sources, selectedId = null, fixedGraphId = null) {
+  const selected = sources.find(source => Number(source.localDataId) === Number(selectedId));
+  const buttonLabel = selected
+    ? escapeHtml(selected.name)
+    : sources.length ? 'Selecciona una fuente…' : 'No hay fuentes disponibles';
+  const buttonMeta = selected?.snmpIndex ? `<small>${escapeHtml(selected.snmpIndex)}</small>` : '';
+  const nativeOptions = sources.map(source => {
+    const graphId = fixedGraphId || source.graphId || '';
+    return `<option value="${source.localDataId}" data-graph-id="${graphId}" ${Number(selectedId)===Number(source.localDataId)?'selected':''}>${escapeHtml(source.name)}</option>`;
+  }).join('');
+  const items = sources.map(source => {
+    const graphId = fixedGraphId || source.graphId || null;
+    const search = `${source.name || ''} ${source.snmpIndex || ''} ${source.graphName || ''}`.toLocaleLowerCase();
+    return `<button type="button" class="cacti-source-option ${Number(selectedId)===Number(source.localDataId)?'selected':''}"
+      data-search="${escapeHtml(search)}" data-click="chooseCactiSource"
+      data-args='["${linkId}",${hostId},${source.localDataId},${graphId || 'null'}]'>
+      <span><strong>${escapeHtml(source.name)}</strong>${source.graphName ? `<small>${escapeHtml(source.graphName)}</small>` : ''}</span>
+      ${source.snmpIndex ? `<em>${escapeHtml(source.snmpIndex)}</em>` : ''}
+    </button>`;
+  }).join('');
+  return `<div class="cacti-source-select ${sources.length ? '' : 'disabled'}" id="cacti-source-picker-${linkId}" data-blur="closeCactiSourcePicker" data-args='["${linkId}","$self"]'>
+    <select class="cacti-native-source" id="cacti-source-${linkId}" tabindex="-1" aria-hidden="true">
+      <option value="">Selecciona una fuente…</option>${nativeOptions}
+    </select>
+    <button type="button" class="cacti-source-trigger" ${sources.length ? '' : 'disabled'} data-click="toggleCactiSourcePicker" data-args='["${linkId}","$self"]' aria-haspopup="listbox" aria-expanded="false">
+      <span>${buttonLabel}${buttonMeta}</span><i aria-hidden="true"></i>
+    </button>
+    <div class="cacti-source-menu" hidden>
+      <div class="cacti-source-search"><span aria-hidden="true">⌕</span><input type="search" placeholder="Buscar interfaz o fuente…" autocomplete="off" data-input="filterCactiSources" data-input-args='["${linkId}","$value"]' data-keydown="handleCactiSourceSearchKey" data-keydown-args='["${linkId}","$value","$event"]'></div>
+      <div class="cacti-source-options" role="listbox">${items}</div>
+      <div class="cacti-source-empty" hidden>Sin coincidencias</div>
+    </div>
+  </div>`;
+}
+
+function toggleCactiSourcePicker(linkId, trigger) {
+  const picker = document.getElementById(`cacti-source-picker-${linkId}`);
+  if (!picker || picker.classList.contains('disabled')) return;
+  const menu = picker.querySelector('.cacti-source-menu');
+  const open = menu.hidden;
+  menu.hidden = !open;
+  picker.classList.toggle('open', open);
+  trigger.setAttribute('aria-expanded', String(open));
+  if (open) setTimeout(() => picker.querySelector('input[type="search"]')?.focus(), 0);
+}
+
+function closeCactiSourcePicker(linkId, picker) {
+  setTimeout(() => {
+    if (picker.contains(document.activeElement)) return;
+    const menu = picker.querySelector('.cacti-source-menu');
+    if (menu) menu.hidden = true;
+    picker.classList.remove('open');
+    picker.querySelector('.cacti-source-trigger')?.setAttribute('aria-expanded', 'false');
+  }, 0);
+}
+
+function filterCactiSources(linkId, query) {
+  const picker = document.getElementById(`cacti-source-picker-${linkId}`);
+  if (!picker) return;
+  const normalized = query.trim().toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  let visible = 0;
+  picker.querySelectorAll('.cacti-source-option').forEach(option => {
+    const haystack = (option.dataset.search || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    option.hidden = !!normalized && !haystack.includes(normalized);
+    if (!option.hidden) visible++;
+  });
+  picker.querySelector('.cacti-source-empty').hidden = visible > 0;
+}
+
+function handleCactiSourceSearchKey(linkId, query, event) {
+  const picker = document.getElementById(`cacti-source-picker-${linkId}`);
+  if (!picker) return;
+  if (event.key === 'Escape') {
+    picker.querySelector('.cacti-source-menu').hidden = true;
+    picker.classList.remove('open');
+    picker.querySelector('.cacti-source-trigger')?.focus();
+  } else if (event.key === 'Enter') {
+    event.preventDefault();
+    picker.querySelector('.cacti-source-option:not([hidden])')?.click();
+  }
+}
+
+function chooseCactiSource(linkId, hostId, localDataId, graphId = null) {
+  const select = document.getElementById(`cacti-source-${linkId}`);
+  if (!select) return;
+  select.value = String(localDataId);
+  renderCactiDsPicker(linkId, hostId, localDataId, graphId);
+  const picker = document.getElementById(`cacti-source-picker-${linkId}`);
+  const source = (cactiCatalog.sources.get(Number(hostId)) || []).find(item => Number(item.localDataId) === Number(localDataId));
+  const trigger = picker?.querySelector('.cacti-source-trigger span');
+  if (trigger && source) trigger.innerHTML = `${escapeHtml(source.name)}${source.snmpIndex ? `<small>${escapeHtml(source.snmpIndex)}</small>` : ''}`;
+  picker?.querySelectorAll('.cacti-source-option').forEach(option => option.classList.toggle('selected', option.dataset.args?.includes(`,${localDataId},`)));
+  const menu = picker?.querySelector('.cacti-source-menu');
+  if (menu) menu.hidden = true;
+  picker?.classList.remove('open');
+}
+
 function cactiDisabledFlowHtml(linkId, sourceText = 'Primero selecciona un equipo…', dsText = 'Primero selecciona una fuente…') {
   return `<div id="cacti-source-wrap-${linkId}">
     <div class="cacti-modal-grid">
@@ -649,9 +746,7 @@ async function loadCactiGraphs(linkId, rawHostId) {
     })));
     cactiCatalog.sources.set(hostId, sources);
     wrap.innerHTML = `<div id="cacti-source-wrap-${linkId}"><div class="cacti-modal-grid">
-      <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" ${sources.length ? '' : 'disabled'} data-change="renderCactiDsPicker" data-args='["${linkId}",${hostId},"$value"]'>
-          <option value="">${sources.length ? 'Selecciona una fuente…' : 'No hay fuentes disponibles'}</option>${sources.map(source => `<option value="${source.localDataId}" data-graph-id="${source.graphId || ''}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
-        </select></label>
+      <label><span>Fuente de la gráfica</span>${cactiSourcePickerHtml(linkId, hostId, sources, link?.dataSource?.localDataId)}</label>
       </div><div id="cacti-ds-wrap-${linkId}">
         <div class="cacti-ds-grid">
           <label>Entrada<select class="prop-val" id="cacti-in-${linkId}" disabled><option>Selecciona una fuente…</option></select></label>
@@ -677,9 +772,7 @@ function loadCactiGraphSources(linkId, hostId, rawGraphId) {
   cactiCatalog.sources.set(Number(hostId), graph.dataSources || []);
   const link = getLink(linkId);
   wrap.innerHTML = `<div class="cacti-modal-grid">
-    <label><span>Fuente de la gráfica</span><select class="prop-val" id="cacti-source-${linkId}" data-change="renderCactiDsPicker" data-args='["${linkId}",${hostId},"$value",${graphId}]'>
-        <option value="">Selecciona una fuente…</option>${graph.dataSources.map(source => `<option value="${source.localDataId}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
-      </select></label>
+    <label><span>Fuente de la gráfica</span>${cactiSourcePickerHtml(linkId, hostId, graph.dataSources, link?.dataSource?.localDataId, graphId)}</label>
     </div><div id="cacti-ds-wrap-${linkId}"></div>`;
   const selected = link?.dataSource?.graphId === graphId ? link.dataSource.localDataId : (graph.dataSources.length === 1 ? graph.dataSources[0].localDataId : null);
   if (selected) {
@@ -701,9 +794,7 @@ async function loadCactiSources(linkId, rawHostId) {
     }
     const sources = cactiCatalog.sources.get(hostId), link = getLink(linkId);
     wrap.innerHTML = `<label class="prop-label" style="margin-top:8px">Interfaz / fuente</label>
-      <select class="prop-val" id="cacti-source-${linkId}" data-change="renderCactiDsPicker" data-args='["${linkId}",${hostId},"$value"]'>
-        <option value="">Selecciona una fuente…</option>${sources.map(source => `<option value="${source.localDataId}" ${Number(link?.dataSource?.localDataId)===source.localDataId?'selected':''}>${escapeHtml(source.name)}${source.snmpIndex ? ` · ${escapeHtml(source.snmpIndex)}` : ''}</option>`).join('')}
-      </select><div id="cacti-ds-wrap-${linkId}"></div>`;
+      ${cactiSourcePickerHtml(linkId, hostId, sources, link?.dataSource?.localDataId)}<div id="cacti-ds-wrap-${linkId}"></div>`;
     if (link?.dataSource?.localDataId) renderCactiDsPicker(linkId, hostId, link.dataSource.localDataId);
   } catch (error) {
     wrap.innerHTML = `<span class="cacti-state error">⚠ ${escapeHtml(error.message)}</span>`;

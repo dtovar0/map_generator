@@ -42,7 +42,13 @@ function syncSegToggle(name, value, disabled) {
   radios.forEach(r => { r.checked = (r.value === String(value)); if (disabled !== undefined) r.disabled = !!disabled; });
   if (disabled !== undefined && radios[0]) radios[0].closest('.seg-toggle')?.setAttribute('aria-disabled', disabled ? 'true' : 'false');
 }
-const NODE_ICONS = ['🖼️','🔲','🔷','🛡️','🖥️','☁️','📡','🌐','🗄️','💻','⚙️','⚠️','📍','🏷️','📊','🔌'];
+const NODE_ICONS = [
+  '🖥️','💻','🗄️','🌐','📡',
+  '☁️','🛡️','🔥','🔀','📶',
+  '🔌','⚙️','💾','💿','📱',
+  '📟','🛰️','🔒','🗃️','📊',
+  '🧰','🧱','🚨','🔋','🖨️'
+];
 const NODE_FONTS = [
   ['system-ui','Sistema'], ['Arial','Arial'], ['Georgia','Georgia'],
   ['Consolas','Consolas'], ['Times New Roman','Times New Roman']
@@ -54,6 +60,7 @@ function linkThresholdEditorHtml(link) {
   if (!link.scaleOverride) return '';
   const scale = Array.isArray(link.scale) && link.scale.length >= 2 ? link.scale : currentScale;
   return `
+    ${appearanceThemeScopeHtml()}
     <div style="height:10px;display:flex;border-radius:3px;overflow:hidden;margin:7px 0 9px">
       ${scale.map(item => `<span style="flex:1;background:${item.color}"></span>`).join('')}
     </div>
@@ -82,7 +89,7 @@ function currentScalePresetName() {
 }
 function generalThresholdEditorHtml() {
   const preset = currentScalePresetName();
-  return `<div class="prop-label">Paleta de umbrales</div>
+  return `${appearanceThemeScopeHtml()}<div class="prop-label">Paleta de umbrales</div>
     <select class="prop-val" data-change="applyPreset" data-args='["$value"]'>
       <option value="cacti" ${preset==='cacti'?'selected':''}>Cacti clásico</option>
       <option value="traffic" ${preset==='traffic'?'selected':''}>Semáforo</option>
@@ -541,7 +548,7 @@ function updatePropsPanel() {
   if (selectedCanvasInfo) {
     const isDate = selectedCanvasInfo === 'date';
     if (isDate) {
-      c.innerHTML = `<div class="prop-row"><div class="prop-label">Apariencia y contenido</div>
+      c.innerHTML = `<div class="prop-row theme-scope-row"><div class="prop-label">Tema de la apariencia</div>${appearanceThemeScopeHtml()}</div><div class="prop-row"><div class="prop-label">Apariencia y contenido</div>
           <label class="prop-check"><input type="checkbox" ${generalConfig.dateStampVisible?'checked':''} data-change="updateGeneralConfig" data-args='["dateStampVisible","$checked"]'> Mostrar en el canvas</label>
           <div class="prop-label u-mt-7">Prefijo</div><input class="prop-val editable" type="text" maxlength="40" value="${escapeHtml(generalConfig.dateStampLabel || '')}" data-change="updateGeneralConfig" data-args='["dateStampLabel","$value"]'>
           <div class="prop-label u-mt-7">Fecha</div><input class="prop-val" type="date" value="${selectedMapDate}" data-change="updateCanvasDateValue" data-args='["$value"]'>
@@ -553,7 +560,7 @@ function updatePropsPanel() {
           <div class="prop-pair u-mt-7"><label>Fondo<input class="prop-val" type="color" value="${generalConfig.dateStampBackground}" data-change="updateGeneralConfig" data-args='["dateStampBackground","$value"]'></label><label>Borde<input class="prop-val" type="color" value="${generalConfig.dateStampBorderColor}" data-change="updateGeneralConfig" data-args='["dateStampBorderColor","$value"]'></label></div></div>`;
       mountPropertyTabs(c, 'canvasDate', 'Fecha de creación', 'Elemento del canvas');
     } else {
-      c.innerHTML = `<div class="prop-row"><div class="prop-label">Apariencia y contenido</div>
+      c.innerHTML = `<div class="prop-row theme-scope-row"><div class="prop-label">Tema de la apariencia</div>${appearanceThemeScopeHtml()}</div><div class="prop-row"><div class="prop-label">Apariencia y contenido</div>
           <label class="prop-check"><input type="checkbox" ${generalConfig.scaleLegendVisible?'checked':''} data-change="updateGeneralConfig" data-args='["scaleLegendVisible","$checked"]'> Mostrar en el canvas</label>
           <div class="prop-label u-mt-7">Título</div><input class="prop-val editable" type="text" maxlength="60" value="${escapeHtml(generalConfig.scaleLegendTitle || '')}" data-change="updateGeneralConfig" data-args='["scaleLegendTitle","$value"]'>
           <label class="prop-check u-mt-7"><input type="checkbox" ${generalConfig.scaleLegendTitleVisible!==false?'checked':''} data-change="updateGeneralConfig" data-args='["scaleLegendTitleVisible","$checked"]'> Mostrar título</label>
@@ -585,6 +592,10 @@ function updatePropsPanel() {
     const textBorderHidden = !!n.textBorderHidden;
     const textBorder = n.textBorderColor || '#1b2e46';
     c.innerHTML = `
+      <div class="prop-row theme-scope-row">
+        <div class="prop-label">Tema de la apariencia</div>
+        ${appearanceThemeScopeHtml()}
+      </div>
       <div class="prop-row">
         <div class="prop-label">${n.type === 'text' ? 'Texto' : 'Nombre'}</div>
         <input class="prop-val editable" type="text" value="${escapeHtml(n.name)}"
@@ -1219,6 +1230,12 @@ function updateNodeAppearance(id, field, rawValue) {
   const beforeStyle = getSnapshot();
   n[field] = value;
   n.appearanceOverride = true;
+  n.appearanceThemes ||= {};
+  n.appearanceThemes[activeTheme] = {...(n.appearanceThemes[activeTheme] || captureNodeAppearance(n)), [field]:value};
+  if (applyAppearanceToBothThemes) {
+    const otherTheme = activeTheme === 'light' ? 'dark' : 'light';
+    n.appearanceThemes[otherTheme] = {...(n.appearanceThemes[otherTheme] || getGeneralNodeAppearance(n.type, otherTheme)), [field]:value};
+  }
   const affectsTextSize = ['fontSize','fontFamily','fontBold','fontItalic','textBorderWidth','textBorderHidden'].includes(field);
   if (n.type === 'text' && affectsTextSize) {
     autoFitTextNode(n);
@@ -1235,7 +1252,13 @@ function useGeneralNodeAppearance(id) {
   const n = getNode(id); if (!n) return;
   const beforeReset = getSnapshot();
   Object.assign(n, getGeneralNodeAppearance(n.type));
-  n.appearanceOverride = false;
+  n.appearanceThemes ||= {};
+  n.appearanceThemes[activeTheme] = captureNodeAppearance(n);
+  if (applyAppearanceToBothThemes) {
+    const otherTheme = activeTheme === 'light' ? 'dark' : 'light';
+    n.appearanceThemes[otherTheme] = getGeneralNodeAppearance(n.type, otherTheme);
+    n.appearanceOverride = false;
+  }
   if (n.type === 'text') autoFitTextNode(n);
   distributePortLinks(id); renderNode(n); renderLinks(); updatePropsPanel();
   const touching = linkIdsTouching(id);
@@ -1541,8 +1564,19 @@ function setLinkScaleOverride(id, enabled) {
   const l = getLink(id); if (!l || l.scaleOverride === enabled) return;
   l.scaleOverride = enabled;
   l.scale = enabled ? currentScale.map(item => ({...item})) : null;
+  l.scaleThemes = enabled ? {[activeTheme]:l.scale.map(item => ({...item}))} : {};
   renderLinks(); updatePropsPanel(); pushHistory();
   setStatus(enabled ? 'Umbrales individuales habilitados' : 'El enlace usa los umbrales generales');
+}
+
+function syncLinkScaleTheme(link) {
+  if (!link?.scaleOverride || !Array.isArray(link.scale)) return;
+  link.scaleThemes ||= {};
+  link.scaleThemes[activeTheme] = link.scale.map(item => ({...item}));
+  if (applyAppearanceToBothThemes) {
+    const otherTheme = activeTheme === 'light' ? 'dark' : 'light';
+    link.scaleThemes[otherTheme] = link.scale.map(item => ({...item}));
+  }
 }
 
 function updateLinkThresholdPct(id, index, rawValue) {
@@ -1553,6 +1587,7 @@ function updateLinkThresholdPct(id, index, rawValue) {
   const value = Math.max(min, Math.min(max, Math.round(Number(rawValue) || 0)));
   if (value === item.pct) { updatePropsPanel(); return; }
   item.pct = value;
+  syncLinkScaleTheme(l);
   renderLinks(); updatePropsPanel(); pushHistory(); setStatus('Umbral individual actualizado');
 }
 
@@ -1560,6 +1595,7 @@ function updateLinkThresholdColor(id, index, color) {
   const l = getLink(id); if (!l?.scaleOverride || !Array.isArray(l.scale)) return;
   if (!/^#[0-9a-f]{6}$/i.test(color) || !l.scale[index] || l.scale[index].color === color) return;
   l.scale[index].color = color.toLowerCase();
+  syncLinkScaleTheme(l);
   renderLinks(); updatePropsPanel(); pushHistory(); setStatus('Color del umbral actualizado');
 }
 
@@ -1574,12 +1610,14 @@ function addLinkThreshold(id) {
   const pct = Math.floor((l.scale[gapIndex].pct + l.scale[gapIndex+1].pct) / 2);
   const color = lerpColor(l.scale[gapIndex].color, l.scale[gapIndex+1].color, .5);
   l.scale.splice(gapIndex+1, 0, {pct,color});
+  syncLinkScaleTheme(l);
   renderLinks(); updatePropsPanel(); pushHistory(); setStatus('Umbral individual agregado');
 }
 
 function removeLinkThreshold(id, index) {
   const l = getLink(id); if (!l?.scaleOverride || !Array.isArray(l.scale) || l.scale.length <= 2) return;
   l.scale.splice(index,1);
+  syncLinkScaleTheme(l);
   renderLinks(); updatePropsPanel(); pushHistory(); setStatus('Umbral individual eliminado');
 }
 
@@ -1587,10 +1625,13 @@ function copyGeneralScaleToLink(id) {
   const l = getLink(id); if (!l) return;
   l.scaleOverride = true;
   l.scale = currentScale.map(item => ({...item}));
+  syncLinkScaleTheme(l);
   renderLinks(); updatePropsPanel(); pushHistory(); setStatus('Umbrales generales copiados al enlace');
 }
 
 function renderConfigUI() {
+  const scopeHost = document.getElementById('cfg-appearance-theme-scope');
+  if (scopeHost) scopeHost.innerHTML = appearanceThemeScopeHtml();
   const values = {
     'cfg-date-stamp-label': generalConfig.dateStampLabel,
     'cfg-date-stamp-font-size': generalConfig.dateStampFontSize,
@@ -1736,10 +1777,30 @@ function updateGeneralConfig(field, rawValue) {
   } else return;
   const beforeConfig = getSnapshot();
   generalConfig[field] = value;
+  if (CANVAS_THEME_FIELDS.includes(field)) {
+    generalAppearanceByTheme[activeTheme][field] = value;
+    if (applyAppearanceToBothThemes) {
+      const otherTheme = activeTheme === 'light' ? 'dark' : 'light';
+      generalAppearanceByTheme[otherTheme][field] = value;
+    }
+  }
   if (appearanceMeta) {
+    generalAppearanceByTheme[activeTheme][field] = value;
+    if (applyAppearanceToBothThemes) {
+      const otherTheme = activeTheme === 'light' ? 'dark' : 'light';
+      generalAppearanceByTheme[otherTheme][field] = value;
+    }
     const [target, nodeField] = appearanceMeta;
     nodes.filter(n => target === 'text' ? n.type === 'text' : n.type !== 'text').forEach(n => {
       n[nodeField] = value;
+      if (n.appearanceOverride) {
+        n.appearanceThemes ||= {};
+        n.appearanceThemes[activeTheme] = {...(n.appearanceThemes[activeTheme] || captureNodeAppearance(n)), [nodeField]:value};
+        if (applyAppearanceToBothThemes) {
+          const otherTheme = activeTheme === 'light' ? 'dark' : 'light';
+          n.appearanceThemes[otherTheme] = {...(n.appearanceThemes[otherTheme] || getGeneralNodeAppearance(n.type, otherTheme)), [nodeField]:value};
+        }
+      }
       if (n.type === 'text' && ['fontSize','fontFamily','fontBold','fontItalic','textBorderWidth','textBorderHidden'].includes(nodeField)) autoFitTextNode(n);
       renderNode(n);
       distributePortLinks(n.id);

@@ -411,7 +411,7 @@ function loadDemo() {
       w:generalConfig.nodeWidth, h:generalConfig.nodeHeight,
       image:null, nameInside:true, hideName:false, textRotation:0, linkPadding:generalConfig.linkPadding,
       ...getGeneralNodeAppearance(d.type),
-      sizeOverride:false, linkPaddingOverride:false, appearanceOverride:false,
+      appearanceThemes:{}, sizeOverride:false, linkPaddingOverride:false, appearanceOverride:false,
       inPct:Math.floor(Math.random()*100), outPct:Math.floor(Math.random()*100) });
     renderNode(nodes[nodes.length-1]);
   });
@@ -424,7 +424,7 @@ function loadDemo() {
       midTermination:generalConfig.midTermination,
       dividerPosition:generalConfig.dividerPosition,
       dividerPositionOverride:false, styleOverride:false,
-      scaleOverride:false, scale:null,
+      scaleOverride:false, scale:null, scaleThemes:{},
       capacity:100, capacityUnit:'Mbps', inUsage:0, outUsage:0,
       editorInPct:Math.floor(Math.random()*100), editorOutPct:Math.floor(Math.random()*100),
       usageLabelInPosition:50, usageLabelOutPosition:50,
@@ -570,12 +570,14 @@ let activeTheme = THEMES[_storedTheme] ? _storedTheme : (LEGACY_THEME_MAP[_store
 function applyTheme(name) {
   const theme = THEMES[name];
   if (!theme) return;
+  const previousTheme = activeTheme;
   activeTheme = name;
   const root = document.documentElement;
   root.dataset.theme = name;
   Object.entries(theme.vars).forEach(([k, v]) => root.style.setProperty(k, v));
   lsSet('mapgen_theme', name);
   document.getElementById('tool-theme')?.classList.remove('active');
+  if (typeof applyElementTheme === 'function') applyElementTheme(name, previousTheme);
 }
 
 function toggleTheme() {

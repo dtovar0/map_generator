@@ -133,7 +133,7 @@ function onNodeClickForLink(toId, requestedPort, pointer = null) {
     midTermination:generalConfig.midTermination,
     dividerPosition:generalConfig.dividerPosition,
     dividerPositionOverride:false, styleOverride:false,
-    scaleOverride:false, scale:null,
+    scaleOverride:false, scale:null, scaleThemes:{},
     routeLane: 0,
     routeStyle: generalConfig.routeStyle === 'free' ? 'free' : 'ortho',
     waypoints: [...linkWaypoints]
@@ -1181,9 +1181,9 @@ function renderLinks() {
         const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
         bg.setAttribute('x', -bw/2); bg.setAttribute('y', -bh/2);
         bg.setAttribute('width', bw); bg.setAttribute('height', bh);
-        bg.setAttribute('fill', '#0A0912E8'); bg.setAttribute('rx', '3');
+        bg.setAttribute('fill', activeTheme === 'light' ? '#FFFFFFF2' : '#0A0912E8'); bg.setAttribute('rx', '3');
         if (isActiveLabel) {
-          bg.setAttribute('stroke', '#7C5CFF'); bg.setAttribute('stroke-width', '1.5');
+          bg.setAttribute('stroke', activeTheme === 'light' ? '#6A45F0' : '#7C5CFF'); bg.setAttribute('stroke-width', '1.5');
           bg.setAttribute('stroke-dasharray', '3 2');
         }
         labelGroup.appendChild(bg);
@@ -1223,11 +1223,11 @@ function renderLinks() {
       const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
       bg.setAttribute('x', -width/2); bg.setAttribute('y', -height/2);
       bg.setAttribute('width', width); bg.setAttribute('height', height);
-      bg.setAttribute('fill', '#0A0912E8'); bg.setAttribute('rx', '3');
+      bg.setAttribute('fill', activeTheme === 'light' ? '#FFFFFFF2' : '#0A0912E8'); bg.setAttribute('rx', '3');
       group.appendChild(bg);
       const text = document.createElementNS('http://www.w3.org/2000/svg','text');
       text.setAttribute('x','0'); text.setAttribute('y',String(fontSize * 0.36)); text.setAttribute('text-anchor','middle');
-      text.setAttribute('font-size',String(fontSize)); text.setAttribute('fill','#F6C85F');
+      text.setAttribute('font-size',String(fontSize)); text.setAttribute('fill',activeTheme === 'light' ? '#9A5700' : '#F6C85F');
       text.setAttribute('font-family',"Consolas,'SF Mono',monospace"); text.setAttribute('font-weight','700');
       text.textContent = txt; group.appendChild(text);
       g.appendChild(group);

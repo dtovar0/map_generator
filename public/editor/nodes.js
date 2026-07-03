@@ -47,7 +47,7 @@ function toggleMultiPlacement() {
 
 function startChartPlacementMode() {
   if (placingItem?.type === 'chart') { cancelPlacing(); return; }
-  const defaultConfig = {type:'bar', color:'#7c5cff', values:[25,50,35,80,60], title:'Gráfica'};
+  const defaultConfig = {type:'bar', color:activeTheme === 'light' ? '#6a45f0' : '#7c5cff', values:[25,50,35,80,60], title:'Gráfica'};
   beginChartPlacement('Gráfica', defaultConfig, 240, 160);
 }
 
@@ -80,6 +80,14 @@ function updateChartConfig(id, key, rawValue) {
     cfg[key] = rawValue;
   }
   n.graphConfig = cfg;
+  if (key === 'color' || key === 'type') {
+    n.graphConfigThemes ||= {};
+    n.graphConfigThemes[activeTheme] = {...(n.graphConfigThemes[activeTheme] || {}), type:cfg.type, color:cfg.color};
+    if (applyAppearanceToBothThemes) {
+      const otherTheme = activeTheme === 'light' ? 'dark' : 'light';
+      n.graphConfigThemes[otherTheme] = {...(n.graphConfigThemes[otherTheme] || {}), type:cfg.type, color:cfg.color};
+    }
+  }
   renderNode(n); pushHistory(); updatePropsPanel();
   setStatus('Gráfica actualizada');
 }
@@ -136,9 +144,16 @@ function createNode(type, icon, label, x, y, w, h, extra = {}) {
     nodeBackgroundTransparent:false,
     textBackground:null, textBackgroundTransparent:type === 'text', textBorderColor:null, textBorderWidth:null, textBorderHidden:false,
     ...getGeneralNodeAppearance(type),
-    sizeOverride:!!(w || h), linkPaddingOverride:false, appearanceOverride:false,
+    appearanceThemes:{}, sizeOverride:!!(w || h), linkPaddingOverride:false, appearanceOverride:false,
     inPct: Math.floor(Math.random()*100), outPct: Math.floor(Math.random()*100),
     ...structuredClone(extra) };
+  if (type === 'chart') {
+    const chartType = node.graphConfig?.type || 'bar';
+    node.graphConfigThemes = {
+      dark:{type:chartType, color:activeTheme === 'dark' ? (node.graphConfig?.color || '#7c5cff') : '#7c5cff'},
+      light:{type:chartType, color:activeTheme === 'light' ? (node.graphConfig?.color || '#6a45f0') : '#6a45f0'}
+    };
+  }
   if (type === 'text') {
     node.textFontSize = Number(node.textFontSize) || 18;
     if (!w && !h) autoFitTextNode(node);
@@ -153,7 +168,7 @@ function renderChartVisual(container, node) {
   const cfg = node.graphConfig || {};
   const values = (cfg.values || [25,50,35,80,60]).map(Number).filter(Number.isFinite);
   const data = values.length ? values : [0];
-  const key = JSON.stringify([cfg.title,cfg.type,cfg.color,data,node.w,node.h]);
+  const key = JSON.stringify([activeTheme,cfg.title,cfg.type,cfg.color,data,node.w,node.h]);
   if (container.dataset.chartKey === key && chartInstances.has(node.id)) return;
   chartInstances.get(node.id)?.destroy(); chartInstances.delete(node.id);
   container.textContent = '';
@@ -172,7 +187,7 @@ function renderChartVisual(container, node) {
     label:cfg.title || node.name || 'Gráfica', data,
     backgroundColor:type === 'doughnut' ? donutColors : `${color}bb`,
     borderColor:color, borderWidth:2,
-    tension:.32, pointRadius:3, pointBackgroundColor:'#111827', fill:false
+    tension:.32, pointRadius:3, pointBackgroundColor:activeTheme === 'light' ? '#ffffff' : '#111827', fill:false
   };
   chartInstances.set(node.id, new Chart(canvas, {
     type, data:{labels,datasets:[dataset]},
@@ -180,8 +195,8 @@ function renderChartVisual(container, node) {
       responsive:true, maintainAspectRatio:false, animation:false,
       plugins:{legend:{display:false},tooltip:{enabled:true}},
       scales:type === 'doughnut' ? {} : {
-        x:{grid:{display:false},ticks:{display:false},border:{color:'#536179'}},
-        y:{beginAtZero:true,grid:{color:'#263247'},ticks:{display:false},border:{display:false}}
+        x:{grid:{display:false},ticks:{display:false},border:{color:activeTheme === 'light' ? '#b6b2d6' : '#536179'}},
+        y:{beginAtZero:true,grid:{color:activeTheme === 'light' ? '#dcdaec' : '#263247'},ticks:{display:false},border:{display:false}}
       },
       cutout:type === 'doughnut' ? '58%' : undefined
     }

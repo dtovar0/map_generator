@@ -13,7 +13,9 @@ function getSnapshot() {
     nodes: structuredClone(nodes),
     links: structuredClone(links),
     currentScale: structuredClone(currentScale),
+    scaleByTheme: structuredClone(scaleByTheme),
     generalConfig: structuredClone(generalConfig),
+    generalAppearanceByTheme: structuredClone(generalAppearanceByTheme),
     nodeCounter,
     linkCounter
   };
@@ -102,6 +104,24 @@ function revertCancel() {
 function applySnapshot(snap) {
   destroyAllCharts();
   generalConfig = {...DEFAULT_GENERAL_CONFIG, ...(snap.generalConfig || {})};
+  if (snap.generalAppearanceByTheme?.dark && snap.generalAppearanceByTheme?.light) {
+    generalAppearanceByTheme = {
+      dark:{...generalAppearanceByTheme.dark, ...structuredClone(snap.generalAppearanceByTheme.dark)},
+      light:{...generalAppearanceByTheme.light, ...structuredClone(snap.generalAppearanceByTheme.light)}
+    };
+  } else {
+    THEME_CONFIG_FIELDS.forEach(field => { generalAppearanceByTheme.dark[field] = generalConfig[field]; });
+  }
+  THEME_CONFIG_FIELDS.forEach(field => {
+    generalConfig[field] = generalAppearanceByTheme[activeTheme]?.[field] ?? generalConfig[field];
+  });
+  if (snap.scaleByTheme?.dark && snap.scaleByTheme?.light) {
+    scaleByTheme = structuredClone(snap.scaleByTheme);
+    currentScale = scaleByTheme[activeTheme].map(item => ({...item}));
+  } else {
+    currentScale = structuredClone(snap.currentScale || PRESETS.cacti);
+    scaleByTheme.dark = currentScale.map(item => ({...item}));
+  }
   if (['arrow-forward','arrow-back'].includes(generalConfig.midTermination))
     generalConfig.midTermination = 'arrows';
   if (generalConfig.usageLabelPosition === 'inside') generalConfig.usageLabelPosition = 'center';
@@ -112,12 +132,26 @@ function applySnapshot(snap) {
     textColor:null, nodeBackground:null, nodeBorderColor:null, nodeBorderWidth:null, nodeBorderHidden:false,
     nodeBackgroundTransparent:false,
     textBackground:null, textBackgroundTransparent:n.type === 'text', textBorderColor:null, textBorderWidth:null, textBorderHidden:false,
-    sizeOverride:false, linkPaddingOverride:false, appearanceOverride:n.appearanceOverride ?? hasCustomNodeAppearance(n), ...n
-  })).map(n => n.appearanceOverride ? n : Object.assign(n, getGeneralNodeAppearance(n.type)));
+    appearanceThemes:{}, sizeOverride:false, linkPaddingOverride:false, appearanceOverride:n.appearanceOverride ?? hasCustomNodeAppearance(n), ...n
+  })).map(n => {
+    if (!n.appearanceOverride) Object.assign(n, getGeneralNodeAppearance(n.type));
+    else {
+      n.appearanceThemes ||= {};
+      n.appearanceThemes[activeTheme] ||= captureNodeAppearance(n);
+      Object.assign(n, n.appearanceThemes[activeTheme]);
+    }
+    if (n.type === 'chart') {
+      n.graphConfig ||= {type:'bar', color:activeTheme === 'light' ? '#6a45f0' : '#7c5cff', values:[25,50,35,80,60], title:n.name || 'Gráfica'};
+      n.graphConfigThemes ||= {};
+      n.graphConfigThemes[activeTheme] ||= {type:n.graphConfig.type || 'bar', color:n.graphConfig.color || (activeTheme === 'light' ? '#6a45f0' : '#7c5cff')};
+      Object.assign(n.graphConfig, n.graphConfigThemes[activeTheme]);
+    }
+    return n;
+  });
   links = structuredClone(snap.links).map(l => ({
     description:'', width:generalConfig.linkWidth,
     midTermination:generalConfig.midTermination,
-    scaleOverride:false, scale:null,
+    scaleOverride:false, scale:null, scaleThemes:{},
     capacity:100, capacityUnit:'Mbps', inUsage:null, outUsage:null,
     editorInPct:null, editorOutPct:null,
     usageLabelInPosition:50, usageLabelOutPosition:50,
@@ -135,6 +169,11 @@ function applySnapshot(snap) {
     styleOverride:false, fromPortLocked:false, toPortLocked:false,
     dataSource:null, telemetryError:null, telemetryTimestamp:null, ...l
   })).map(l => {
+    if (l.scaleOverride) {
+      l.scaleThemes ||= {};
+      l.scaleThemes[activeTheme] ||= Array.isArray(l.scale) ? l.scale.map(item => ({...item})) : currentScale.map(item => ({...item}));
+      l.scale = l.scaleThemes[activeTheme].map(item => ({...item}));
+    }
     const capacity = Math.max(.01, Number(l.capacity) || 100);
     const rawIn  = l.inUsage  == null ? (Number(l.inPct)  || 0) : Number(l.inUsage);
     const rawOut = l.outUsage == null ? (Number(l.outPct) || 0) : Number(l.outUsage);
@@ -152,8 +191,6 @@ function applySnapshot(snap) {
       outPct:Math.round(outUsage / capacity * 1000) / 10
     };
   });
-  if (Array.isArray(snap.currentScale) && snap.currentScale.length >= 2)
-    currentScale = structuredClone(snap.currentScale);
   nodeCounter = Number.isInteger(snap.nodeCounter) ? snap.nodeCounter : maxIdNumber(nodes);
   linkCounter = Number.isInteger(snap.linkCounter) ? snap.linkCounter : maxIdNumber(links);
   document.getElementById('canvas').innerHTML = '';
@@ -200,10 +237,23 @@ const PRESETS = {
   cool:    [{pct:0,color:'#1a365d'},{pct:50,color:'#2d3748'},{pct:100,color:'#742a2a'}],
 };
 let currentScale = PRESETS.cacti.map(s => ({...s}));
+let scaleByTheme = {
+  dark: currentScale.map(item => ({...item})),
+  light: PRESETS.heat.map(item => ({...item}))
+};
+
+function syncScaleThemeScope() {
+  scaleByTheme[activeTheme] = currentScale.map(item => ({...item}));
+  if (applyAppearanceToBothThemes) {
+    const otherTheme = activeTheme === 'light' ? 'dark' : 'light';
+    scaleByTheme[otherTheme] = currentScale.map(item => ({...item}));
+  }
+}
 
 function applyPreset(name) {
   if (name === 'custom') return;
   currentScale = PRESETS[name].map(s => ({...s}));
+  syncScaleThemeScope();
   renderScaleUI();
   renderLinks();
   pushHistory(); setStatus('Umbrales generales actualizados');
@@ -221,6 +271,7 @@ function addThreshold() {
   }
   const newPct = Math.floor((currentScale[gapIdx].pct + currentScale[gapIdx + 1].pct) / 2);
   currentScale.splice(gapIdx + 1, 0, { pct: newPct, color: '#718096' });
+  syncScaleThemeScope();
   document.getElementById('palette-sel').value = 'custom';
   renderScaleUI();
   renderLinks();
@@ -230,6 +281,7 @@ function addThreshold() {
 function removeThreshold(idx) {
   if (currentScale.length <= 2) return;
   currentScale.splice(idx, 1);
+  syncScaleThemeScope();
   document.getElementById('palette-sel').value = 'custom';
   renderScaleUI();
   renderLinks();
@@ -242,6 +294,7 @@ function updateThresholdPct(idx, val) {
   const v = Math.max(min, Math.min(max, parseInt(val, 10) || 0));
   if (currentScale[idx].pct === v) { renderScaleUI(); return; }
   currentScale[idx].pct = v;
+  syncScaleThemeScope();
   document.getElementById('palette-sel').value = 'custom';
   renderScaleUI();
   renderLinks();
@@ -251,6 +304,7 @@ function updateThresholdPct(idx, val) {
 function updateThresholdColor(idx, color) {
   if (!currentScale[idx] || currentScale[idx].color === color) return;
   currentScale[idx].color = color;
+  syncScaleThemeScope();
   document.getElementById('palette-sel').value = 'custom';
   renderScaleUI();
   renderLinks();
@@ -262,6 +316,7 @@ function updateThresholdText(idx, text) {
   const value = String(text || '').trim().slice(0, 30);
   if ((currentScale[idx].text || '') === value) return;
   currentScale[idx].text = value;
+  syncScaleThemeScope();
   renderScaleUI(); pushHistory(); setStatus('Texto del umbral actualizado');
 }
 
