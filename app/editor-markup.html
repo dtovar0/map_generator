@@ -516,6 +516,30 @@
   </div>
 </div>
 
+<!-- Users admin modal -->
+<div class="modal-backdrop" id="users-modal" role="dialog" aria-modal="true" aria-labelledby="users-modal-title">
+  <div class="modal-card users-modal-panel">
+    <div class="modal-header">
+      <span class="modal-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5"/><circle cx="17.5" cy="9.5" r="2.5"/><path d="M16 14.8c2.8.3 5.5 2 5.5 5.2"/></svg></span>
+      <span class="modal-title" id="users-modal-title">Usuarios</span>
+      <button class="modal-close" data-click="closeUsersModal" title="Cerrar (Esc)">✕</button>
+    </div>
+    <div class="users-modal-body">
+      <form id="user-create-form" class="users-create-row">
+        <input id="user-new-username" placeholder="Usuario" autocomplete="off" required />
+        <input id="user-new-password" type="password" placeholder="Contraseña (mín. 8)" autocomplete="new-password" required minlength="8" />
+        <select id="user-new-role">
+          <option value="viewer">Solo lectura</option>
+          <option value="editor" selected>Editor</option>
+          <option value="admin">Administrador</option>
+        </select>
+        <button class="tb-btn" type="submit">Crear</button>
+      </form>
+      <div id="users-table"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Confirm modal -->
 <div class="modal-backdrop" id="confirm-modal" role="alertdialog" aria-modal="true">
   <div class="modal-card u-w-400">

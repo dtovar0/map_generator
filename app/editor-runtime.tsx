@@ -25,6 +25,7 @@ const RUNTIME_PARTS = [
   "/editor/maps.js",
   "/editor/tooltips.js",
   "/editor/auth.js",
+  "/editor/users.js",
   "/editor/init.js",
 ];
 

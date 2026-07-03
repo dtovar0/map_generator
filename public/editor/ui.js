@@ -431,6 +431,10 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.preventDefault(); closeHotkeysModal(); }
     return;
   }
+  if (document.getElementById('users-modal')?.classList.contains('open')) {
+    if (e.key === 'Escape') { e.preventDefault(); closeUsersModal(); }
+    return;
+  }
   const tag = document.activeElement.tagName;
   if (tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'||document.activeElement.isContentEditable) return;
   if (e.ctrlKey || e.metaKey) {

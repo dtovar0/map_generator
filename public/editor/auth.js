@@ -3,8 +3,7 @@
 // ════════════════════════════════════════════════════
 // toggleUserMenu/authLogout are resolved by the data-click delegation set up
 // in core.js (runDataAction looks them up as window[...]), same as
-// togglePresentationExportMenu; openUsersModal is a no-op until Task 14 lands
-// since runDataAction silently ignores handlers that aren't functions yet.
+// togglePresentationExportMenu; openUsersModal is defined in users.js.
 let currentUser = null;
 
 const ROLE_LABELS = { admin: 'Administrador', editor: 'Editor', viewer: 'Solo lectura' };
