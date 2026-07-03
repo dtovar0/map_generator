@@ -21,7 +21,8 @@ export async function POST(request: Request) {
   if (!username || !password || username.length > 190) {
     return NextResponse.json({ error: "Usuario y contraseña son obligatorios" }, { status: 400 });
   }
-  const state = failures.get(username);
+  const lockKey = username.toLowerCase();
+  const state = failures.get(lockKey);
   if (state && state.lockedUntil > Date.now()) {
     return NextResponse.json({ error: "Demasiados intentos; espera un minuto" }, { status: 423 });
   }
@@ -31,13 +32,15 @@ export async function POST(request: Request) {
     if (!user || !valid) {
       const next = { count: (state?.count || 0) + 1, lockedUntil: 0 };
       if (next.count >= 5) { next.count = 0; next.lockedUntil = Date.now() + 60_000; }
-      failures.set(username, next);
+      failures.set(lockKey, next);
       return NextResponse.json({ error: "Usuario o contraseña incorrectos" }, { status: 401 });
     }
-    failures.delete(username);
+    failures.delete(lockKey);
     const { token, maxAge } = await createSession(user.id);
-    const { passwordHash: _omitted, ...safe } = user;
-    const response = NextResponse.json({ user: safe });
+    const response = NextResponse.json({ user: {
+      id: user.id, username: user.username, displayName: user.displayName,
+      role: user.role, provider: user.provider,
+    }});
     response.headers.set("Set-Cookie", sessionCookieHeader(token, maxAge, isSecureRequest(request)));
     return response;
   } catch (error) {
