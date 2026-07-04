@@ -53,7 +53,10 @@ export function ensureAuthReady(): Promise<void> {
        ON DUPLICATE KEY UPDATE role = 'admin', active = 1`,
       [bootstrapUser, await hashPassword(bootstrapPassword)],
     );
-  })();
+  })().catch((error) => {
+    bootstrapped = undefined; // retry on next request after a transient DB failure
+    throw error;
+  });
   return bootstrapped;
 }
 

@@ -55,6 +55,9 @@ export function mapgenPool(): mysql.Pool {
 export function dbReady(): Promise<void> {
   ready ||= (async () => {
     for (const sql of SCHEMA) await mapgenPool().query(sql);
-  })();
+  })().catch((error) => {
+    ready = undefined; // retry on next request after a transient DB failure
+    throw error;
+  });
   return ready;
 }
