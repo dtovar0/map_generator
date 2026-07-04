@@ -134,6 +134,9 @@ Ejemplo de configuración Apache:
   RequestHeader unset Remote-Groups
   RequestHeader unset Remote-Name
   RequestHeader unset Remote-Email
+  # También el host reenviado: evita que un cliente inyecte el origen usado al
+  # construir el redirect_uri de OIDC (Apache lo antepone si el cliente lo envía).
+  RequestHeader unset X-Forwarded-Host
   # ... configuración estándar de Authelia (auth_request / ErrorDocument 401) que
   #     reinyecta Remote-User/Remote-Groups/Remote-Name/Remote-Email tras autenticar ...
 </Location>

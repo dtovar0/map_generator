@@ -32,9 +32,14 @@ export async function POST(request: Request) {
   }
   try {
     const user = await getLocalUserForLogin(username);
-    const valid = user?.active && user.passwordHash
-      ? await verifyPassword(password, user.passwordHash)
-      : await verifyPassword(password, await dummyHash);
+    let valid = false;
+    if (user?.active && user.passwordHash) {
+      valid = await verifyPassword(password, user.passwordHash);
+    } else {
+      // Equalize timing for unknown/passwordless users without ever treating
+      // the dummy verification as a successful login.
+      await verifyPassword(password, await dummyHash);
+    }
     if (!user || !valid) {
       const next = { count: (state?.count || 0) + 1, lockedUntil: 0 };
       if (next.count >= 5) { next.count = 0; next.lockedUntil = Date.now() + 60_000; }
