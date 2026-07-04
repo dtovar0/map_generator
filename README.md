@@ -30,7 +30,7 @@ La aplicación persiste usuarios, sesiones y mapas en una base de datos MariaDB/
 (`mapgen`), independiente del catálogo de Cacti. Hay tres modos de autenticación
 configurables por variables de entorno, combinables: local, forward-auth de Authelia y
 OIDC de Authelia. Los roles son `admin`, `editor` y `viewer` (jerárquicos): viewer sólo
-puede ver mapas y modo presentación; editor además crea/edita/borra mapas; admin además
+puede ver mapas y modo presentación; editor además crea/edita mapas; admin además
 gestiona usuarios.
 
 ### Aprovisionamiento de la base de datos
@@ -50,6 +50,11 @@ Los mapas existentes en `data/maps/*.json` se importan a la tabla con:
 npm run maps:import
 ```
 
+**Importante:** hay que arrancar la aplicación al menos una vez (`npm run dev` o
+`npm run start`) antes de ejecutar `npm run maps:import`, porque es la app la que crea las
+tablas (`users`, `sessions`, `maps`) en su primer uso del pool de conexión; el script de
+importación no las crea.
+
 El script omite los ids que ya existan en la tabla y **no borra los archivos**: quedan en
 `data/maps/` como respaldo.
 
@@ -57,10 +62,10 @@ El script omite los ids que ya existan en la tabla y **no borra los archivos**: 
 
 | Variable | Default | Uso |
 | --- | --- | --- |
-| `MAPGEN_DB_HOST` | — | Host de MariaDB/MySQL para la base `mapgen` |
-| `MAPGEN_DB_PORT` | — | Puerto |
-| `MAPGEN_DB_USER` | — | Usuario dedicado (ver aprovisionamiento) |
-| `MAPGEN_DB_PASSWORD` | — | Contraseña |
+| `MAPGEN_DB_HOST` | `127.0.0.1` | Host de MariaDB/MySQL para la base `mapgen` |
+| `MAPGEN_DB_PORT` | `3306` | Puerto |
+| `MAPGEN_DB_USER` | `mapgen` | Usuario dedicado (ver aprovisionamiento) |
+| `MAPGEN_DB_PASSWORD` | `vacío` | Contraseña |
 | `MAPGEN_DB_NAME` | `mapgen` | Nombre de la base |
 | `MAPGEN_DB_SOCKET` | — | Socket local opcional, tiene prioridad sobre host/puerto |
 | `AUTH_LOCAL_ENABLED` | `true` | Habilita el formulario de login local |
@@ -98,6 +103,11 @@ Con `AUTH_FORWARD_ENABLED=true`, la app confía en los headers `Remote-User`,
 calcula su rol desde `Remote-Groups` (salvo que un admin ya le haya fijado el rol
 manualmente). No hay validación de un secreto compartido ni lista de proxies confiables:
 el modelo de confianza es **bind a localhost**.
+
+**Nota de seguridad — colisión de nombres:** si un nombre de usuario de Authelia coincide
+con el de una cuenta **local** existente que tiene contraseña, el login se **rechaza** (tanto
+en forward-auth como en OIDC): una identidad de Authelia nunca puede tomar el control de
+una cuenta local por homonimia. El intento queda registrado en el log del servidor.
 
 **Requisitos de seguridad obligatorios de este modo** (no son opcionales):
 
