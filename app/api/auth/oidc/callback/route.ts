@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthConfig } from "../../../../../lib/auth/config";
 import {
-  OIDC_STATE_COOKIE, getJwks, getOidcMetadata, verifyIdToken, verifyStatePayload,
+  OIDC_STATE_COOKIE, getJwks, getOidcMetadata, publicOrigin, verifyIdToken, verifyStatePayload,
 } from "../../../../../lib/auth/oidc";
 import { createSession, isSecureRequest, sessionCookieHeader } from "../../../../../lib/auth/session";
 import { provisionAutheliaUser } from "../../../../../lib/auth/users";
@@ -17,14 +17,19 @@ function readStateCookie(request: Request): string | null {
   return null;
 }
 
+function clearStateCookieHeader(secure: boolean): string {
+  return `${OIDC_STATE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? "; Secure" : ""}`;
+}
+
 function failure(request: Request): NextResponse {
-  const response = NextResponse.redirect(new URL("/login?error=oidc", request.url));
-  response.headers.set("Set-Cookie", `${OIDC_STATE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+  const response = NextResponse.redirect(`${publicOrigin(request)}/login?error=oidc`);
+  response.headers.set("Set-Cookie", clearStateCookieHeader(isSecureRequest(request)));
   return response;
 }
 
 export async function GET(request: Request) {
   const cfg = getAuthConfig();
+  const origin = publicOrigin(request);
   if (!cfg.oidcEnabled || !cfg.sessionSecret) return failure(request);
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -42,7 +47,7 @@ export async function GET(request: Request) {
       body: new URLSearchParams({
         grant_type: "authorization_code",
         code,
-        redirect_uri: new URL("/api/auth/oidc/callback", request.url).toString(),
+        redirect_uri: `${origin}/api/auth/oidc/callback`,
         client_id: cfg.oidcClientId,
         client_secret: cfg.oidcClientSecret,
         code_verifier: stored.verifier,
@@ -66,11 +71,15 @@ export async function GET(request: Request) {
       email: typeof claims.email === "string" ? claims.email : undefined,
       groups: Array.isArray(claims.groups) ? claims.groups.map(String) : [],
     });
-    if (!user) return NextResponse.redirect(new URL("/login?error=inactive", request.url));
+    if (!user) {
+      const response = NextResponse.redirect(`${origin}/login?error=inactive`);
+      response.headers.set("Set-Cookie", clearStateCookieHeader(isSecureRequest(request)));
+      return response;
+    }
     const { token, maxAge } = await createSession(user.id);
-    const response = NextResponse.redirect(new URL("/", request.url));
+    const response = NextResponse.redirect(`${origin}/`);
     response.headers.append("Set-Cookie", sessionCookieHeader(token, maxAge, isSecureRequest(request)));
-    response.headers.append("Set-Cookie", `${OIDC_STATE_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+    response.headers.append("Set-Cookie", clearStateCookieHeader(isSecureRequest(request)));
     return response;
   } catch (error) {
     console.error("OIDC callback:", error);

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getAuthConfig } from "../../../../../lib/auth/config";
-import { OIDC_STATE_COOKIE, getOidcMetadata, signStatePayload } from "../../../../../lib/auth/oidc";
+import { OIDC_STATE_COOKIE, getOidcMetadata, publicOrigin, signStatePayload } from "../../../../../lib/auth/oidc";
 import { isSecureRequest } from "../../../../../lib/auth/session";
 
 export const runtime = "nodejs";
@@ -9,16 +9,17 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const cfg = getAuthConfig();
+  const origin = publicOrigin(request);
   if (!cfg.oidcEnabled || !cfg.oidcClientId || !cfg.sessionSecret) {
-    return NextResponse.redirect(new URL("/login?error=oidc", request.url));
+    return NextResponse.redirect(`${origin}/login?error=oidc`);
   }
   const metadata = await getOidcMetadata();
-  if (!metadata) return NextResponse.redirect(new URL("/login?error=oidc", request.url));
+  if (!metadata) return NextResponse.redirect(`${origin}/login?error=oidc`);
 
   const state = randomBytes(16).toString("base64url");
   const verifier = randomBytes(32).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
-  const redirectUri = new URL("/api/auth/oidc/callback", request.url).toString();
+  const redirectUri = `${origin}/api/auth/oidc/callback`;
 
   const authorize = new URL(metadata.authorization_endpoint);
   authorize.searchParams.set("response_type", "code");

@@ -4,6 +4,15 @@ import { getAuthConfig } from "./config";
 
 export const OIDC_STATE_COOKIE = "mapgen_oidc";
 
+// Behind the TLS proxy request.url is plain http; rebuild the public origin
+// from the forwarded proto so OIDC redirect URIs match the registered client.
+export function publicOrigin(request: Request): string {
+  const url = new URL(request.url);
+  const proto = request.headers.get("x-forwarded-proto")?.split(",")[0].trim();
+  const host = request.headers.get("x-forwarded-host")?.split(",")[0].trim() || request.headers.get("host") || url.host;
+  return `${proto || url.protocol.replace(":", "")}://${host}`;
+}
+
 export interface OidcMetadata {
   authorization_endpoint: string;
   token_endpoint: string;
