@@ -93,6 +93,14 @@
     </div>
   </div>
   <input id="map-file-input" type="file" accept="application/json,.json" hidden data-change="importMapFile" data-args='["$self"]' />
+  <div class="dropdown presentation-action" id="user-menu">
+    <button class="tb-btn toolbar-icon" id="btn-user" data-click="toggleUserMenu" aria-haspopup="true" aria-expanded="false" title="Cuenta"><span class="btn-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg></span><span class="btn-label" id="user-chip-name"></span></button>
+    <div class="dropdown-menu" id="user-menu-panel">
+      <div class="user-menu-info"><strong id="user-menu-name"></strong><small id="user-menu-role"></small></div>
+      <button class="dd-item" id="btn-admin-users" data-click="openUsersModal" hidden>Usuarios</button>
+      <button class="dd-item" data-click="authLogout">Cerrar sesión</button>
+    </div>
+  </div>
   <button class="tb-btn presentation-toggle" id="btn-presentation" data-click="togglePresentationMode"
           aria-pressed="false" title="Cambiar entre vista de editor y presentación (P)"><span class="btn-icon"><svg viewBox="0 0 24 24"><path d="M7 5v14l12-7z"/></svg></span><span class="btn-label">Presentación</span></button>
 </div>
@@ -504,6 +512,30 @@
     <div class="modal-footer">
       <div></div>
       <div class="modal-footer-right"><button class="tb-btn primary" data-click="closeAlert">Entendido</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Users admin modal -->
+<div class="modal-backdrop" id="users-modal" role="dialog" aria-modal="true" aria-labelledby="users-modal-title">
+  <div class="modal-card users-modal-panel">
+    <div class="modal-header">
+      <span class="modal-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-5.5 6.5-5.5s6.5 2 6.5 5.5"/><circle cx="17.5" cy="9.5" r="2.5"/><path d="M16 14.8c2.8.3 5.5 2 5.5 5.2"/></svg></span>
+      <span class="modal-title" id="users-modal-title">Usuarios</span>
+      <button class="modal-close" data-click="closeUsersModal" title="Cerrar (Esc)">✕</button>
+    </div>
+    <div class="users-modal-body">
+      <form id="user-create-form" class="users-create-row">
+        <input id="user-new-username" placeholder="Usuario" autocomplete="off" required />
+        <input id="user-new-password" type="password" placeholder="Contraseña (mín. 8)" autocomplete="new-password" required minlength="8" />
+        <select id="user-new-role">
+          <option value="viewer">Solo lectura</option>
+          <option value="editor" selected>Editor</option>
+          <option value="admin">Administrador</option>
+        </select>
+        <button class="tb-btn" type="submit">Crear</button>
+      </form>
+      <div id="users-table"></div>
     </div>
   </div>
 </div>

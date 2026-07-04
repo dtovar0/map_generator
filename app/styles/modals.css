@@ -163,3 +163,27 @@
   body.presentation-mode.presentation-date-empty #canvas,
   body.presentation-mode.presentation-date-empty #links-svg,
   body.presentation-mode.presentation-date-empty #overlay-svg { visibility: hidden; }
+
+  /* Users admin panel. */
+  .users-modal-panel { width: min(760px, calc(100vw - 32px)); }
+  .users-modal-body { padding: 16px 20px 20px; display: grid; gap: 14px; max-height: 70vh; overflow-y: auto; }
+  .users-create-row { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; }
+  .users-create-row input, .users-create-row select {
+    padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--surface2); color: var(--text); font: 400 13px/1 var(--font-ui);
+  }
+  .users-create-row input:focus, .users-create-row select:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+  .users-row {
+    display: grid; grid-template-columns: 1fr auto auto auto auto auto; gap: 8px; align-items: center;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface2);
+  }
+  .users-row-inactive { opacity: .55; }
+  .users-cell-id { display: grid; gap: 2px; }
+  .users-cell-id small { color: var(--text3); }
+  .users-badge { padding: 3px 10px; border-radius: 999px; font: 600 11px/1.4 var(--font-ui); }
+  .users-badge-admin { background: var(--accent-lo); color: var(--accent); }
+  .users-badge-editor { background: var(--surface3); color: var(--text2); }
+  .users-badge-viewer { background: var(--surface3); color: var(--text3); }
+  .users-action { font-size: 12px; }
+  .users-action-danger { color: var(--danger); }
+  .users-empty { color: var(--text3); text-align: center; padding: 18px 0; }

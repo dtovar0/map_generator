@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "test": "node --import tsx --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "maps:import": "node scripts/import-maps.mjs"
   },
   "dependencies": {
     "chart.js": "4.5.1",
@@ -22,6 +24,7 @@
     "@types/prop-types": "15.7.15",
     "@types/react": "18.3.23",
     "@types/react-dom": "18.3.7",
+    "tsx": "^4.23.0",
     "typescript": "5.9.3"
   }
 }

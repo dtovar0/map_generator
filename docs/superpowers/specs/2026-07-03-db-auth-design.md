@@ -87,7 +87,6 @@ Variables de entorno:
 | --- | --- | --- |
 | `AUTH_LOCAL_ENABLED` | `true` | Formulario de login local |
 | `AUTH_FORWARD_ENABLED` | `false` | Headers de Authelia vía proxy |
-| `AUTH_FORWARD_TRUSTED_PROXIES` | — | IPs/CIDRs desde los que se confía en los headers |
 | `AUTH_OIDC_ENABLED` | `false` | Botón "Entrar con Authelia" |
 | `AUTH_OIDC_ISSUER` | — | URL del issuer de Authelia |
 | `AUTH_OIDC_CLIENT_ID` / `AUTH_OIDC_CLIENT_SECRET` | — | Cliente registrado en Authelia |
@@ -107,12 +106,19 @@ Variables de entorno:
 
 ### Forward-auth (Authelia clásico)
 
-- Si la petición trae `Remote-User` y la IP de origen del socket está en
-  `AUTH_FORWARD_TRUSTED_PROXIES`, se acepta la identidad: se aprovisiona o actualiza el
-  usuario (`provider='authelia'`, `display_name` de `Remote-Name`, `email` de
-  `Remote-Email`), se calcula el rol desde `Remote-Groups` y se crea una sesión propia de
-  la app de forma transparente (sin pasar por `/login`).
-- Si los headers no están o la IP no es confiable, se ignoran y aplica el flujo normal.
+- Con `AUTH_FORWARD_ENABLED=true`, si la petición trae `Remote-User` se acepta la
+  identidad: se aprovisiona o actualiza el usuario (`provider='authelia'`,
+  `display_name` de `Remote-Name`, `email` de `Remote-Email`) y el rol se calcula desde
+  `Remote-Groups`, sin pasar por `/login`.
+- **Modelo de confianza (decisión del usuario): bind a localhost.** La app no verifica el
+  origen de los headers; la seguridad depende del despliegue: el servidor Next DEBE
+  escuchar solo en `127.0.0.1` (`next start -H 127.0.0.1`) con Apache/Authelia como único
+  ingreso, y el proxy DEBE eliminar cualquier header `Remote-*` proveniente del cliente.
+  Esto queda documentado en el README como requisito obligatorio del modo forward.
+- La identidad es por petición (stateless): no se crea fila en `sessions` — los headers
+  llegan en cada request. El aprovisionamiento en DB usa un caché en memoria de 60 s para
+  no golpear la DB en cada petición.
+- Si los headers no están, aplica el flujo normal (`/login`).
 
 ### OIDC (Authorization Code + PKCE, sin dependencias)
 
@@ -142,8 +148,9 @@ Variables de entorno:
 - En DB solo se guarda el SHA-256 del token. TTL deslizante: `expires_at` se extiende
   cuando queda menos de la mitad. Las sesiones vencidas se purgan de forma oportunista.
 - `middleware.ts` (edge, sin MySQL) solo hace la verificación barata: documento sin cookie
-  de sesión → redirect a `/login` (excepto `/login` y rutas de auth). La validación real
-  vive en `lib/auth/session.ts`.
+  de sesión y sin `Remote-User` (con forward habilitado) → redirect a `/login` (excepto
+  `/login`, `/denied` y rutas de auth). La validación real vive en `lib/auth/session.ts`
+  y el guard de las rutas API.
 - Helper central `requireUser(request, minRole?)`: valida la sesión contra la DB (y en su
   ausencia intenta forward-auth si está habilitado); devuelve el usuario o una respuesta
   401/403. Todas las rutas API lo usan.
@@ -213,7 +220,7 @@ páginas de error genéricas de navegador.
   local y OIDC muestran el error en la página.
 - Issuer OIDC inaccesible o callback inválido → redirect a `/login?error=oidc` con
   mensaje genérico (el detalle va al log del servidor).
-- Headers forward-auth desde IP no confiable → se ignoran silenciosamente (log en debug).
+- Forward-auth habilitado pero sin `Remote-User` → aplica el flujo normal de login.
 - Escrituras de mapas conservan la serialización por id (`withMapLock`).
 
 ## 7. Verificación

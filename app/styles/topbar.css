@@ -72,3 +72,9 @@
   #presentation-date:disabled, #presentation-refresh:disabled {
     opacity: .45; cursor: not-allowed;
   }
+
+  /* Current-user chip and admin/viewer visibility. */
+  #user-menu .user-menu-info { padding: 8px 12px; display: grid; gap: 2px; border-bottom: 1px solid var(--border); }
+  #user-menu .user-menu-info small { color: var(--text3); }
+  body.role-viewer #btn-presentation,
+  body.role-viewer #btn-save-map { display: none !important; }
