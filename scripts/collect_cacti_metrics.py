@@ -60,7 +60,51 @@ def database_connection():
     return pymysql.connect(**options)
 
 
-def required_bindings(maps_dir: Path) -> dict[int, set[str]]:
+def mapgen_database_connection():
+    """Connection to the Map Generator app's own DB (table `maps`)."""
+    options = {
+        "user": env("MAPGEN_DB_USER", "mapgen"),
+        "password": env("MAPGEN_DB_PASSWORD"),
+        "database": env("MAPGEN_DB_NAME", "mapgen"),
+        "charset": "utf8mb4",
+        "autocommit": False,
+    }
+    socket = env("MAPGEN_DB_SOCKET")
+    if socket:
+        options["unix_socket"] = socket
+    else:
+        options["host"] = env("MAPGEN_DB_HOST", "127.0.0.1")
+        options["port"] = int(env("MAPGEN_DB_PORT", "3306"))
+    return pymysql.connect(**options)
+
+
+def bindings_from_record(record: dict, required: dict[int, set[str]]) -> None:
+    days = record.get("days") or {}
+    snapshot = days.get(max(days)) if days else None
+    for link in (snapshot or {}).get("links", []):
+        source = link.get("dataSource") or {}
+        if source.get("provider") != "cacti":
+            continue
+        try:
+            local_data_id = int(source["localDataId"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        names = {str(source.get("inDs") or ""), str(source.get("outDs") or "")}
+        required.setdefault(local_data_id, set()).update(name for name in names if name)
+    for node in (snapshot or {}).get("nodes", []):
+        if node.get("type") != "chart":
+            continue
+        for series in (node.get("graphConfig") or {}).get("series", []):
+            try:
+                local_data_id = int(series["localDataId"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            ds_name = str(series.get("dsName") or "")
+            if ds_name:
+                required.setdefault(local_data_id, set()).add(ds_name)
+
+
+def required_bindings_from_files(maps_dir: Path) -> dict[int, set[str]]:
     required: dict[int, set[str]] = {}
     for filename in maps_dir.glob("*.json"):
         try:
@@ -68,30 +112,35 @@ def required_bindings(maps_dir: Path) -> dict[int, set[str]]:
         except (OSError, json.JSONDecodeError) as error:
             print(f"Aviso: se omitió {filename.name}: {error}", file=sys.stderr)
             continue
-        days = record.get("days") or {}
-        snapshot = days.get(max(days)) if days else None
-        for link in (snapshot or {}).get("links", []):
-            source = link.get("dataSource") or {}
-            if source.get("provider") != "cacti":
-                continue
-            try:
-                local_data_id = int(source["localDataId"])
-            except (KeyError, TypeError, ValueError):
-                continue
-            names = {str(source.get("inDs") or ""), str(source.get("outDs") or "")}
-            required.setdefault(local_data_id, set()).update(name for name in names if name)
-        for node in (snapshot or {}).get("nodes", []):
-            if node.get("type") != "chart":
-                continue
-            for series in (node.get("graphConfig") or {}).get("series", []):
-                try:
-                    local_data_id = int(series["localDataId"])
-                except (KeyError, TypeError, ValueError):
-                    continue
-                ds_name = str(series.get("dsName") or "")
-                if ds_name:
-                    required.setdefault(local_data_id, set()).add(ds_name)
+        bindings_from_record(record, required)
     return required
+
+
+def required_bindings_from_db(maps_dir: Path) -> dict[int, set[str]]:
+    """Primary source: maps now live in the mapgen DB (table `maps`, column `days`).
+
+    Falls back to the legacy JSON directory when the mapgen DB is unreachable,
+    so pre-migration installs keep working.
+    """
+    try:
+        connection = mapgen_database_connection()
+    except pymysql.MySQLError as error:
+        print(f"Aviso: no se pudo conectar a la base mapgen ({error}); se usa data/maps como respaldo", file=sys.stderr)
+        return required_bindings_from_files(maps_dir)
+    try:
+        required: dict[int, set[str]] = {}
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT days FROM maps")
+            rows = cursor.fetchall()
+        for (days_value,) in rows:
+            days = json.loads(days_value) if isinstance(days_value, (str, bytes)) else days_value
+            bindings_from_record({"days": days}, required)
+        return required
+    except pymysql.MySQLError as error:
+        print(f"Aviso: falló la consulta a la base mapgen ({error}); se usa data/maps como respaldo", file=sys.stderr)
+        return required_bindings_from_files(maps_dir)
+    finally:
+        connection.close()
 
 
 def source_paths(connection, ids: list[int]) -> dict[int, str]:
@@ -204,7 +253,7 @@ def main() -> int:
                 cursor.execute(schema)
             connection.commit()
 
-        required = required_bindings(maps_dir)
+        required = required_bindings_from_db(maps_dir)
         paths = source_paths(connection, list(required))
         samples: list[tuple[int, str, datetime, float]] = []
         failures = 0
