@@ -134,6 +134,12 @@ export async function provisionAutheliaUser(identity: {
   username: string; displayName?: string; email?: string; groups: string[];
 }): Promise<AppUser | null> {
   await ensureAuthReady();
+  const existing = await getLocalUserForLogin(identity.username);
+  if (existing && existing.provider === "local" && existing.passwordHash) {
+    // An Authelia identity must never merge onto a local password account.
+    console.error(`Authelia login blocked: username "${identity.username}" already belongs to a local password account`);
+    return null;
+  }
   const cfg = getAuthConfig();
   const role = roleFromGroups(identity.groups, cfg);
   await mapgenPool().query(

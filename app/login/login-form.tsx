@@ -9,7 +9,7 @@ const QUERY_ERRORS: Record<string, string> = {
 
 function safeNext(): string {
   const next = new URLSearchParams(window.location.search).get("next") || "/";
-  return next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  return next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : "/";
 }
 
 export default function LoginForm() {

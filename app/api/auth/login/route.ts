@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthConfig } from "../../../../lib/auth/config";
-import { verifyPassword } from "../../../../lib/auth/passwords";
+import { hashPassword, verifyPassword } from "../../../../lib/auth/passwords";
 import { createSession, isSecureRequest, sessionCookieHeader } from "../../../../lib/auth/session";
 import { getLocalUserForLogin } from "../../../../lib/auth/users";
 
@@ -10,6 +10,10 @@ export const dynamic = "force-dynamic";
 // Small in-memory brake against credential stuffing: 5 failures per
 // username lock the account name for 60 seconds.
 const failures = new Map<string, { count: number; lockedUntil: number }>();
+
+// Flatten user-enumeration timing: always pay the password-hashing cost, even
+// when the username doesn't exist or has no local password.
+const dummyHash = hashPassword("timing-equalizer-dummy");
 
 export async function POST(request: Request) {
   if (!getAuthConfig().localEnabled) {
@@ -28,10 +32,13 @@ export async function POST(request: Request) {
   }
   try {
     const user = await getLocalUserForLogin(username);
-    const valid = user?.active && user.passwordHash && (await verifyPassword(password, user.passwordHash));
+    const valid = user?.active && user.passwordHash
+      ? await verifyPassword(password, user.passwordHash)
+      : await verifyPassword(password, await dummyHash);
     if (!user || !valid) {
       const next = { count: (state?.count || 0) + 1, lockedUntil: 0 };
       if (next.count >= 5) { next.count = 0; next.lockedUntil = Date.now() + 60_000; }
+      if (failures.size > 500) failures.clear();
       failures.set(lockKey, next);
       return NextResponse.json({ error: "Usuario o contraseña incorrectos" }, { status: 401 });
     }
