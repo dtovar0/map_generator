@@ -57,6 +57,10 @@
     transition: background 0.1s, color 0.1s; border: none; background: transparent;
     text-align: left; width: 100%; font-family: inherit;
   }
+  .dd-item svg {
+    width: 16px; height: 16px; flex: 0 0 16px;
+    fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+  }
   .dd-item:hover { background: var(--surface2); color: var(--text); }
   .dd-item.active { color: var(--ok); }
   .dd-item.danger { color: var(--danger); }

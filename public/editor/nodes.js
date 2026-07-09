@@ -70,8 +70,11 @@ function beginChartPlacement(title, graphConfig, width, height) {
 function updateChartConfig(id, key, rawValue) {
   const n = getNode(id); if (!n || n.type !== 'chart') return;
   const cfg = {type:'line', title:n.name || 'Gráfica', range:'24h', step:0, consolidation:'AVERAGE', series:[], ...(n.graphConfig || {})};
-  if (['stacked','legend','fill','points','showAxes'].includes(key)) {
+  if (['stacked','legend','fill','points','showAxes','xGrid','yGrid','yBeginAtZero'].includes(key)) {
     cfg[key] = rawValue === true || rawValue === 'true';
+  } else if (['xTickLimit','xTickEvery','yTickLimit','yTickStep','yMin','yMax','yDecimals'].includes(key)) {
+    const value = rawValue === '' || rawValue === null || rawValue === undefined ? null : Number(rawValue);
+    if (value === null || Number.isFinite(value)) cfg[key] = value;
   } else {
     cfg[key] = rawValue;
   }
@@ -187,7 +190,7 @@ function renderChartVisual(container, node) {
   const cfg = node.graphConfig || {};
   const cached = chartSeriesCache.get(node.id);
   if (Array.isArray(cfg.series) && cfg.series.length) queueMicrotask(() => loadChartRrdData(node));
-  const key = JSON.stringify([activeTheme,cfg.title,cfg.type,node.w,node.h,cfg.range,cfg.step,cfg.stacked,cfg.legend,cfg.fill,cfg.points,cfg.showAxes,cfg.series,cached]);
+  const key = JSON.stringify([activeTheme,cfg.title,cfg.type,node.w,node.h,cfg.range,cfg.step,cfg.stacked,cfg.legend,cfg.fill,cfg.points,cfg.showAxes,cfg.xGrid,cfg.yGrid,cfg.xAxisLabel,cfg.yAxisLabel,cfg.xFormat,cfg.xTickLimit,cfg.xTickEvery,cfg.yScale,cfg.yFormat,cfg.yDecimals,cfg.yUnit,cfg.yTickLimit,cfg.yTickStep,cfg.yBeginAtZero,cfg.yMin,cfg.yMax,cfg.series,cached]);
   if (container.dataset.chartKey === key && chartInstances.has(node.id)) return;
   chartInstances.get(node.id)?.destroy(); chartInstances.delete(node.id);
   container.textContent = '';
@@ -209,14 +212,30 @@ function renderChartVisual(container, node) {
       pointRadius:cfg.points ? 2 : 0, fill:cfg.type === 'area' || !!cfg.fill, spanGaps:true, stack:cfg.stacked ? 'rrd' : undefined};
   });
   const effectiveType = type;
+  const formatXAxisValue = value => {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return String(value ?? '');
+    const format = cfg.xFormat || 'datetime';
+    if (format === 'date') return date.toLocaleDateString([], {month:'short',day:'numeric'});
+    if (format === 'time') return date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    if (format === 'full') return date.toLocaleString([], {year:'2-digit',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+    if (format === 'raw') return String(value);
+    return date.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  };
   const humanValue = value => {
     const number = Number(value); if (!Number.isFinite(number)) return '—';
+    const decimals = Number.isFinite(Number(cfg.yDecimals)) ? Math.max(0, Math.min(6, Number(cfg.yDecimals))) : null;
+    const suffix = cfg.yUnit ? ` ${cfg.yUnit}` : '';
+    if (cfg.yFormat === 'number') return `${number.toLocaleString(undefined, {maximumFractionDigits:decimals ?? 2})}${suffix}`;
+    if (cfg.yFormat === 'percent') return `${number.toLocaleString(undefined, {maximumFractionDigits:decimals ?? 1})}%`;
+    if (cfg.yFormat === 'raw') return `${decimals === null ? String(number) : number.toFixed(decimals)}${suffix}`;
     const units = ['bps','Kbps','Mbps','Gbps','Tbps'];
     let scaled = Math.abs(number), unit = 0;
     while (scaled >= 1000 && unit < units.length - 1) { scaled /= 1000; unit++; }
     const signed = number < 0 ? -scaled : scaled;
-    return `${signed.toLocaleString(undefined, {maximumFractionDigits:scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2})} ${units[unit]}`;
+    return `${signed.toLocaleString(undefined, {maximumFractionDigits:decimals ?? (scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2)})} ${units[unit]}`;
   };
+  const xEvery = Math.max(1, Number(cfg.xTickEvery) || 1);
   chartInstances.set(node.id, new Chart(canvas, {
     type:effectiveType, data:{datasets:rrdDatasets},
     options:{
@@ -226,8 +245,19 @@ function renderChartVisual(container, node) {
         label:item => `${item.dataset.label || 'Serie'}: ${humanValue(item.parsed.y)}`
       }}},
       scales:effectiveType === 'doughnut' ? {} : {
-        x:{type:'linear',stacked:!!cfg.stacked,grid:{display:false},ticks:{display:cfg.showAxes !== false,color:activeTheme === 'light' ? '#625e78' : '#94a3b8',maxTicksLimit:6,callback:value => new Date(value).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})},border:{color:activeTheme === 'light' ? '#b6b2d6' : '#536179'}},
-        y:{beginAtZero:true,stacked:!!cfg.stacked,grid:{color:activeTheme === 'light' ? '#dcdaec' : '#263247'},ticks:{display:cfg.showAxes !== false,color:activeTheme === 'light' ? '#625e78' : '#94a3b8',callback:humanValue},border:{display:false}}
+        x:{type:'linear',stacked:!!cfg.stacked,
+          grid:{display:!!cfg.xGrid,color:activeTheme === 'light' ? '#dcdaec' : '#263247'},
+          title:{display:!!cfg.xAxisLabel && cfg.showAxes !== false,text:cfg.xAxisLabel,color:activeTheme === 'light' ? '#403c5c' : '#cbd5e1',font:{size:10,weight:'600'}},
+          ticks:{display:cfg.showAxes !== false,color:activeTheme === 'light' ? '#625e78' : '#94a3b8',maxTicksLimit:Number(cfg.xTickLimit) || 6,callback:(value,index) => index % xEvery === 0 ? formatXAxisValue(value) : ''},
+          border:{color:activeTheme === 'light' ? '#b6b2d6' : '#536179'}},
+        y:{type:cfg.yScale === 'logarithmic' ? 'logarithmic' : 'linear',
+          beginAtZero:cfg.yScale === 'logarithmic' ? false : cfg.yBeginAtZero !== false,stacked:!!cfg.stacked,
+          min:cfg.yMin !== null && cfg.yMin !== '' && Number.isFinite(Number(cfg.yMin)) ? Number(cfg.yMin) : undefined,
+          max:cfg.yMax !== null && cfg.yMax !== '' && Number.isFinite(Number(cfg.yMax)) ? Number(cfg.yMax) : undefined,
+          grid:{display:cfg.yGrid !== false,color:activeTheme === 'light' ? '#dcdaec' : '#263247'},
+          title:{display:!!cfg.yAxisLabel && cfg.showAxes !== false,text:cfg.yAxisLabel,color:activeTheme === 'light' ? '#403c5c' : '#cbd5e1',font:{size:10,weight:'600'}},
+          ticks:{display:cfg.showAxes !== false,color:activeTheme === 'light' ? '#625e78' : '#94a3b8',maxTicksLimit:Number(cfg.yTickLimit) || 6,stepSize:Number(cfg.yTickStep) || undefined,callback:humanValue},
+          border:{display:false}}
       },
       cutout:type === 'doughnut' ? '58%' : undefined
     }

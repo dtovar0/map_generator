@@ -12,6 +12,7 @@
   body.presentation-mode #topbar > .presentation-action { order: 1; }
   body.presentation-mode #topbar > .spacer { order: 2; }
   body.presentation-mode #topbar > #btn-presentation { order: 3; }
+  body.presentation-mode #topbar > #user-menu { order: 4; }
   body.presentation-mode #btn-presentation {
     background: var(--accent-lo); border-color: var(--accent); color: var(--accent);
   }

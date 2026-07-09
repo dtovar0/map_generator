@@ -121,7 +121,7 @@ const PROPERTY_TAB_CONFIG = {
     ['content','Contenido'], ['appearance','Apariencia'], ['transform','Transformar'], ['arrange','Ordenar']
   ],
   chart: [
-    ['data','Datos'], ['appearance','Apariencia'], ['layout','Diseño'], ['arrange','Ordenar']
+    ['data','Datos'], ['chart','Gráfica'], ['appearance','Apariencia'], ['layout','Diseño'], ['arrange','Ordenar']
   ],
   link: [
     ['data','Datos'], ['style','Estilo'], ['labels','Etiquetas'], ['thresholds','Umbrales']
@@ -139,12 +139,21 @@ const PROPERTY_TAB_ICONS = {
   layout:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 4v16M9 10h11"/>',
   transform:'<path d="M4 8V4h4M20 16v4h-4M16 4h4v4M8 20H4v-4"/><path d="m8 8 8 8M16 8l-8 8"/>',
   data:'<path d="M5 19V9h4v10M10 19V5h4v14M15 19v-7h4v7M3 19h18"/>',
+  chart:'<path d="M4 15l5-6 4 4 6-8"/><path d="M3 19h18"/><circle cx="9" cy="9" r="1.5"/><circle cx="13" cy="13" r="1.5"/><circle cx="19" cy="5" r="1.5"/>',
   style:'<path d="m4 16 9-9 4 4-9 9H4z"/><path d="m14 6 2-2 4 4-2 2"/>',
   labels:'<path d="M4 5h11l5 5-10 10-6-6z"/><circle cx="9" cy="10" r="1.5"/>',
   thresholds:'<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
   arrange:'<path d="M5 5v14M19 5v14M5 8h6l2 4h6M5 16h6l2-4"/><circle cx="5" cy="8" r="2"/><circle cx="5" cy="16" r="2"/><circle cx="19" cy="12" r="2"/>'
 };
 function checkControlIcon(text) {
+  if (/apilar/i.test(text)) return '<path d="m12 3 8 4-8 4-8-4z"/><path d="m4 12 8 4 8-4M4 16.5l8 4 8-4"/>';
+  if (/rellenar|área|area/i.test(text)) return '<path d="M4 16l5-7 4 4 7-8v14H4Z"/>';
+  if (/leyenda/i.test(text)) return '<rect x="4" y="5" width="4.5" height="4.5" rx="1"/><rect x="4" y="14.5" width="4.5" height="4.5" rx="1"/><path d="M12 7.2h8M12 16.7h8"/>';
+  if (/ejes/i.test(text)) return '<path d="M5 19V5M5 19h14"/><path d="M9 15l3-4 3 2 4-6"/>';
+  if (/grilla x/i.test(text)) return '<path d="M4 19h16M8 5v14M12 5v14M16 5v14"/>';
+  if (/grilla y/i.test(text)) return '<path d="M5 4v16M5 8h14M5 12h14M5 16h14"/>';
+  if (/cero y/i.test(text)) return '<path d="M5 19V5M5 19h14"/><path d="M9 15h6"/>';
+  if (/puntos/i.test(text)) return '<circle cx="6" cy="16" r="2"/><circle cx="12" cy="9" r="2"/><circle cx="18" cy="13" r="2"/><path d="M8 15l3-4M14 10l2.5 2"/>';
   if (/ocultar|visible|mostrar/i.test(text)) return '<path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.5"/>';
   if (/transparente|fondo/i.test(text)) return '<rect x="5" y="5" width="10" height="10" rx="2"/><path d="M9 9h10v10H9z"/>';
   if (/borde/i.test(text)) return '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 8h8v8H8z"/>';
@@ -199,7 +208,8 @@ function propertyTabForElement(element, profile) {
     return 'transform';
   }
   if (profile === 'chart') {
-    if (/^Nombre$|^Gráfica$/.test(label) || source.includes('nameInside') || source.includes('hideName')) return 'data';
+    if (/^Gráfica$|^Ejes$/.test(label)) return 'chart';
+    if (/^Nombre$/.test(label) || source.includes('nameInside') || source.includes('hideName')) return 'data';
     if (/^Tipografía$|^Apariencia del nodo$|^Contenedor del texto$/.test(label) || source.includes('useGeneralNodeAppearance')) return 'appearance';
     return 'layout';
   }
@@ -217,7 +227,7 @@ function mountPropertyTabs(container, profile, title, subtitle, entityId = null)
   container.closest('.panel-section')?.classList.add('has-property-tabs');
   const shell = document.createElement('div'); shell.className = `props-tabs-shell props-profile-${profile}`;
   const head = document.createElement('div'); head.className = 'props-entity-head';
-  head.innerHTML = `<span class="props-entity-icon"><svg viewBox="0 0 24 24">${profile === 'link' ? PROPERTY_TAB_ICONS.style : profile === 'chart' ? PROPERTY_TAB_ICONS.data : profile === 'text' || profile === 'canvasDate' ? PROPERTY_TAB_ICONS.content : profile === 'canvasLegend' ? PROPERTY_TAB_ICONS.thresholds : PROPERTY_TAB_ICONS.layout}</svg></span><span class="props-entity-copy"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle)}</small></span><span class="props-live-dot" title="Elemento seleccionado"></span>`;
+  head.innerHTML = `<span class="props-entity-icon"><svg viewBox="0 0 24 24">${profile === 'link' ? PROPERTY_TAB_ICONS.style : profile === 'chart' ? PROPERTY_TAB_ICONS.chart : profile === 'text' || profile === 'canvasDate' ? PROPERTY_TAB_ICONS.content : profile === 'canvasLegend' ? PROPERTY_TAB_ICONS.thresholds : PROPERTY_TAB_ICONS.layout}</svg></span><span class="props-entity-copy"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle)}</small></span><span class="props-live-dot" title="Elemento seleccionado"></span>`;
   const nav = document.createElement('div'); nav.className = 'props-tab-nav'; nav.setAttribute('role','tablist');
   nav.style.gridTemplateColumns = `repeat(${tabs.length}, minmax(0,1fr))`;
   const stage = document.createElement('div'); stage.className = 'props-tab-stage';
@@ -725,11 +735,42 @@ function updatePropsPanel() {
           <button class="tb-btn primary u-w-full u-mt-7" data-click="toggleChartSourcePicker" data-args='["${n.id}"]'>+ Agregar fuente</button>
           <div id="chart-source-picker-${n.id}"></div>
           <div class="prop-label" style="margin-top:9px">Presentación</div>
-          <label class="prop-check"><input type="checkbox" ${n.graphConfig?.stacked?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","stacked","$checked"]'> Apilar series</label>
-          <label class="prop-check"><input type="checkbox" ${n.graphConfig?.fill || n.graphConfig?.type==='area'?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","fill","$checked"]'> Rellenar área</label>
-          <label class="prop-check"><input type="checkbox" ${n.graphConfig?.legend!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","legend","$checked"]'> Mostrar leyenda</label>
-          <label class="prop-check"><input type="checkbox" ${n.graphConfig?.showAxes!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","showAxes","$checked"]'> Mostrar ejes</label>
-          <label class="prop-check"><input type="checkbox" ${n.graphConfig?.points?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","points","$checked"]'> Mostrar puntos</label>
+          <div class="chart-presentation-checks">
+            <label class="prop-check" title="Apilar series"><input type="checkbox" ${n.graphConfig?.stacked?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","stacked","$checked"]'> Apilar</label>
+            <label class="prop-check" title="Rellenar área"><input type="checkbox" ${n.graphConfig?.fill?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","fill","$checked"]'> Rellenar</label>
+            <label class="prop-check" title="Mostrar leyenda"><input type="checkbox" ${n.graphConfig?.legend!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","legend","$checked"]'> Leyenda</label>
+            <label class="prop-check" title="Mostrar ejes"><input type="checkbox" ${n.graphConfig?.showAxes!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","showAxes","$checked"]'> Ejes</label>
+            <label class="prop-check" title="Mostrar puntos"><input type="checkbox" ${n.graphConfig?.points?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","points","$checked"]'> Puntos</label>
+          </div>
+          <div class="prop-row">
+            <div class="prop-label">Ejes</div>
+            <div class="chart-axis-grid">
+              <label><span>Título X</span><input class="prop-val editable" type="text" maxlength="40" value="${escapeHtml(n.graphConfig?.xAxisLabel || '')}" placeholder="Tiempo" data-change="updateChartConfig" data-args='["${n.id}","xAxisLabel","$value"]'></label>
+              <label><span>Título Y</span><input class="prop-val editable" type="text" maxlength="40" value="${escapeHtml(n.graphConfig?.yAxisLabel || '')}" placeholder="Tráfico" data-change="updateChartConfig" data-args='["${n.id}","yAxisLabel","$value"]'></label>
+              <label><span>Formato X</span><select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","xFormat","$value"]'>
+                ${[['datetime','Fecha + hora'],['date','Fecha'],['time','Hora'],['full','Completo'],['raw','Texto/raw']].map(([value,label]) => `<option value="${value}" ${(n.graphConfig?.xFormat || 'datetime')===value?'selected':''}>${label}</option>`).join('')}
+              </select></label>
+              <label><span>Formato Y</span><select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","yFormat","$value"]'>
+                ${[['human','Tráfico legible'],['number','Número'],['percent','Porcentaje'],['raw','Raw']].map(([value,label]) => `<option value="${value}" ${(n.graphConfig?.yFormat || 'human')===value?'selected':''}>${label}</option>`).join('')}
+              </select></label>
+              <label><span>Marcas X</span><input class="prop-val coord" type="number" min="2" max="16" value="${n.graphConfig?.xTickLimit ?? 6}" data-change="updateChartConfig" data-args='["${n.id}","xTickLimit","$value"]'></label>
+              <label><span>Cada N X</span><input class="prop-val coord" type="number" min="1" max="20" value="${n.graphConfig?.xTickEvery ?? 1}" data-change="updateChartConfig" data-args='["${n.id}","xTickEvery","$value"]'></label>
+              <label><span>Marcas Y</span><input class="prop-val coord" type="number" min="2" max="16" value="${n.graphConfig?.yTickLimit ?? 6}" data-change="updateChartConfig" data-args='["${n.id}","yTickLimit","$value"]'></label>
+              <label><span>Escala Y</span><select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","yScale","$value"]'>
+                ${[['linear','Lineal'],['logarithmic','Logarítmica']].map(([value,label]) => `<option value="${value}" ${(n.graphConfig?.yScale || 'linear')===value?'selected':''}>${label}</option>`).join('')}
+              </select></label>
+              <label><span>Paso Y</span><input class="prop-val coord" type="number" min="0" value="${n.graphConfig?.yTickStep ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yTickStep","$value"]'></label>
+              <label><span>Decimales Y</span><input class="prop-val coord" type="number" min="0" max="6" value="${n.graphConfig?.yDecimals ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yDecimals","$value"]'></label>
+              <label><span>Unidad Y</span><input class="prop-val editable" type="text" maxlength="12" value="${escapeHtml(n.graphConfig?.yUnit || '')}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yUnit","$value"]'></label>
+              <label><span>Mín Y</span><input class="prop-val coord" type="number" value="${n.graphConfig?.yMin ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yMin","$value"]'></label>
+              <label><span>Máx Y</span><input class="prop-val coord" type="number" value="${n.graphConfig?.yMax ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yMax","$value"]'></label>
+            </div>
+            <div class="chart-presentation-checks chart-axis-toggles">
+              <label class="prop-check" title="Mostrar grilla X"><input type="checkbox" ${n.graphConfig?.xGrid?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","xGrid","$checked"]'> Grilla X</label>
+              <label class="prop-check" title="Mostrar grilla Y"><input type="checkbox" ${n.graphConfig?.yGrid!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","yGrid","$checked"]'> Grilla Y</label>
+              <label class="prop-check" title="Iniciar eje Y en cero"><input type="checkbox" ${n.graphConfig?.yBeginAtZero!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","yBeginAtZero","$checked"]'> Cero Y</label>
+            </div>
+          </div>
           <button class="tb-btn u-w-full u-mt-7" data-click="refreshChartRrd" data-args='["${n.id}"]'>↻ Actualizar datos</button>
         </div>` : n.type === 'text' ? `
         <div class="prop-row">

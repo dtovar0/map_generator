@@ -43,6 +43,13 @@
   .tb-btn.active { background: color-mix(in srgb, var(--accent) 14%, var(--surface2)); border-color: color-mix(in srgb, var(--accent) 68%, var(--border)); color: var(--accent); }
   .tb-btn.toolbar-icon { width: 38px; min-width: 38px; padding: 0; }
   .tb-btn.compact-icon { width: 28px; min-width: 28px; height: 28px; min-height: 28px; padding: 0; border-radius: 7px; }
+  .tb-btn.user-chip {
+    width: auto;
+    min-width: 0;
+    max-width: 170px;
+    padding: 0 11px;
+    overflow: hidden;
+  }
   .btn-icon {
     width: 18px; height: 18px; display: inline-grid; place-items: center;
     line-height: 1; font-size: 14px; flex: 0 0 18px; transform: translateY(-.25px);
@@ -50,6 +57,11 @@
   .btn-icon svg, .ct-btn svg { width: 18px; height: 18px; display: block; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .ct-btn svg { width: 17px; height: 17px; }
   .btn-label { display: inline-flex; align-items: center; height: 100%; line-height: 1; }
+  .user-chip .btn-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   .spacer { flex: 1; }
   .sep { width: 1px; height: 24px; background: color-mix(in srgb, var(--border) 90%, transparent); flex-shrink: 0; margin: 0 2px; }
@@ -74,6 +86,8 @@
   }
 
   /* Current-user chip and admin/viewer visibility. */
+  #user-menu { flex-shrink: 0; }
+  #user-menu-panel { right: 0; left: auto; transform-origin: top right; }
   #user-menu .user-menu-info { padding: 8px 12px; display: grid; gap: 2px; border-bottom: 1px solid var(--border); }
   #user-menu .user-menu-info small { color: var(--text3); }
   body.role-viewer #btn-presentation,
