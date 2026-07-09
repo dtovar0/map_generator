@@ -148,7 +148,7 @@ const PROPERTY_TAB_CONFIG = {
     ['content','Contenido'], ['appearance','Apariencia'], ['transform','Transformar'], ['arrange','Ordenar']
   ],
   chart: [
-    ['data','Datos'], ['chart','Gráfica'], ['appearance','Apariencia'], ['layout','Diseño'], ['arrange','Ordenar']
+    ['chart','Gráfica'], ['axes','Ejes'], ['appearance','Apariencia'], ['layout','Diseño'], ['arrange','Ordenar']
   ],
   link: [
     ['data','Datos'], ['style','Estilo'], ['labels','Etiquetas'], ['thresholds','Umbrales']
@@ -167,6 +167,7 @@ const PROPERTY_TAB_ICONS = {
   transform:'<path d="M4 8V4h4M20 16v4h-4M16 4h4v4M8 20H4v-4"/><path d="m8 8 8 8M16 8l-8 8"/>',
   data:'<path d="M5 19V9h4v10M10 19V5h4v14M15 19v-7h4v7M3 19h18"/>',
   chart:'<path d="M4 15l5-6 4 4 6-8"/><path d="M3 19h18"/><circle cx="9" cy="9" r="1.5"/><circle cx="13" cy="13" r="1.5"/><circle cx="19" cy="5" r="1.5"/>',
+  axes:'<path d="M5 4v15h15"/><path d="M5 19 19 5"/><path d="M15 5h4v4"/>',
   style:'<path d="m4 16 9-9 4 4-9 9H4z"/><path d="m14 6 2-2 4 4-2 2"/>',
   labels:'<path d="M4 5h11l5 5-10 10-6-6z"/><circle cx="9" cy="10" r="1.5"/>',
   thresholds:'<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
@@ -235,8 +236,8 @@ function propertyTabForElement(element, profile) {
     return 'transform';
   }
   if (profile === 'chart') {
-    if (/^Gráfica$|^Ejes$/.test(label)) return 'chart';
-    if (/^Nombre$/.test(label) || source.includes('nameInside') || source.includes('hideName')) return 'data';
+    if (/^Ejes$/.test(label)) return 'axes';
+    if (/^Gráfica$/.test(label)) return 'chart';
     if (/^Tipografía$|^Apariencia del nodo$|^Contenedor del texto$/.test(label) || source.includes('useGeneralNodeAppearance')) return 'appearance';
     return 'layout';
   }
@@ -770,7 +771,7 @@ function updatePropsPanel() {
         </div>
         <div class="prop-row">
           <div class="prop-label">Ejes</div>
-          <details class="prop-subsection" ${(n.graphConfig?.xAxisLabel || n.graphConfig?.xGrid) ? 'open' : ''}>
+          <details class="prop-subsection" open>
             <summary><span class="prop-subsection-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h16M6 19V9M12 19v-5M18 19v-8"/></svg></span><span>Eje X (horizontal / tiempo)</span></summary>
             <div class="prop-subsection-body">
               <div class="chart-axis-grid">
@@ -783,7 +784,7 @@ function updatePropsPanel() {
               <label class="prop-check chart-inline-check u-mt-7"><input type="checkbox" ${n.graphConfig?.xGrid?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","xGrid","$checked"]'> Mostrar grilla vertical</label>
             </div>
           </details>
-          <details class="prop-subsection" ${(n.graphConfig?.yAxisLabel || n.graphConfig?.yUnit || n.graphConfig?.yMin != null || n.graphConfig?.yMax != null) ? 'open' : ''}>
+          <details class="prop-subsection" open>
             <summary><span class="prop-subsection-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4v16h16M5 6h8M5 12h11M5 18h5"/></svg></span><span>Eje Y (vertical / valores)</span></summary>
             <div class="prop-subsection-body">
               <div class="chart-axis-grid">
