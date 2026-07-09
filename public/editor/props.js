@@ -25,6 +25,33 @@ const SEG_OPTIONS = {
     ['bar','<svg viewBox="0 0 24 24"><path d="M5 19V10h4v9M10 19V5h4v14M15 19v-7h4v7M3 19h18"/></svg>','Barras'],
     ['line','<svg viewBox="0 0 24 24"><path d="M4 15l5-6 4 4 6-8"/><path d="M3 19h18"/></svg>','Línea'],
     ['area','<svg viewBox="0 0 24 24"><path d="M4 16l5-7 4 4 7-8v14H4Z"/></svg>','Área']
+  ],
+  consolidation: [
+    ['AVERAGE','<svg viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M4 7l4 3 4-4 4 3 4-4"/></svg>','Promedio'],
+    ['MAX','<svg viewBox="0 0 24 24"><path d="M4 18l6-9 4 5 6-9"/><path d="M18 5v4h-4"/></svg>','Máximo'],
+    ['MIN','<svg viewBox="0 0 24 24"><path d="M4 6l6 9 4-5 6 9"/><path d="M18 19v-4h-4"/></svg>','Mínimo'],
+    ['LAST','<svg viewBox="0 0 24 24"><path d="M4 12h11"/><path d="M12 7l5 5-5 5"/><path d="M20 5v14"/></svg>','Último']
+  ],
+  yScale: [
+    ['linear','<svg viewBox="0 0 24 24"><path d="M5 19V5M5 19h14"/><path d="M7 15l4-4 3 2 4-6"/></svg>','Escala lineal'],
+    ['logarithmic','<svg viewBox="0 0 24 24"><path d="M5 19V5M5 19h14"/><path d="M6 17c5 0 4-9 12-11"/></svg>','Escala logarítmica']
+  ],
+  xFormat: [
+    ['datetime','<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4"/><path d="M12 13v3l2 1"/></svg>','Fecha + hora'],
+    ['date','<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4"/></svg>','Fecha'],
+    ['time','<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>','Hora'],
+    ['full','<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>','Completo'],
+    ['raw','<svg viewBox="0 0 24 24"><path d="M8 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h2M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"/></svg>','Texto / raw']
+  ],
+  yFormat: [
+    ['human','<svg viewBox="0 0 24 24"><path d="M4 12h16"/><path d="M6 8h3M6 16h3M18 6l-2 12"/></svg>','Tráfico legible'],
+    ['number','<svg viewBox="0 0 24 24"><path d="M8 4v16M14 4v16M4 9h16M4 15h16"/></svg>','Número'],
+    ['percent','<svg viewBox="0 0 24 24"><path d="M19 5 5 19"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>','Porcentaje'],
+    ['raw','<svg viewBox="0 0 24 24"><path d="M8 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h2M16 4h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-2"/></svg>','Raw']
+  ],
+  textOrientation: [
+    ['0','<svg viewBox="0 0 24 24"><path d="M5 8h14M5 12h9M5 16h12"/></svg>','Horizontal'],
+    ['90','<svg viewBox="0 0 24 24"><path d="M8 5v14M12 5v9M16 5v12"/></svg>','Vertical']
   ]
 };
 function segToggleHtml(name, value, options, call, opts = {}) {
@@ -78,9 +105,9 @@ function linkThresholdEditorHtml(link) {
         <div style="flex:1;height:10px;border-radius:3px;background:${item.color}"></div>
         ${scale.length > 2 ? `<button class="sth-del" data-click="removeLinkThreshold" data-args='["${link.id}",${index}]' title="Eliminar">✕</button>` : '<div style="width:22px"></div>'}
       </div>`).join('')}
-    <div style="display:flex;gap:5px;margin-top:7px">
-      <button class="tb-btn" style="flex:1;font-size:10px" data-click="addLinkThreshold" data-args='["${link.id}"]'>+ Umbral</button>
-      <button class="tb-btn" style="flex:1;font-size:10px" data-click="copyGeneralScaleToLink" data-args='["${link.id}"]'>Copiar general</button>
+    <div class="prop-btn-grid u-mt-7">
+      <button class="tb-btn" data-click="addLinkThreshold" data-args='["${link.id}"]'>+ Umbral</button>
+      <button class="tb-btn" data-click="copyGeneralScaleToLink" data-args='["${link.id}"]'>Copiar general</button>
     </div>`;
 }
 function currentScalePresetName() {
@@ -150,9 +177,9 @@ function checkControlIcon(text) {
   if (/rellenar|área|area/i.test(text)) return '<path d="M4 16l5-7 4 4 7-8v14H4Z"/>';
   if (/leyenda/i.test(text)) return '<rect x="4" y="5" width="4.5" height="4.5" rx="1"/><rect x="4" y="14.5" width="4.5" height="4.5" rx="1"/><path d="M12 7.2h8M12 16.7h8"/>';
   if (/ejes/i.test(text)) return '<path d="M5 19V5M5 19h14"/><path d="M9 15l3-4 3 2 4-6"/>';
-  if (/grilla x/i.test(text)) return '<path d="M4 19h16M8 5v14M12 5v14M16 5v14"/>';
-  if (/grilla y/i.test(text)) return '<path d="M5 4v16M5 8h14M5 12h14M5 16h14"/>';
-  if (/cero y/i.test(text)) return '<path d="M5 19V5M5 19h14"/><path d="M9 15h6"/>';
+  if (/grilla (x|vertical)/i.test(text)) return '<path d="M4 19h16M8 5v14M12 5v14M16 5v14"/>';
+  if (/grilla (y|horizontal)/i.test(text)) return '<path d="M5 4v16M5 8h14M5 12h14M5 16h14"/>';
+  if (/cero|iniciar en cero/i.test(text)) return '<path d="M5 19V5M5 19h14"/><path d="M9 15h6"/>';
   if (/puntos/i.test(text)) return '<circle cx="6" cy="16" r="2"/><circle cx="12" cy="9" r="2"/><circle cx="18" cy="13" r="2"/><path d="M8 15l3-4M14 10l2.5 2"/>';
   if (/ocultar|visible|mostrar/i.test(text)) return '<path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.5"/>';
   if (/transparente|fondo/i.test(text)) return '<rect x="5" y="5" width="10" height="10" rx="2"/><path d="M9 9h10v10H9z"/>';
@@ -629,25 +656,25 @@ function updatePropsPanel() {
                    data-change="updateNodeAppearance" data-args='["${n.id}","fontItalic","$checked"]' /><span class="format-glyph" aria-hidden="true">I</span></label>
           </div>
         </div>
-        <div class="prop-label" style="margin-top:7px">Color del texto</div>
-        <input class="prop-val" type="color" value="${textColor}" style="height:31px;padding:3px"
+        <div class="prop-label u-mt-7">Color del texto</div>
+        <input class="prop-val color-swatch" type="color" value="${textColor}"
                data-change="updateNodeAppearance" data-args='["${n.id}","textColor","$value"]' />
       </div>
       ${n.type === 'text' ? '' : `<div class="prop-row">
         <div class="prop-label">Apariencia del nodo</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <label style="font-size:10px;color:var(--text2)">Fondo
-            <input class="prop-val" type="color" value="${nodeBg}" style="height:31px;padding:3px" ${nodeBgTransparent?'disabled':''}
+        <div class="color-pair">
+          <label>Fondo
+            <input class="prop-val color-swatch" type="color" value="${nodeBg}" ${nodeBgTransparent?'disabled':''}
                    data-change="updateNodeAppearance" data-args='["${n.id}","nodeBackground","$value"]' />
           </label>
-          <label style="font-size:10px;color:var(--text2)">Borde
-            <input class="prop-val" type="color" value="${nodeBorder}" style="height:31px;padding:3px" ${nodeBorderHidden?'disabled':''}
+          <label>Borde
+            <input class="prop-val color-swatch" type="color" value="${nodeBorder}" ${nodeBorderHidden?'disabled':''}
                    data-change="updateNodeAppearance" data-args='["${n.id}","nodeBorderColor","$value"]' />
           </label>
         </div>
-        <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${nodeBgTransparent?'checked':''}
+        <label class="prop-check u-mt-7"><input type="checkbox" ${nodeBgTransparent?'checked':''}
                data-change="updateNodeAppearance" data-args='["${n.id}","nodeBackgroundTransparent","$checked"]' /> Fondo transparente</label>
-        <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${nodeBorderHidden?'checked':''}
+        <label class="prop-check u-mt-7"><input type="checkbox" ${nodeBorderHidden?'checked':''}
                data-change="updateNodeAppearance" data-args='["${n.id}","nodeBorderHidden","$checked"]' /> Ocultar borde del nodo</label>
         <div class="stack-field${nodeBorderHidden?' is-disabled':''}">
           <span class="stack-field-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 17h18"/></svg></span>
@@ -661,19 +688,19 @@ function updatePropsPanel() {
       </div>`}
       <div class="prop-row">
         <div class="prop-label">Contenedor del texto</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <label style="font-size:10px;color:var(--text2)">Fondo
-            <input class="prop-val" type="color" value="${textBg}" style="height:31px;padding:3px" ${textBgTransparent?'disabled':''}
+        <div class="color-pair">
+          <label>Fondo
+            <input class="prop-val color-swatch" type="color" value="${textBg}" ${textBgTransparent?'disabled':''}
                    data-change="updateNodeAppearance" data-args='["${n.id}","textBackground","$value"]' />
           </label>
-          <label style="font-size:10px;color:var(--text2)">Borde
-            <input class="prop-val" type="color" value="${textBorder}" style="height:31px;padding:3px" ${textBorderHidden?'disabled':''}
+          <label>Borde
+            <input class="prop-val color-swatch" type="color" value="${textBorder}" ${textBorderHidden?'disabled':''}
                    data-change="updateNodeAppearance" data-args='["${n.id}","textBorderColor","$value"]' />
           </label>
         </div>
-        <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${textBgTransparent?'checked':''}
+        <label class="prop-check u-mt-7"><input type="checkbox" ${textBgTransparent?'checked':''}
                data-change="updateNodeAppearance" data-args='["${n.id}","textBackgroundTransparent","$checked"]' /> Fondo transparente</label>
-        <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${textBorderHidden?'checked':''}
+        <label class="prop-check u-mt-7"><input type="checkbox" ${textBorderHidden?'checked':''}
                data-change="updateNodeAppearance" data-args='["${n.id}","textBorderHidden","$checked"]' /> Ocultar borde del texto</label>
         <div class="stack-field${textBorderHidden?' is-disabled':''}">
           <span class="stack-field-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 17h18"/></svg></span>
@@ -690,13 +717,13 @@ function updatePropsPanel() {
         <div class="prop-pair">
           <input class="prop-val coord" type="number" min="32" max="2000" value="${n.w}"
                  title="Ancho" data-change="resizeNodeFromProps" data-args='["${n.id}","w","$value"]' />
-          <span style="color:var(--text3)">×</span>
+          <span class="u-text3">×</span>
           <input class="prop-val coord" type="number" min="32" max="2000" value="${n.h}"
                  title="Alto" data-change="resizeNodeFromProps" data-args='["${n.id}","h","$value"]' />
         </div>
       </div>
       ${n.appearanceOverride ? `
-        <button class="tb-btn" style="width:100%;font-size:11px;margin-bottom:9px" data-click="useGeneralNodeAppearance" data-args='["${n.id}"]'>
+        <button class="tb-btn prop-reset-btn" data-click="useGeneralNodeAppearance" data-args='["${n.id}"]'>
           ↺ Usar apariencia general
         </button>` : ''}
       ${isSupportNode(n) ? '' : `<div class="prop-row">
@@ -709,32 +736,30 @@ function updatePropsPanel() {
         </div>
       </div>`}
       ${(n.type !== 'text' && (n.sizeOverride || n.linkPaddingOverride)) ? `
-        <button class="tb-btn" style="width:100%;font-size:11px;margin-bottom:9px" data-click="useGeneralNodeConfig" data-args='["${n.id}"]'>
+        <button class="tb-btn prop-reset-btn" data-click="useGeneralNodeConfig" data-args='["${n.id}"]'>
           ↺ Usar configuración general
         </button>` : ''}
       ${n.type === 'chart' ? `
         <div class="prop-row">
           <div class="prop-label">Gráfica</div>
-          <div class="cacti-state connected" style="margin-top:7px">● Fuente Cacti configurada (DB o RRD)</div>
-          <div class="prop-label" style="margin-top:7px">Tipo</div>
+          <div class="cacti-state connected u-mt-7">● Fuente Cacti configurada (DB o RRD)</div>
+          <div class="prop-label u-mt-7">Tipo</div>
           ${segToggleHtml(`chart-type-${n.id}`, n.graphConfig?.type || 'bar', SEG_OPTIONS.chartType, `updateChartConfig('${n.id}','type','%v')`, {label:'Tipo de gráfica'})}
-          <div class="prop-label" style="margin-top:9px">Escala temporal</div>
+          <div class="prop-label u-mt-9">Escala temporal</div>
           <select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","range","$value"]'>
             ${[['1h','Última hora'],['6h','Últimas 6 horas'],['24h','Últimas 24 horas'],['7d','Últimos 7 días'],['30d','Últimos 30 días'],['90d','Últimos 90 días'],['1y','Último año']].map(([value,label]) => `<option value="${value}" ${n.graphConfig?.range===value?'selected':''}>${label}</option>`).join('')}
           </select>
-          <div class="prop-label" style="margin-top:7px">Step / resolución</div>
+          <div class="prop-label u-mt-7">Step / resolución</div>
           <select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","step","$value"]'>
             ${[[0,'Automático (según escala)'],[60,'1 minuto'],[300,'5 minutos'],[900,'15 minutos'],[1800,'30 minutos'],[3600,'1 hora'],[14400,'4 horas'],[21600,'6 horas'],[43200,'12 horas'],[86400,'1 día']].map(([value,label]) => `<option value="${value}" ${Number(n.graphConfig?.step||0)===value?'selected':''}>${label}</option>`).join('')}
           </select>
-          <div class="cacti-state" style="margin-top:5px">RRD usa el archivo con la resolución disponible más cercana.</div>
-          <div class="prop-label" style="margin-top:7px">Consolidación</div>
-          <select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","consolidation","$value"]'>
-            ${[['AVERAGE','Promedio'],['MAX','Máximo'],['MIN','Mínimo'],['LAST','Último']].map(([value,label]) => `<option value="${value}" ${n.graphConfig?.consolidation===value?'selected':''}>${label}</option>`).join('')}
-          </select>
+          <div class="cacti-state u-mt-5">RRD usa el archivo con la resolución disponible más cercana.</div>
+          <div class="prop-label u-mt-7">Consolidación</div>
+          ${segToggleHtml(`chart-cf-${n.id}`, n.graphConfig?.consolidation || 'AVERAGE', SEG_OPTIONS.consolidation, `updateChartConfig('${n.id}','consolidation','%v')`, {label:'Consolidación'})}
           <div class="chart-series-list">${chartSeriesListHtml(n)}</div>
           <button class="tb-btn primary u-w-full u-mt-7" data-click="toggleChartSourcePicker" data-args='["${n.id}"]'>+ Agregar fuente</button>
           <div id="chart-source-picker-${n.id}"></div>
-          <div class="prop-label" style="margin-top:9px">Presentación</div>
+          <div class="prop-label u-mt-9">Presentación</div>
           <div class="chart-presentation-checks">
             <label class="prop-check" title="Apilar series"><input type="checkbox" ${n.graphConfig?.stacked?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","stacked","$checked"]'> Apilar</label>
             <label class="prop-check" title="Rellenar área"><input type="checkbox" ${n.graphConfig?.fill?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","fill","$checked"]'> Rellenar</label>
@@ -742,55 +767,61 @@ function updatePropsPanel() {
             <label class="prop-check" title="Mostrar ejes"><input type="checkbox" ${n.graphConfig?.showAxes!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","showAxes","$checked"]'> Ejes</label>
             <label class="prop-check" title="Mostrar puntos"><input type="checkbox" ${n.graphConfig?.points?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","points","$checked"]'> Puntos</label>
           </div>
-          <div class="prop-row">
-            <div class="prop-label">Ejes</div>
-            <div class="chart-axis-grid">
-              <label><span>Título X</span><input class="prop-val editable" type="text" maxlength="40" value="${escapeHtml(n.graphConfig?.xAxisLabel || '')}" placeholder="Tiempo" data-change="updateChartConfig" data-args='["${n.id}","xAxisLabel","$value"]'></label>
-              <label><span>Título Y</span><input class="prop-val editable" type="text" maxlength="40" value="${escapeHtml(n.graphConfig?.yAxisLabel || '')}" placeholder="Tráfico" data-change="updateChartConfig" data-args='["${n.id}","yAxisLabel","$value"]'></label>
-              <label><span>Formato X</span><select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","xFormat","$value"]'>
-                ${[['datetime','Fecha + hora'],['date','Fecha'],['time','Hora'],['full','Completo'],['raw','Texto/raw']].map(([value,label]) => `<option value="${value}" ${(n.graphConfig?.xFormat || 'datetime')===value?'selected':''}>${label}</option>`).join('')}
-              </select></label>
-              <label><span>Formato Y</span><select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","yFormat","$value"]'>
-                ${[['human','Tráfico legible'],['number','Número'],['percent','Porcentaje'],['raw','Raw']].map(([value,label]) => `<option value="${value}" ${(n.graphConfig?.yFormat || 'human')===value?'selected':''}>${label}</option>`).join('')}
-              </select></label>
-              <label><span>Marcas X</span><input class="prop-val coord" type="number" min="2" max="16" value="${n.graphConfig?.xTickLimit ?? 6}" data-change="updateChartConfig" data-args='["${n.id}","xTickLimit","$value"]'></label>
-              <label><span>Cada N X</span><input class="prop-val coord" type="number" min="1" max="20" value="${n.graphConfig?.xTickEvery ?? 1}" data-change="updateChartConfig" data-args='["${n.id}","xTickEvery","$value"]'></label>
-              <label><span>Marcas Y</span><input class="prop-val coord" type="number" min="2" max="16" value="${n.graphConfig?.yTickLimit ?? 6}" data-change="updateChartConfig" data-args='["${n.id}","yTickLimit","$value"]'></label>
-              <label><span>Escala Y</span><select class="prop-val" data-change="updateChartConfig" data-args='["${n.id}","yScale","$value"]'>
-                ${[['linear','Lineal'],['logarithmic','Logarítmica']].map(([value,label]) => `<option value="${value}" ${(n.graphConfig?.yScale || 'linear')===value?'selected':''}>${label}</option>`).join('')}
-              </select></label>
-              <label><span>Paso Y</span><input class="prop-val coord" type="number" min="0" value="${n.graphConfig?.yTickStep ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yTickStep","$value"]'></label>
-              <label><span>Decimales Y</span><input class="prop-val coord" type="number" min="0" max="6" value="${n.graphConfig?.yDecimals ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yDecimals","$value"]'></label>
-              <label><span>Unidad Y</span><input class="prop-val editable" type="text" maxlength="12" value="${escapeHtml(n.graphConfig?.yUnit || '')}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yUnit","$value"]'></label>
-              <label><span>Mín Y</span><input class="prop-val coord" type="number" value="${n.graphConfig?.yMin ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yMin","$value"]'></label>
-              <label><span>Máx Y</span><input class="prop-val coord" type="number" value="${n.graphConfig?.yMax ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yMax","$value"]'></label>
+        </div>
+        <div class="prop-row">
+          <div class="prop-label">Ejes</div>
+          <details class="prop-subsection" ${(n.graphConfig?.xAxisLabel || n.graphConfig?.xGrid) ? 'open' : ''}>
+            <summary><span class="prop-subsection-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h16M6 19V9M12 19v-5M18 19v-8"/></svg></span><span>Eje X (horizontal / tiempo)</span></summary>
+            <div class="prop-subsection-body">
+              <div class="chart-axis-grid">
+                <label class="u-span-2"><span>Título</span><input class="prop-val editable" type="text" maxlength="40" value="${escapeHtml(n.graphConfig?.xAxisLabel || '')}" placeholder="Tiempo" data-change="updateChartConfig" data-args='["${n.id}","xAxisLabel","$value"]'></label>
+                <label><span>Marcas máx.</span><input class="prop-val coord" type="number" min="2" max="16" value="${n.graphConfig?.xTickLimit ?? 6}" data-change="updateChartConfig" data-args='["${n.id}","xTickLimit","$value"]'></label>
+                <label><span>Mostrar cada N</span><input class="prop-val coord" type="number" min="1" max="20" value="${n.graphConfig?.xTickEvery ?? 1}" data-change="updateChartConfig" data-args='["${n.id}","xTickEvery","$value"]'></label>
+              </div>
+              <div class="prop-label u-mt-7">Formato de etiqueta</div>
+              ${segToggleHtml(`chart-xfmt-${n.id}`, n.graphConfig?.xFormat || 'datetime', SEG_OPTIONS.xFormat, `updateChartConfig('${n.id}','xFormat','%v')`, {label:'Formato del eje X'})}
+              <label class="prop-check chart-inline-check u-mt-7"><input type="checkbox" ${n.graphConfig?.xGrid?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","xGrid","$checked"]'> Mostrar grilla vertical</label>
             </div>
-            <div class="chart-presentation-checks chart-axis-toggles">
-              <label class="prop-check" title="Mostrar grilla X"><input type="checkbox" ${n.graphConfig?.xGrid?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","xGrid","$checked"]'> Grilla X</label>
-              <label class="prop-check" title="Mostrar grilla Y"><input type="checkbox" ${n.graphConfig?.yGrid!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","yGrid","$checked"]'> Grilla Y</label>
-              <label class="prop-check" title="Iniciar eje Y en cero"><input type="checkbox" ${n.graphConfig?.yBeginAtZero!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","yBeginAtZero","$checked"]'> Cero Y</label>
+          </details>
+          <details class="prop-subsection" ${(n.graphConfig?.yAxisLabel || n.graphConfig?.yUnit || n.graphConfig?.yMin != null || n.graphConfig?.yMax != null) ? 'open' : ''}>
+            <summary><span class="prop-subsection-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4v16h16M5 6h8M5 12h11M5 18h5"/></svg></span><span>Eje Y (vertical / valores)</span></summary>
+            <div class="prop-subsection-body">
+              <div class="chart-axis-grid">
+                <label class="u-span-2"><span>Título</span><input class="prop-val editable" type="text" maxlength="40" value="${escapeHtml(n.graphConfig?.yAxisLabel || '')}" placeholder="Tráfico" data-change="updateChartConfig" data-args='["${n.id}","yAxisLabel","$value"]'></label>
+                <label><span>Unidad</span><input class="prop-val editable" type="text" maxlength="12" value="${escapeHtml(n.graphConfig?.yUnit || '')}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yUnit","$value"]'></label>
+                <label><span>Decimales</span><input class="prop-val coord" type="number" min="0" max="6" value="${n.graphConfig?.yDecimals ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yDecimals","$value"]'></label>
+                <label><span>Mínimo</span><input class="prop-val coord" type="number" value="${n.graphConfig?.yMin ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yMin","$value"]'></label>
+                <label><span>Máximo</span><input class="prop-val coord" type="number" value="${n.graphConfig?.yMax ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yMax","$value"]'></label>
+                <label><span>Marcas máx.</span><input class="prop-val coord" type="number" min="2" max="16" value="${n.graphConfig?.yTickLimit ?? 6}" data-change="updateChartConfig" data-args='["${n.id}","yTickLimit","$value"]'></label>
+                <label><span>Paso</span><input class="prop-val coord" type="number" min="0" value="${n.graphConfig?.yTickStep ?? ''}" placeholder="auto" data-change="updateChartConfig" data-args='["${n.id}","yTickStep","$value"]'></label>
+              </div>
+              <div class="prop-label u-mt-7">Formato de valor</div>
+              ${segToggleHtml(`chart-yfmt-${n.id}`, n.graphConfig?.yFormat || 'human', SEG_OPTIONS.yFormat, `updateChartConfig('${n.id}','yFormat','%v')`, {label:'Formato del eje Y'})}
+              <div class="prop-label u-mt-7">Escala</div>
+              ${segToggleHtml(`chart-yscale-${n.id}`, n.graphConfig?.yScale || 'linear', SEG_OPTIONS.yScale, `updateChartConfig('${n.id}','yScale','%v')`, {label:'Escala del eje Y'})}
+              <div class="prop-check-row u-mt-7">
+                <label class="prop-check" title="Mostrar grilla horizontal"><input type="checkbox" ${n.graphConfig?.yGrid!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","yGrid","$checked"]'> Grilla horizontal</label>
+                <label class="prop-check" title="Iniciar el eje Y en cero"><input type="checkbox" ${n.graphConfig?.yBeginAtZero!==false?'checked':''} data-change="updateChartConfig" data-args='["${n.id}","yBeginAtZero","$checked"]'> Iniciar en cero</label>
+              </div>
             </div>
-          </div>
+          </details>
           <button class="tb-btn u-w-full u-mt-7" data-click="refreshChartRrd" data-args='["${n.id}"]'>↻ Actualizar datos</button>
         </div>` : n.type === 'text' ? `
         <div class="prop-row">
           <div class="prop-label">Contenido</div>
-          <div class="prop-val" style="color:var(--text2);font-size:11px">El texto se adapta al ancho y alto del cuadro.</div>
+          <div class="prop-hint">El texto se adapta al ancho y alto del cuadro.</div>
         </div>
         <div class="prop-row">
-          <div class="prop-label">Rotación</div>
-          <div class="input-unit">
+          <div class="prop-label">Orientación</div>
+          ${segToggleHtml(`text-orient-${n.id}`, ((Number(n.textRotation)||0) % 180) === 90 ? '90' : '0', SEG_OPTIONS.textOrientation, `updateTextRotation('${n.id}','%v')`, {label:'Orientación del texto'})}
+          <div class="prop-label u-mt-9">Rotación exacta</div>
+          <div class="angle-picker">
+            ${[0,90,180,270].map(angle => `<button class="angle-chip ${(Number(n.textRotation)||0) === angle ? 'active' : ''}" data-click="updateTextRotation" data-args='["${n.id}",${angle}]'>${angle}°</button>`).join('')}
+          </div>
+          <div class="input-unit u-mt-5">
             <input class="prop-val coord" type="number" min="0" max="359" value="${Number(n.textRotation)||0}"
-                   data-change="updateTextRotation" data-args='["${n.id}","$value"]' />
+                   title="Ángulo personalizado" data-change="updateTextRotation" data-args='["${n.id}","$value"]' />
             <span class="input-unit-suffix">°</span>
-          </div>
-          <div class="prop-label" style="margin-top:7px">Orientación</div>
-          <div style="display:flex;gap:5px;margin-top:5px">
-            <button class="tb-btn ${((Number(n.textRotation)||0) % 180) === 0 ? 'active' : ''}" style="flex:1;font-size:11px" data-click="updateTextRotation" data-args='["${n.id}",0]'>Horizontal</button>
-            <button class="tb-btn ${((Number(n.textRotation)||0) % 180) === 90 ? 'active' : ''}" style="flex:1;font-size:11px" data-click="updateTextRotation" data-args='["${n.id}",90]'>Vertical</button>
-          </div>
-          <div style="display:flex;gap:4px;margin-top:5px">
-            ${[0,90,180,270].map(angle => `<button class="tb-btn" style="flex:1;font-size:11px" data-click="updateTextRotation" data-args='["${n.id}",${angle}]'>${angle}°</button>`).join('')}
           </div>
         </div>` : `
         <div class="prop-row">
@@ -799,7 +830,7 @@ function updatePropsPanel() {
           <input class="prop-val editable" type="text" value="${escapeHtml(visualValue)}"
                  placeholder="Emoji o URL de imagen" data-change="setNodeVisual" data-args='["${n.id}",this.value.trim()]' />
           <input class="prop-file" type="file" accept="image/*" data-change="uploadNodeImage" data-args='["${n.id}","$self"]' />
-          ${n.image ? `<button class="tb-btn" style="width:100%;font-size:11px;margin-top:5px" data-click="clearNodeImage" data-args='["${n.id}"]'>Usar icono</button>` : ''}
+          ${n.image ? `<button class="tb-btn u-w-full u-mt-5" data-click="clearNodeImage" data-args='["${n.id}"]'>Usar icono</button>` : ''}
         </div>`}
       ${n.type === 'text' ? '' : `<div class="prop-row">
         <label class="prop-check">
@@ -821,11 +852,11 @@ function updatePropsPanel() {
     c.innerHTML = `
       <div class="prop-row">
         <div class="prop-label">Enlace</div>
-        <div class="prop-val" style="font-size:11px">${escapeHtml(from?.name)} → ${escapeHtml(to?.name)}</div>
+        <div class="prop-val prop-endpoint-summary">${escapeHtml(from?.name)} → ${escapeHtml(to?.name)}</div>
       </div>
       <div class="prop-row">
         <div class="prop-label">Acciones del enlace</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div class="prop-btn-grid">
           <button class="tb-btn" data-click="redrawLink" data-args='["${l.id}"]' title="Regenera únicamente la geometría de la ruta">Redibujar</button>
           <button class="tb-btn" data-click="cloneLink" data-args='["${l.id}"]' title="Copia el enlace y conserva su configuración">Clonar enlace</button>
         </div>
@@ -844,23 +875,23 @@ function updatePropsPanel() {
       </div>
       <div class="prop-row">
         <div class="prop-label">Etiqueta de capacidad</div>
-        <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${l.capacityLabelVisible!==false?'checked':''}
+        <label class="prop-check u-mt-7"><input type="checkbox" ${l.capacityLabelVisible!==false?'checked':''}
                data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelVisible","$checked"]' /> Mostrar tag de capacidad</label>
-        <div class="prop-label" style="margin-top:7px">Posición del tag</div>
+        <div class="prop-label u-mt-7">Posición del tag</div>
         ${segToggleHtml(`cap-place-${l.id}`, ['above','below','left'].includes(l.capacityLabelSide) ? l.capacityLabelSide : 'right', SEG_OPTIONS.placement, `updateLinkCapacityLabelPlacement('${l.id}','%v')`, {label:'Posición del tag', disabled:l.capacityLabelVisible===false})}
-        <div class="prop-label" style="margin-top:7px">Tamaño del texto</div>
+        <div class="prop-label u-mt-7">Tamaño del texto</div>
         <div class="input-unit"><input class="prop-val coord" type="number" min="8" max="72"
              value="${l.capacityLabelFontSize ?? 11}" ${l.capacityLabelVisible===false?'disabled':''}
              data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelFontSize","$value"]' /><span class="input-unit-suffix">px</span></div>
-        <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${l.capacityLabelRotate?'checked':''} ${l.capacityLabelVisible===false?'disabled':''}
+        <label class="prop-check u-mt-7"><input type="checkbox" ${l.capacityLabelRotate?'checked':''} ${l.capacityLabelVisible===false?'disabled':''}
                data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelRotate","$checked"]' /> Rotar siguiendo el enlace</label>
-        <label class="prop-check" style="margin-top:5px"><input type="checkbox" ${l.capacityLabelFlip?'checked':''} ${!l.capacityLabelRotate||l.capacityLabelVisible===false?'disabled':''}
+        <label class="prop-check u-mt-5"><input type="checkbox" ${l.capacityLabelFlip?'checked':''} ${!l.capacityLabelRotate||l.capacityLabelVisible===false?'disabled':''}
                data-change="updateLinkCapacityLabel" data-args='["${l.id}","capacityLabelFlip","$checked"]' /> Girar 180° sólo en vertical</label>
       </div>
       <div class="prop-row">
         <div class="prop-label">Tipo de ruta</div>
         ${segToggleHtml(`route-style-${l.id}`, l.routeStyle === 'free' ? 'free' : 'ortho', SEG_OPTIONS.routeStyle, `updateLinkRouteStyle('${l.id}','%v')`, {label:'Tipo de ruta'})}
-        <div style="margin-top:6px;font-size:10px;color:var(--text3);line-height:1.4">${l.routeStyle === 'free'
+        <div class="prop-hint u-mt-5">${l.routeStyle === 'free'
           ? 'Segmentos rectos en cualquier ángulo; los puntos se ajustan en pasos de 5°.'
           : 'Trazado con ángulos rectos (horizontal y vertical).'}</div>
       </div>
@@ -877,23 +908,23 @@ function updatePropsPanel() {
         ${segToggleHtml(`mid-term-${l.id}`, l.midTermination || 'circle', SEG_OPTIONS.marker, `updateLinkTermination('${l.id}','%v')`, {label:'Marcador intermedio'})}
       </div>
       <div class="prop-row">
-        <div class="prop-label" style="display:flex;justify-content:space-between">
-          <span>Posición del divisor</span><span id="divider-position-value">${l.dividerPosition ?? 50}%</span>
+        <div class="prop-label prop-label-inline">
+          <span>Posición del divisor</span><span id="divider-position-value" class="prop-label-pill">${l.dividerPosition ?? 50}%</span>
         </div>
         <input id="divider-position-slider" class="prop-val" type="range" min="5" max="95" step="1"
                value="${l.dividerPosition ?? 50}" data-start="${l.dividerPosition ?? 50}"
                data-input="previewLinkDivider" data-args='["${l.id}","$value"]'
                data-change="commitLinkDivider" data-args='["${l.id}","$value",this.dataset.start]' />
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3)"><span>Entrada</span><span>Salida</span></div>
+        <div class="prop-range-legend"><span>Entrada</span><span>Salida</span></div>
       </div>
       <div class="prop-row">
         <div class="prop-label">Texto de utilización</div>
         ${segToggleHtml(`usage-fmt-${l.id}`, l.usageLabelFormat==='human'?'human':'percentage', SEG_OPTIONS.usageFormat, `updateLinkUsageLabel('${l.id}','usageLabelFormat','%v')`, {label:'Formato del texto'})}
-        <div class="prop-label" style="margin-top:7px">Ubicación</div>
+        <div class="prop-label u-mt-7">Ubicación</div>
         ${segToggleHtml(`usage-pos-${l.id}`, ['above','below','center'].includes(l.usageLabelPosition)?l.usageLabelPosition:'above', SEG_OPTIONS.usagePosition, `updateLinkUsageLabel('${l.id}','usageLabelPosition','%v')`, {label:'Ubicación'})}
-        <label class="prop-check" style="margin-top:7px"><input type="checkbox" ${l.usageLabelRotate?'checked':''}
+        <label class="prop-check u-mt-7"><input type="checkbox" ${l.usageLabelRotate?'checked':''}
                data-change="updateLinkUsageLabel" data-args='["${l.id}","usageLabelRotate","$checked"]' /> Rotar siguiendo el enlace</label>
-        <label class="prop-check" style="margin-top:5px"><input type="checkbox" ${l.usageLabelFlip?'checked':''} ${!l.usageLabelRotate?'disabled':''}
+        <label class="prop-check u-mt-5"><input type="checkbox" ${l.usageLabelFlip?'checked':''} ${!l.usageLabelRotate?'disabled':''}
                data-change="updateLinkUsageLabel" data-args='["${l.id}","usageLabelFlip","$checked"]' /> Girar 180° sólo en vertical</label>
       </div>
       <div class="prop-row">
@@ -905,7 +936,7 @@ function updatePropsPanel() {
         ${linkThresholdEditorHtml(l)}
       </div>
       ${(l.styleOverride || l.dividerPositionOverride || l.usageLabelOverride || l.capacityLabelOverride) ? `
-        <button class="tb-btn" style="width:100%;font-size:11px;margin-bottom:9px" data-click="useGeneralLinkConfig" data-args='["${l.id}"]'>
+        <button class="tb-btn prop-reset-btn" data-click="useGeneralLinkConfig" data-args='["${l.id}"]'>
           ↺ Usar estilo general
         </button>` : ''}
       `;
